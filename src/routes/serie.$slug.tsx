@@ -1,11 +1,11 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Play } from "lucide-react";
 import { formatDuration, seriesDetailQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
-import { Button } from "@/components/ui/button";
+import { InlinePlayer } from "@/components/site/InlinePlayer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/serie/$slug")({
