@@ -79,19 +79,15 @@ function wrap<T>(fn: () => Promise<T>) {
   });
 }
 
-async function linkGenres(ctx: Ctx, kind: "movie" | "series", contentId: string, genres: { name: string }[]) {
+// Maps TMDB genre ids onto the fixed system genres only; never creates new genres.
+async function linkGenres(ctx: Ctx, kind: "movie" | "series", contentId: string, genres: { id?: number; name: string }[]) {
   const joinTable = kind === "movie" ? "movie_genres" : "series_genres";
   const fk = kind === "movie" ? "movie_id" : "series_id";
-  for (const g of genres ?? []) {
-    const slug = slugify(g.name);
-    if (!slug) continue;
-    let { data: row } = await ctx.supabase.from("genres").select("id").eq("slug", slug).maybeSingle();
-    if (!row) {
-      const ins = await ctx.supabase.from("genres").insert({ name: g.name, slug }).select("id").single();
-      if (ins.error) continue;
-      row = ins.data;
-    }
-    await ctx.supabase.from(joinTable).upsert({ [fk]: contentId, genre_id: row.id }, { onConflict: `${fk},genre_id`, ignoreDuplicates: true });
+  const ids = (genres ?? []).map((g) => g.id).filter((n): n is number => typeof n === "number");
+  if (!ids.length) return;
+  const { data: rows } = await (ctx.supabase.from("genres") as any).select("id").overlaps("tmdb_genre_ids", ids);
+  for (const row of (rows ?? []) as { id: string }[]) {
+    await ctx.supabase.from(joinTable).upsert({ [fk]: contentId, genre_id: row.id } as any, { onConflict: `${fk},genre_id`, ignoreDuplicates: true });
   }
 }
 
