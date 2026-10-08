@@ -15,6 +15,13 @@
       "when": 1791426071823,
       "tag": "0001_admin_panel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791426563115,
+      "tag": "0002_public_site",
+      "breakpoints": true
     }
   ]
 }

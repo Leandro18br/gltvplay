@@ -790,6 +790,23 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      popular_content: {
+        Args: {
+          _kind: Database["public"]["Enums"]["content_kind"]
+          _limit?: number
+        }
+        Returns: {
+          content_id: string
+          views: number
+        }[]
+      }
+      popular_series: {
+        Args: { _limit?: number }
+        Returns: {
+          series_id: string
+          views: number
+        }[]
+      }
     }
     Enums: {
       account_status: "active" | "suspended" | "banned"

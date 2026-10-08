@@ -1,8 +1,72 @@
-import { queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 // Public catalog reads. RLS only exposes published rows to visitors,
-// so whatever the admin publishes appears here automatically.
+// so whatever the admin publishes (or unpublishes) is reflected here automatically.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sb: any = supabase;
+
+export type Kind = "movie" | "series" | "channel";
+export type Genre = { id: string; name: string; slug: string };
+export type Item = {
+  kind: Kind;
+  id: string;
+  slug: string | null;
+  title: string;
+  description: string | null;
+  poster_url: string | null;
+  backdrop_url: string | null;
+  trailer_url?: string | null;
+  release_year?: number | null;
+  duration_minutes?: number | null;
+  age_rating?: string | null;
+  quality?: string | null;
+  language?: string | null;
+  country?: string | null;
+  featured: boolean;
+  category_id?: string | null;
+  created_at?: string;
+  genres: Genre[];
+};
+
+const MOVIE_SEL =
+  "id,slug,title,original_title,description,poster_url,backdrop_url,trailer_url,release_year,duration_minutes,age_rating,quality,language,country,featured,category_id,created_at,movie_genres(genres(id,name,slug))";
+const SERIES_SEL =
+  "id,slug,title,original_title,description,poster_url,backdrop_url,trailer_url,release_year,age_rating,featured,category_id,created_at,series_genres(genres(id,name,slug))";
+const CHANNEL_SEL = "id,slug,name,logo_url,description,featured,category_id,created_at";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (s: string) => UUID_RE.test(s);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Raw = any;
+const pickGenres = (rows: Raw[] | null | undefined): Genre[] =>
+  (rows ?? []).map((r) => r.genres).filter(Boolean);
+
+export const toMovie = (r: Raw): Item => ({ ...r, kind: "movie", genres: pickGenres(r.movie_genres) });
+export const toSeries = (r: Raw): Item => ({ ...r, kind: "series", genres: pickGenres(r.series_genres) });
+export const toChannel = (r: Raw): Item => ({
+  kind: "channel",
+  id: r.id,
+  slug: r.slug,
+  title: r.name,
+  description: r.description,
+  poster_url: r.logo_url,
+  backdrop_url: null,
+  featured: r.featured,
+  category_id: r.category_id,
+  created_at: r.created_at,
+  genres: [],
+});
+
+export const itemParam = (i: { slug?: string | null; id: string }) => i.slug || i.id;
+
+export function formatDuration(min?: number | null) {
+  if (!min) return null;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h ? `${h}h${m ? ` ${m}min` : ""}` : `${m}min`;
+}
 
 export const siteSettingsQuery = queryOptions({
   queryKey: ["site_settings"],
@@ -14,45 +78,220 @@ export const siteSettingsQuery = queryOptions({
   staleTime: 60_000,
 });
 
+function byIds(items: Item[], ids: string[]) {
+  const map = new Map(items.map((i) => [i.id, i]));
+  return ids.map((id) => map.get(id)).filter(Boolean) as Item[];
+}
+
+function groupByGenre(items: Item[], genres: Genre[], max = 6) {
+  return genres
+    .map((g) => ({ genre: g, items: items.filter((i) => i.genres.some((x) => x.id === g.id)) }))
+    .filter((r) => r.items.length > 0)
+    .sort((a, b) => b.items.length - a.items.length)
+    .slice(0, max);
+}
+
+const releaseSort = (a: Item, b: Item) =>
+  (b.release_year ?? 0) - (a.release_year ?? 0) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+
 export const homeCatalogQuery = queryOptions({
   queryKey: ["catalog", "home"],
   queryFn: async () => {
-    const [movies, series, channels, banners] = await Promise.all([
-      supabase
-        .from("movies")
-        .select("id,title,description,poster_url,backdrop_url,release_year,age_rating,quality,featured,duration_minutes")
-        .eq("status", "published")
-        .order("featured", { ascending: false })
-        .order("sort_order")
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("series")
-        .select("id,title,description,poster_url,backdrop_url,release_year,age_rating,featured")
-        .eq("status", "published")
-        .order("featured", { ascending: false })
-        .order("sort_order")
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("channels")
-        .select("id,name,logo_url,description,featured")
-        .eq("status", "published")
-        .order("featured", { ascending: false })
-        .order("sort_order")
-        .limit(30),
-      supabase
-        .from("banners")
-        .select("id,title,subtitle,image_url,button_label,button_url,content_kind,content_id")
-        .eq("is_active", true)
-        .order("sort_order")
-        .limit(10),
+    const [movies, series, channels, banners, genres, popM, popS] = await Promise.all([
+      sb.from("movies").select(MOVIE_SEL).eq("status", "published").order("featured", { ascending: false }).order("sort_order").order("created_at", { ascending: false }).limit(80),
+      sb.from("series").select(SERIES_SEL).eq("status", "published").order("featured", { ascending: false }).order("sort_order").order("created_at", { ascending: false }).limit(80),
+      sb.from("channels").select(CHANNEL_SEL).eq("status", "published").order("featured", { ascending: false }).order("sort_order").limit(30),
+      sb.from("banners").select("id,title,subtitle,image_url,button_label,button_url,content_kind,content_id").eq("is_active", true).order("sort_order").limit(10),
+      sb.from("genres").select("id,name,slug").order("name"),
+      sb.rpc("popular_content", { _kind: "movie", _limit: 20 }),
+      sb.rpc("popular_series", { _limit: 20 }),
     ]);
-    if (movies.error) throw movies.error;
-    if (series.error) throw series.error;
-    if (channels.error) throw channels.error;
-    if (banners.error) throw banners.error;
-    return { movies: movies.data, series: series.data, channels: channels.data, banners: banners.data };
+    for (const r of [movies, series, channels, banners, genres]) if (r.error) throw r.error;
+    const m: Item[] = movies.data.map(toMovie);
+    const s: Item[] = series.data.map(toSeries);
+    const c: Item[] = channels.data.map(toChannel);
+    const g: Genre[] = genres.data;
+    const popularMovies = byIds(m, (popM.data ?? []).map((x: Raw) => x.content_id));
+    const popularSeries = byIds(s, (popS.data ?? []).map((x: Raw) => x.series_id));
+    const popular = [...popularMovies, ...popularSeries].slice(0, 20);
+    return {
+      movies: m,
+      series: s,
+      channels: c,
+      banners: banners.data as Raw[],
+      featuredMovies: m.filter((x) => x.featured),
+      featuredSeries: s.filter((x) => x.featured),
+      releases: [...m, ...s].sort(releaseSort).slice(0, 20),
+      popular,
+      moviesByGenre: groupByGenre(m, g),
+      seriesByGenre: groupByGenre(s, g),
+    };
   },
   staleTime: 30_000,
 });
+
+export const genresQuery = queryOptions({
+  queryKey: ["catalog", "genres"],
+  queryFn: async () => {
+    const { data, error } = await sb.from("genres").select("id,name,slug").order("name");
+    if (error) throw error;
+    return data as Genre[];
+  },
+  staleTime: 5 * 60_000,
+});
+
+export const categoriesQuery = queryOptions({
+  queryKey: ["catalog", "categories"],
+  queryFn: async () => {
+    const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").order("sort_order").order("name");
+    if (error) throw error;
+    return data as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[];
+  },
+  staleTime: 60_000,
+});
+
+export const PAGE_SIZE = 24;
+export type SortKey = "recent" | "year" | "title";
+
+export const catalogListQuery = (kind: Kind, genre: string | undefined, sort: SortKey) =>
+  infiniteQueryOptions({
+    queryKey: ["catalog", "list", kind, genre ?? "", sort],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const table = kind === "movie" ? "movies" : kind === "series" ? "series" : "channels";
+      let sel = kind === "movie" ? MOVIE_SEL : kind === "series" ? SERIES_SEL : CHANNEL_SEL;
+      if (genre && kind !== "channel") {
+        const join = kind === "movie" ? "movie_genres" : "series_genres";
+        sel = sel.replace(`${join}(genres(id,name,slug))`, `${join}!inner(genres!inner(id,name,slug))`);
+      }
+      let q = sb.from(table).select(sel).eq("status", "published");
+      if (genre && kind !== "channel") {
+        const join = kind === "movie" ? "movie_genres" : "series_genres";
+        q = q.eq(`${join}.genres.slug`, genre);
+      }
+      if (sort === "title") q = q.order(kind === "channel" ? "name" : "title");
+      else if (sort === "year" && kind !== "channel") q = q.order("release_year", { ascending: false, nullsFirst: false });
+      else q = q.order("created_at", { ascending: false });
+      const from = pageParam * PAGE_SIZE;
+      const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      const map = kind === "movie" ? toMovie : kind === "series" ? toSeries : toChannel;
+      return { items: (data as Raw[]).map(map), next: data.length === PAGE_SIZE ? pageParam + 1 : null };
+    },
+    getNextPageParam: (last) => last.next,
+    staleTime: 30_000,
+  });
+
+const bySlugOrId = (q: Raw, param: string) => (isUuid(param) ? q.eq("id", param) : q.eq("slug", param));
+
+export const movieDetailQuery = (param: string) =>
+  queryOptions({
+    queryKey: ["catalog", "movie", param],
+    queryFn: async () => {
+      const { data, error } = await bySlugOrId(sb.from("movies").select(MOVIE_SEL).eq("status", "published"), param).maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const item = toMovie(data);
+      const ids = item.genres.map((g) => g.id);
+      let related: Item[] = [];
+      if (ids.length) {
+        const r = await sb.from("movies").select(`${MOVIE_SEL.replace("movie_genres(", "mg:movie_genres!inner(genre_id),movie_genres(")}`).eq("status", "published").in("mg.genre_id", ids).neq("id", item.id).limit(16);
+        related = (r.data ?? []).map(toMovie);
+      }
+      return { item, related };
+    },
+    staleTime: 30_000,
+  });
+
+export type Episode = {
+  id: string; episode_number: number; title: string; description: string | null;
+  thumbnail_url: string | null; duration_minutes: number | null; release_date: string | null;
+};
+export type Season = { id: string; season_number: number; title: string | null; poster_url: string | null; episodes: Episode[] };
+
+export const seriesDetailQuery = (param: string) =>
+  queryOptions({
+    queryKey: ["catalog", "series", param],
+    queryFn: async () => {
+      const { data, error } = await bySlugOrId(sb.from("series").select(SERIES_SEL).eq("status", "published"), param).maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const item = toSeries(data);
+      const { data: seasons, error: e2 } = await sb
+        .from("seasons")
+        .select("id,season_number,title,poster_url,episodes(id,episode_number,title,description,thumbnail_url,duration_minutes,release_date,status)")
+        .eq("series_id", item.id)
+        .order("season_number");
+      if (e2) throw e2;
+      const s: Season[] = (seasons ?? []).map((x: Raw) => ({
+        ...x,
+        episodes: (x.episodes ?? []).filter((e: Raw) => e.status === "published").sort((a: Raw, b: Raw) => a.episode_number - b.episode_number),
+      }));
+      return { item, seasons: s };
+    },
+    staleTime: 30_000,
+  });
+
+export const channelDetailQuery = (param: string) =>
+  queryOptions({
+    queryKey: ["catalog", "channel", param],
+    queryFn: async () => {
+      const { data, error } = await bySlugOrId(sb.from("channels").select(CHANNEL_SEL).eq("status", "published"), param).maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const others = await sb.from("channels").select(CHANNEL_SEL).eq("status", "published").neq("id", data.id).order("sort_order").limit(20);
+      return { item: toChannel(data), others: (others.data ?? []).map(toChannel) as Item[] };
+    },
+    staleTime: 30_000,
+  });
+
+export const categoryQuery = (slug: string) =>
+  queryOptions({
+    queryKey: ["catalog", "category", slug],
+    queryFn: async () => {
+      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").maybeSingle();
+      if (error) throw error;
+      if (!cat) return null;
+      const [m, s, c] = await Promise.all([
+        sb.from("movies").select(MOVIE_SEL).eq("status", "published").eq("category_id", cat.id).order("sort_order").limit(60),
+        sb.from("series").select(SERIES_SEL).eq("status", "published").eq("category_id", cat.id).order("sort_order").limit(60),
+        sb.from("channels").select(CHANNEL_SEL).eq("status", "published").eq("category_id", cat.id).order("sort_order").limit(60),
+      ]);
+      return {
+        category: cat as { id: string; name: string; slug: string; description: string | null; image_url: string | null },
+        movies: (m.data ?? []).map(toMovie) as Item[],
+        series: (s.data ?? []).map(toSeries) as Item[],
+        channels: (c.data ?? []).map(toChannel) as Item[],
+      };
+    },
+    staleTime: 30_000,
+  });
+
+export type EpisodeHit = { id: string; title: string; episode_number: number; thumbnail_url: string | null; season_number: number; series: Item };
+
+export const searchQuery = (term: string) =>
+  queryOptions({
+    queryKey: ["catalog", "search", term],
+    enabled: term.trim().length >= 2,
+    queryFn: async () => {
+      const t = `%${term.trim().replace(/[%_,()]/g, " ")}%`;
+      const [m, s, e, c] = await Promise.all([
+        sb.from("movies").select(MOVIE_SEL).eq("status", "published").or(`title.ilike.${t},original_title.ilike.${t}`).limit(18),
+        sb.from("series").select(SERIES_SEL).eq("status", "published").or(`title.ilike.${t},original_title.ilike.${t}`).limit(18),
+        sb.from("episodes").select("id,title,episode_number,thumbnail_url,seasons!inner(season_number,series!inner(id,slug,title,poster_url,backdrop_url,status))").eq("status", "published").eq("seasons.series.status", "published").ilike("title", t).limit(12),
+        sb.from("channels").select(CHANNEL_SEL).eq("status", "published").ilike("name", t).limit(12),
+      ]);
+      const episodes: EpisodeHit[] = (e.data ?? []).map((x: Raw) => ({
+        id: x.id, title: x.title, episode_number: x.episode_number, thumbnail_url: x.thumbnail_url,
+        season_number: x.seasons.season_number,
+        series: toSeries({ ...x.seasons.series, series_genres: [] }),
+      }));
+      return {
+        movies: (m.data ?? []).map(toMovie) as Item[],
+        series: (s.data ?? []).map(toSeries) as Item[],
+        episodes,
+        channels: (c.data ?? []).map(toChannel) as Item[],
+      };
+    },
+    staleTime: 15_000,
+  });
