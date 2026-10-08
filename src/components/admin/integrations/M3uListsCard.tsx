@@ -75,14 +75,14 @@ export function M3uListsCard() {
         const indexed = l.sync_state === "indexed" || (!!l.last_synced_at && l.sync_state !== "indexing");
         return (
           <div key={l.id} className="rounded-xl border border-border p-3">
-            <div className="flex flex-wrap items-start gap-3">
-              <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-3">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2"><b>{l.name}</b>
                   <Badge variant={l.is_active ? "default" : "outline"}>{l.is_active ? "Ativa" : "Inativa"}</Badge>
                   <Badge variant="outline">{l.detected_type === "m3u_plus" ? "M3U Plus" : l.detected_type === "m3u" ? "M3U" : l.list_type === "m3u_plus" ? "M3U Plus" : l.list_type === "m3u" ? "M3U" : "Automático"}</Badge>
                   <Badge variant="secondary">{STATE[l.sync_state] ?? l.sync_state}</Badge></div>
                 <p className="mt-1 font-mono text-xs text-muted-foreground">{l.url_hint}</p>
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="mt-2 grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
                   {[["Conteúdos", l.total_items], ["Filmes", l.movies_count], ["Séries", l.series_count], ["Canais", l.channels_count]].map(([k, v]) => (
                     <div key={k as string} className="rounded-lg bg-muted/40 px-2 py-1.5"><p className="text-[11px] text-muted-foreground">{k}</p><p className="font-semibold">{n(v as number)}</p></div>))}
                 </div>
