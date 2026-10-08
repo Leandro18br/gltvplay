@@ -9,3 +9,8 @@
 - [ ] Integrate movie/episode source editing and admin embed preview/settings.
 - [ ] Render sandboxed embeds with loading/retry and episode selection; preserve existing video playback.
 - [ ] Run security tests and verify the authenticated admin-to-player flow.
+# M3U large lists
+- [x] Diagnose the "Internal server error" (worker CPU limit during single-request sync).
+- [x] Resumable chunked indexing into an M3U catalog; chunked finalize.
+- [x] Explore with server-side search/filters/pagination; single, selected and per-lot import without duplicates.
+- [x] Verified with the real list (391k entries) and a no-duplicate import test.

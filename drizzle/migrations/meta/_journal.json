@@ -106,6 +106,20 @@
       "when": 1791475497305,
       "tag": "0014_m3u_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791477589135,
+      "tag": "0015_m3u_catalog_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791479155643,
+      "tag": "0016_m3u_chunked_finalize",
+      "breakpoints": true
     }
   ]
 }
