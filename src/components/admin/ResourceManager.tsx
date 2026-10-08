@@ -39,6 +39,8 @@ export type Field = {
   kind?: "movie" | "series" | "episode" | "channel";
   full?: boolean;
   defaultValue?: unknown;
+  /** Hidden when creating; new rows use defaultValue. */
+  editOnly?: boolean;
 };
 
 export type Column = { key: string; label: string; render?: (r: Row) => ReactNode; className?: string };
@@ -384,7 +386,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader><DialogTitle>{editing?.id ? `Editar ${config.singular.toLowerCase()}` : `Novo(a) ${config.singular.toLowerCase()}`}</DialogTitle></DialogHeader>
           <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
-            {config.fields.filter((f) => !(lockScope && f.name === config.scope?.col)).map((f) => (
+            {config.fields.filter((f) => !(lockScope && f.name === config.scope?.col) && !(f.editOnly && !editing?.id)).map((f) => (
               <div key={f.name} className={`space-y-1.5 ${f.full || ["textarea", "image", "genres", "playback"].includes(f.type) ? "md:col-span-2" : ""}`}>
                 {f.type !== "boolean" && <Label>{f.label}{f.required && " *"}</Label>}
                 {["text", "url", "number"].includes(f.type) && (

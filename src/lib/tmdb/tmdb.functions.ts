@@ -204,7 +204,7 @@ export const tmdbImportMovie = createServerFn({ method: "POST" })
       id = found.id;
     } else {
       const slug = await uniqueSlug(ctx, "movies", fields.title, fields.release_year);
-      const r = await ctx.supabase.from("movies").insert({ ...fields, slug, status: "draft" }).select("id").single();
+      const r = await ctx.supabase.from("movies").insert({ ...fields, slug, status: "published" }).select("id").single();
       if (r.error) throw r.error;
       id = r.data.id;
     }
@@ -228,7 +228,7 @@ export const tmdbImportSeries = createServerFn({ method: "POST" })
       id = found.id;
     } else {
       const slug = await uniqueSlug(ctx, "series", fields.title, fields.release_year);
-      const r = await ctx.supabase.from("series").insert({ ...fields, slug, status: "draft" }).select("id").single();
+      const r = await ctx.supabase.from("series").insert({ ...fields, slug, status: "published" }).select("id").single();
       if (r.error) throw r.error;
       id = r.data.id;
     }
