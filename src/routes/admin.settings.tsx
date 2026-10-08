@@ -15,6 +15,7 @@ import { EmbedSettings } from "@/components/admin/EmbedSettings";
 
 export const Route = createFileRoute("/admin/settings")({
   beforeLoad: ({ context }) => { if (!isAdminRoleGuard(context.role)) throw redirect({ to: "/admin" }); },
+  head:()=>({meta:[{title:"Configurações e embeds — GLTV Plus ADM"},{name:"description",content:"Configurações da plataforma e domínios autorizados de reprodução."},{property:"og:title",content:"Configurações — GLTV Plus ADM"},{property:"og:description",content:"Gerencie identidade e permissões de embeds."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary"}]}),
   component: SettingsPage,
 });
 

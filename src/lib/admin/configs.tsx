@@ -43,7 +43,7 @@ export const moviesConfig: ResourceConfig = {
     { name: "poster_url", label: "Poster", type: "image", folder: "posters", aspect: "aspect-[2/3]" },
     { name: "backdrop_url", label: "Backdrop", type: "image", folder: "backdrops" },
     { name: "genres", label: "Gêneros", type: "genres", joinTable: "movie_genres", fk: "movie_id" },
-    { name: "playback", label: "URL de reprodução autorizada", type: "playback", kind: "movie" },
+    { name: "playback", label: "Fonte de reprodução", type: "playback", kind: "movie", full:true },
   ],
 };
 
@@ -118,7 +118,7 @@ export const episodesConfig: ResourceConfig = {
     { name: "release_date", label: "Data de lançamento", type: "text", placeholder: "AAAA-MM-DD" },
     status,
     { name: "thumbnail_url", label: "Thumbnail", type: "image", folder: "thumbnails" },
-    { name: "playback", label: "URL de reprodução autorizada", type: "playback", kind: "episode" },
+    { name: "playback", label: "Fonte de reprodução", type: "playback", kind: "episode", full:true },
   ],
 };
 

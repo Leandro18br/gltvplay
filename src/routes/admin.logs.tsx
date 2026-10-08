@@ -11,17 +11,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const Route = createFileRoute("/admin/logs")({
   beforeLoad: ({ context }) => { if (!isAdminRoleGuard(context.role)) throw redirect({ to: "/admin" }); },
+  head:()=>({meta:[{title:"Auditoria e reprodução — GLTV Plus ADM"},{name:"description",content:"Auditoria administrativa e diagnóstico de fontes de reprodução."},{property:"og:title",content:"Auditoria — GLTV Plus ADM"},{property:"og:description",content:"Registros de alterações e falhas de reprodução."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary"}]}),
   component: Logs,
 });
 
 const PAGE = 20;
-const ENTITIES = ["movies", "series", "seasons", "episodes", "channels", "categories", "genres", "banners", "playback_sources", "site_settings", "user_roles", "profiles"];
+const ENTITIES = ["movies", "series", "seasons", "episodes", "channels", "categories", "genres", "banners", "playback_sources", "embed_domains", "site_settings", "user_roles", "profiles"];
 const ACTION: Record<string, string> = { insert: "Criou", update: "Editou", delete: "Excluiu" };
 
 function Logs() {
   const [page, setPage] = useState(0);
   const [entity, setEntity] = useState("all");
   const [open, setOpen] = useState<Row | null>(null);
+  const diagnostics=useQuery({queryKey:["admin","playback-diagnostics"],queryFn:async()=>{const r=await db.from("playback_diagnostics").select("id,source_id,event,created_at").order("created_at",{ascending:false}).limit(30);if(r.error)throw r.error;return r.data as {id:string;source_id:string|null;event:string;created_at:string}[];},refetchInterval:30000});
   const list = useQuery({
     queryKey: ["admin", "logs", page, entity],
     queryFn: async () => {
@@ -74,6 +76,7 @@ function Logs() {
         <Button size="icon" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}><ChevronLeft /></Button>
         <Button size="icon" variant="outline" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}><ChevronRight /></Button>
       </div>
+      <section className="space-y-3 border-t border-border pt-5"><h2 className="font-semibold">Diagnóstico de reprodução</h2>{diagnostics.isError?<Button variant="outline" onClick={()=>diagnostics.refetch()}>Tentar novamente</Button>:diagnostics.isPending?<Loader2 className="animate-spin" />:!diagnostics.data.length?<p className="text-sm text-muted-foreground">Nenhuma falha registrada.</p>:<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-2">Data</th><th className="p-2">Fonte</th><th className="p-2">Evento</th></tr></thead><tbody>{diagnostics.data.map(d=><tr key={d.id} className="border-t border-border"><td className="whitespace-nowrap p-2">{new Date(d.created_at).toLocaleString("pt-BR")}</td><td className="p-2 font-mono text-xs">{d.source_id ?? "Fonte removida"}</td><td className="p-2">{({timeout:"Tempo de carregamento excedido",frame_error:"Falha ao carregar iframe",user_report:"Player indisponível informado pelo usuário"} as Record<string,string>)[d.event] ?? d.event}</td></tr>)}</tbody></table></div>}</section>
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>Detalhes da alteração</DialogTitle></DialogHeader>
