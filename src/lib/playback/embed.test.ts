@@ -16,3 +16,17 @@ describe("authorized embeds",()=>{
   it("flags player pages saved as Vídeo/URL",()=>{expect(looksLikePlayerPage("https://site.com/filme/24099")).toBe(true);expect(looksLikePlayerPage("https://site.com/movie.mp4")).toBe(false);});
   it("limits normalized embed URL length to 2048",()=>{expect(()=>normalizeEmbed("https://youtube.com/"+"a".repeat(2048),policy)).toThrow();});
 });
+import { normalizePlayback as np2 } from "./embed";
+describe("streambetter iframe code", () => {
+  const code = `<iframe\n  src="https://streambetter.shop/filme/20558"\n  width="640"\n  height="360"\n  frameborder="0"\n  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"\n  allowfullscreen\n></iframe>`;
+  it("extracts the exact src from iframe code", () => {
+    expect(np2({ type: "embed", input: code, active: true, primary: true }, { domains: ["streambetter.shop"], allowIframe: true })).toBe("https://streambetter.shop/filme/20558");
+  });
+  it("treats iframe code as embed even when typed as Vídeo/URL", () => {
+    expect(np2({ type: "url", input: code, active: true, primary: true }, { domains: ["streambetter.shop"], allowIframe: true })).toBe("https://streambetter.shop/filme/20558");
+  });
+  it("accepts subdomains of an authorized domain but not other domains", () => {
+    expect(np2({ type: "embed", input: "https://www.streambetter.shop/filme/1", active: true, primary: true }, { domains: ["streambetter.shop"], allowIframe: true })).toBe("https://www.streambetter.shop/filme/1");
+    expect(() => np2({ type: "embed", input: "https://evilstreambetter.shop/x", active: true, primary: true }, { domains: ["streambetter.shop"], allowIframe: true })).toThrow();
+  });
+});
