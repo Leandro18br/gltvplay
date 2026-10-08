@@ -48,8 +48,8 @@ export function M3uListsCard() {
         const r = await step({ data: { listId: l.id, restart: restart && first } });
         first = false;
         if (!r.ok) throw new Error(r.error);
-        const pct = r.total ? ` (${Math.min(99, Math.floor(((r.done ? r.total : r.offset ?? 0) / r.total) * 100))}%)` : "";
-        setB(l.id, `Indexando… ${n(r.entries)} itens lidos${pct}`);
+        const pct = r.total ? ` (${Math.min(99, Math.floor(((r.offset ?? 0) / r.total) * 100))}%)` : "";
+        setB(l.id, r.phase === "finalize" ? `Finalizando… ${n(("checked" in r ? r.checked : 0) ?? 0)} itens conferidos` : `Indexando… ${n(r.entries)} itens lidos${pct}`);
         if (r.done) { toast.success("Catálogo M3U indexado. Agora é só explorar e importar."); break; }
         refresh();
       }

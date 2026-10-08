@@ -194,10 +194,17 @@ function filtered(q: any, f: ExploreFilter) {
 
 export async function explore(f: ExploreFilter & { page: number; pageSize: number }) {
   const from = (f.page - 1) * f.pageSize;
-  const r = await filtered(db.from("m3u_items").select("id,kind,title,year,group_title,logo,tmdb_id,episode_count,missing,content_id,imported_at,import_error,import_attempts", { count: "exact" }), f)
+  const r = await filtered(db.from("m3u_items").select("id,kind,title,series_key,year,group_title,logo,tmdb_id,episode_count,missing,content_id,imported_at,import_error,import_attempts", { count: "exact" }), f)
     .order("title_norm").order("id").range(from, from + f.pageSize - 1);
   if (r.error) throw new Error("Não foi possível pesquisar o catálogo");
-  return { items: r.data as any[], total: r.count ?? 0 };
+  const items = (r.data ?? []) as any[];
+  const keys = items.filter((x) => x.kind === "series" && x.series_key).map((x) => x.series_key as string);
+  if (keys.length) {
+    const c = await db.rpc("m3u_episode_counts", { _list: f.listId, _keys: keys });
+    const m = new Map<string, number>(((c.data ?? []) as any[]).map((x) => [x.series_key, Number(x.n)]));
+    for (const x of items) if (x.kind === "series") x.episode_count = m.get(x.series_key) ?? 0;
+  }
+  return { items, total: r.count ?? 0 };
 }
 
 export async function groups(listId: string, kind: string) {
