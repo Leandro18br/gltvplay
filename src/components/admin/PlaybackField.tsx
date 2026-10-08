@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export function PlaybackField({value,onChange}:{value?:PlaybackValue;onChange:(v:PlaybackValue)=>void}) {
+export function PlaybackField({value,onChange}:{value:PlaybackValue|undefined;onChange:(v:PlaybackValue)=>void}) {
   const v=value ?? emptyPlayback;
   const validate=useServerFn(validatePlayback);
   const [testing,setTesting]=useState(false);

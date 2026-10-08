@@ -210,7 +210,7 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
         if (f.type === "playback") {
           if(f.kind!=="movie" && f.kind!=="episode" && f.kind!=="channel")throw new Error("Configure a reprodução por episódio");
           const result=await saveSource({data:{kind:f.kind,contentId:id,value:values[f.name] ?? emptyPlayback}});
-          if(result.id) setValues(v=>({...v,[f.name]:{...v[f.name],id:result.id}}));
+          if(result.id) setValues((v:Row)=>({...v,[f.name]:{...v[f.name],id:result.id}}));
         }
       }
       toast.success(isNew ? `${config.singular} criado(a)` : "Alterações salvas");
