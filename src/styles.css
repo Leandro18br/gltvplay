@@ -100,8 +100,8 @@
   --gradient-fade: linear-gradient(to top, var(--background) 8%, oklch(0.12 0.005 250 / 0.6) 45%, transparent);
   --gradient-side: linear-gradient(to right, var(--background) 10%, oklch(0.12 0.005 250 / 0.4) 55%, transparent);
   --glow: 0 0 0 1px oklch(0.82 0.09 230 / 0.35), 0 12px 40px -12px oklch(0.82 0.09 230 / 0.45);
-  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Maven Pro", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Maven Pro", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -117,6 +117,7 @@
 
 @layer base {
   body { font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+  button, input, select, textarea, video { font-family: inherit; }
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: 0; }
 }
 
