@@ -21,4 +21,5 @@
 
 # Public player positioning
 - [x] Place the existing movie/series player before poster and details, just below navigation, with a proportional wide thumbnail.
-- [ ] Verify movie Play and episode-specific series playback on mobile and desktop without changing catalog or sources.
+- [x] Verify authenticated movie/series layout at 320, 390, 768 and 1280 widths: player at y=80, own thumbnail, no overflow or external player before Play. Mobile and desktop Play resolve existing sources; selecting episode 2 requests a different episode ID. Sixteen existing tests pass.
+- [ ] Confirm successful media playback: blocked by the tested existing movie and episode sources returning browser media error 4 (no supported source); URLs, player logic and catalog remain unchanged.
