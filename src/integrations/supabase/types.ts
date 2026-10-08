@@ -252,6 +252,30 @@ export type Database = {
         }
         Relationships: []
       }
+      home_layouts: {
+        Row: {
+          config: Json
+          id: string
+          revision: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          id?: string
+          revision?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          id?: string
+          revision?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       movie_genres: {
         Row: {
           genre_id: string
@@ -815,6 +839,15 @@ export type Database = {
           views: number
         }[]
       }
+      publish_home_draft: {
+        Args: { expected_revision: number }
+        Returns: number
+      }
+      save_home_draft: {
+        Args: { c: Json; expected_revision: number }
+        Returns: number
+      }
+      validate_home_config: { Args: { c: Json }; Returns: undefined }
     }
     Enums: {
       account_status: "active" | "suspended" | "banned"

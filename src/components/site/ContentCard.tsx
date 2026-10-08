@@ -82,8 +82,8 @@ export function Row({ title, items, action }: { title: string; items: Item[]; ac
   const scroll = (dir: number) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.8, behavior: "smooth" });
   return (
     <section className="group/row relative animate-rise" aria-label={title}>
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 md:px-10">
-        <h2 className="text-lg font-semibold md:text-xl">{title}</h2>
+      <div className="mx-auto grid max-w-[1600px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 md:px-10">
+        <h2 className="min-w-0 break-words text-lg font-semibold md:text-xl">{title}</h2>
         {action}
       </div>
       <div className="relative">

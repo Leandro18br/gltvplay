@@ -4,15 +4,15 @@ import { Play } from "lucide-react";
 import { continueWatchingQuery, useActiveProfile, useWatchlist } from "@/lib/user-data";
 import { Row } from "./ContentCard";
 
-export function ContinueWatchingRow() {
+export function ContinueWatchingRow({ title = "Continue assistindo", limit = 20, showAll = false }: { title?: string; limit?: number; showAll?: boolean } = {}) {
   const { user, profileId, loading } = useActiveProfile();
   const { data = [] } = useQuery({ ...continueWatchingQuery(user?.id ?? "none", profileId), enabled: !!user && !loading });
   if (!user || !data.length) return null;
   return (
-    <section aria-label="Continue assistindo" className="animate-rise">
-      <h2 className="mx-auto max-w-[1600px] px-4 text-lg font-semibold md:px-10 md:text-xl">Continue assistindo</h2>
+    <section aria-label={title} className="animate-rise">
+      <div className="mx-auto grid max-w-[1600px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 md:px-10"><h2 className="min-w-0 text-lg font-semibold md:text-xl">{title}</h2>{showAll && <Link to="/perfil" className="text-sm text-primary">Ver todos ›</Link>}</div>
       <div className="flex gap-3 overflow-x-auto px-4 py-5 [scrollbar-width:none] md:px-10">
-        {data.map((c) => (
+        {data.slice(0, limit).map((c) => (
           <Link key={c.contentId} to="/assistir/$kind/$id" params={{ kind: c.kind, id: c.contentId }}
             className="group relative w-64 shrink-0 overflow-hidden rounded-xl bg-card ring-1 ring-border transition hover:ring-primary/50 md:w-80">
             <div className="relative aspect-video">
@@ -33,8 +33,8 @@ export function ContinueWatchingRow() {
   );
 }
 
-export function MyListRow() {
+export function MyListRow({ title = "Minha lista", limit = 20, showAll = true }: { title?: string; limit?: number; showAll?: boolean } = {}) {
   const wl = useWatchlist();
   if (!wl.user) return null;
-  return <Row title="Minha lista" items={wl.items} action={<Link to="/minha-lista" className="text-sm text-primary hover:underline">Ver tudo</Link>} />;
+  return <Row title={title} items={wl.items.slice(0, limit)} action={showAll ? <Link to="/minha-lista" className="text-sm text-primary hover:underline">Ver todos ›</Link> : undefined} />;
 }

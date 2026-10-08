@@ -31,7 +31,7 @@ function CatalogSync() {
       }, 400);
     };
     const ch = supabase.channel("catalog-sync");
-    for (const table of ["movies", "series", "seasons", "episodes", "channels", "categories", "genres", "banners", "site_settings"]) {
+    for (const table of ["movies", "series", "seasons", "episodes", "channels", "categories", "genres", "banners", "site_settings", "home_layouts"]) {
       ch.on("postgres_changes", { event: "*", schema: "public", table }, bump);
     }
     ch.subscribe();

@@ -1,16 +1,16 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Home, Search, Film, Tv, ListVideo, User } from "lucide-react";
+import { Home, Search, Film, Tv, Shapes, User } from "lucide-react";
 import { siteSettingsQuery } from "@/lib/catalog";
 import { SiteHeader } from "./SiteHeader";
 
 const MOBILE = [
   { to: "/", label: "Início", icon: Home, exact: true },
-  { to: "/buscar", label: "Buscar", icon: Search },
-  { to: "/filmes", label: "Filmes", icon: Film },
   { to: "/series", label: "Séries", icon: Tv },
-  { to: "/minha-lista", label: "Lista", icon: ListVideo },
+  { to: "/filmes", label: "Filmes", icon: Film },
+  { to: "/categorias", label: "Categorias", icon: Shapes },
+  { to: "/buscar", label: "Busca", icon: Search },
   { to: "/perfil", label: "Perfil", icon: User },
 ] as const;
 
@@ -63,7 +63,7 @@ export function SiteShell({ children, padTop = true }: { children: ReactNode; pa
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
-      <main className={padTop ? "pt-20 md:pt-24" : ""}>{children}</main>
+      <main className={`${padTop ? "pt-20 md:pt-24" : ""} pb-[calc(1rem+env(safe-area-inset-bottom))]`}>{children}</main>
       <SiteFooter />
       <MobileNav />
     </div>
