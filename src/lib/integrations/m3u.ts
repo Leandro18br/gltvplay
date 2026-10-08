@@ -11,7 +11,7 @@ export const slugify = (s: string) => norm(s).replace(/ /g, "-");
 
 function attrs(line: string) {
   const out: Record<string, string> = {};
-  for (const m of line.matchAll(/([a-zA-Z0-9_-]+)="([^"]*)"/g)) out[m[1].toLowerCase()] = m[2];
+  for (const m of line.matchAll(/([a-zA-Z0-9_-]+)="([^"]*)"/g)) out[(m[1] ?? "").toLowerCase()] = m[2] ?? "";
   return out;
 }
 
