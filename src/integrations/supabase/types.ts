@@ -810,7 +810,7 @@ export type Database = {
     }
     Enums: {
       account_status: "active" | "suspended" | "banned"
-      app_role: "admin" | "editor" | "user"
+      app_role: "admin" | "editor" | "user" | "super_admin"
       content_kind: "movie" | "series" | "episode" | "channel"
       content_status: "draft" | "published" | "archived"
     }
@@ -941,7 +941,7 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["active", "suspended", "banned"],
-      app_role: ["admin", "editor", "user"],
+      app_role: ["admin", "editor", "user", "super_admin"],
       content_kind: ["movie", "series", "episode", "channel"],
       content_status: ["draft", "published", "archived"],
     },
