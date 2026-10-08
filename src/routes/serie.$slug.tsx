@@ -58,7 +58,7 @@ function SeriesPage() {
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-semibold">Episódios</h2>
             {data.seasons.length > 0 && (
-              <Select value={season?.id} onValueChange={setSeasonId}>
+              <Select value={season?.id ?? ""} onValueChange={setSeasonId}>
                 <SelectTrigger className="w-48 rounded-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {data.seasons.map((s) => <SelectItem key={s.id} value={s.id}>{s.title || `Temporada ${s.season_number}`}</SelectItem>)}
