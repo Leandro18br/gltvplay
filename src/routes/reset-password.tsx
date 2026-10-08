@@ -24,7 +24,7 @@ function ResetPassword() {
   const navigate = useNavigate();
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<"name" | "email" | "password" | "confirm" | "current", string>>>({});
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState<boolean | null>(null);
 
@@ -38,12 +38,12 @@ function ResetPassword() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = newPasswordSchema.safeParse({ password: pw, confirm: pw2 });
-    if (!parsed.success) return setErrors(fieldErrors(parsed.error));
+    if (!parsed.success) { setErrors(fieldErrors(parsed.error)); return; }
     setErrors({});
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
     setLoading(false);
-    if (error) return toast.error(authErrorMessage(error.message));
+    if (error) { toast.error(authErrorMessage(error.message)); return; }
     toast.success("Senha atualizada com sucesso");
     navigate({ to: "/", replace: true });
   }

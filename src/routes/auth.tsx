@@ -15,7 +15,7 @@ type Mode = "in" | "up" | "forgot";
 const safeRedirect = (r: unknown) => (typeof r === "string" && r.startsWith("/") && !r.startsWith("//") ? r : "/");
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { redirect?: string | undefined; mode?: "up" | undefined } => ({
     redirect: typeof s["redirect"] === "string" ? (s["redirect"] as string) : undefined,
     mode: s["mode"] === "up" ? ("up" as const) : undefined,
   }),
@@ -38,7 +38,7 @@ function AuthPage() {
   const target = safeRedirect(search.redirect);
   const [mode, setMode] = useState<Mode>(search.mode ?? "in");
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<"name" | "email" | "password" | "confirm" | "current", string>>>({});
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState<null | "confirm" | "reset">(null);
 
@@ -56,7 +56,7 @@ function AuthPage() {
     try {
       if (mode === "up") {
         const parsed = signUpSchema.safeParse(form);
-        if (!parsed.success) return setErrors(fieldErrors(parsed.error));
+        if (!parsed.success) { setErrors(fieldErrors(parsed.error)); return; }
         setLoading(true);
         const { data, error } = await supabase.auth.signUp({
           email: parsed.data.email,
@@ -73,7 +73,7 @@ function AuthPage() {
         else setSent("confirm");
       } else if (mode === "in") {
         const parsed = signInSchema.safeParse(form);
-        if (!parsed.success) return setErrors(fieldErrors(parsed.error));
+        if (!parsed.success) { setErrors(fieldErrors(parsed.error)); return; }
         setLoading(true);
         const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
         if (error) throw error;
@@ -88,7 +88,7 @@ function AuthPage() {
         navigate({ to: target, replace: true });
       } else {
         const parsed = emailSchema.safeParse(form.email);
-        if (!parsed.success) return setErrors({ email: parsed.error.issues[0]?.message ?? "E-mail inválido" });
+        if (!parsed.success) { setErrors({ email: parsed.error.issues[0]?.message ?? "E-mail inválido" }); return; }
         setLoading(true);
         const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, { redirectTo: `${window.location.origin}/reset-password` });
         if (error) throw error;

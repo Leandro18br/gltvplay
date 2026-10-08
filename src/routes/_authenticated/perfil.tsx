@@ -86,12 +86,12 @@ function AccountTab() {
   useEffect(() => { if (profile.data) setName(profile.data.name ?? ""); }, [profile.data]);
 
   const [pw, setPw] = useState({ current: "", password: "", confirm: "" });
-  const [pwErr, setPwErr] = useState<Record<string, string>>({});
+  const [pwErr, setPwErr] = useState<Partial<Record<"name" | "email" | "password" | "confirm" | "current", string>>>({});
   const [pwSaving, setPwSaving] = useState(false);
 
   const saveName = async () => {
     const p = nameSchema.safeParse(name);
-    if (!p.success) return setNameErr(p.error.issues[0]?.message);
+    if (!p.success) { setNameErr(p.error.issues[0]?.message); return; }
     setNameErr(undefined);
     setSaving(true);
     const { error } = await supabase.from("profiles").update({ name: p.data }).eq("id", user!.id);
@@ -101,8 +101,8 @@ function AccountTab() {
 
   const uploadAvatar = async (file: File) => {
     if (!user) return;
-    if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) return toast.error("Envie uma imagem PNG, JPG, WEBP ou GIF");
-    if (file.size > 3 * 1024 * 1024) return toast.error("A imagem deve ter até 3MB");
+    if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) { toast.error("Envie uma imagem PNG, JPG, WEBP ou GIF"); return; }
+    if (file.size > 3 * 1024 * 1024) { toast.error("A imagem deve ter até 3MB"); return; }
     setUploading(true);
     try {
       const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
@@ -124,15 +124,15 @@ function AccountTab() {
 
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pw.current) return setPwErr({ current: "Informe sua senha atual" });
+    if (!pw.current) { setPwErr({ current: "Informe sua senha atual" }); return; }
     const p = newPasswordSchema.safeParse({ password: pw.password, confirm: pw.confirm });
-    if (!p.success) return setPwErr(fieldErrors(p.error));
+    if (!p.success) { setPwErr(fieldErrors(p.error)); return; }
     setPwErr({});
     setPwSaving(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await supabase.auth.updateUser({ password: p.data.password, current_password: pw.current } as any);
     setPwSaving(false);
-    if (error) return toast.error(authErrorMessage(error.message));
+    if (error) { toast.error(authErrorMessage(error.message)); return; }
     toast.success("Senha alterada");
     setPw({ current: "", password: "", confirm: "" });
   };
@@ -197,11 +197,11 @@ function ProfilesTab() {
 
   const add = async () => {
     const n = newName.trim();
-    if (n.length < 1 || n.length > 40) return toast.error("O nome do perfil deve ter de 1 a 40 caracteres");
+    if (n.length < 1 || n.length > 40) { toast.error("O nome do perfil deve ter de 1 a 40 caracteres"); return; }
     setBusy(true);
     const { error } = await supabase.from("viewer_profiles").insert({ user_id: user!.id, name: n, is_kids: kids });
     setBusy(false);
-    if (error) return toast.error(/max 5/.test(error.message) ? "Limite de 5 perfis por conta" : "Não foi possível criar o perfil");
+    if (error) { toast.error(/max 5/.test(error.message) ? "Limite de 5 perfis por conta" : "Não foi possível criar o perfil"); return; }
     toast.success("Perfil criado");
     setNewName(""); setKids(false); refresh();
   };
