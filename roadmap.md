@@ -18,3 +18,8 @@
 # M3U responsive interface
 - [x] Fit M3U list cards, forms, explorer, progress and actions within the available width without changing import logic.
 - [x] Verify authenticated M3U interface at 320, 360, 375, 390, 412, 768, 1024 and desktop widths; real list search/selection, internal scrolling and create/edit dialogs checked. All nine existing M3U tests passed; no import or indexing rerun to avoid modifying catalog data.
+
+# Public player positioning
+- [x] Place the existing movie/series player before poster and details, just below navigation, with a proportional wide thumbnail.
+- [x] Verify authenticated movie/series layout at 320, 390, 768 and 1280 widths: player at y=80, own thumbnail, no overflow or external player before Play. Mobile and desktop Play resolve existing sources; selecting episode 2 requests a different episode ID. Sixteen existing tests pass.
+- [ ] Confirm successful media playback: blocked by the tested existing movie and episode sources returning browser media error 4 (no supported source); URLs, player logic and catalog remain unchanged.

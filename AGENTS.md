@@ -32,3 +32,4 @@
 - Genres are a fixed, seeded set (`ensure_fixed_genres`, idempotent by normalized name) mapped via `genres.tmdb_genre_ids`; TMDB imports only link to existing genres, never create them. Why: reusable categories without duplicates.
 
 - Player/catalog integration rules (MegaEmbed, M3U) live in `src/lib/integrations/AGENTS.md`. Why: directory-scoped detail.
+- Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: keep presentation ordering independent of source and episode logic.

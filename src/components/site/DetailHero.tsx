@@ -14,14 +14,16 @@ function trailerEmbed(url: string) {
   return null;
 }
 
-/** Compact details header: poster, info and the small player block (no big banner). */
+/** Player first, followed by the existing poster and details (no separate banner). */
 export function DetailHero({ item, extraMeta, player }: { item: Item; extraMeta?: ReactNode; player?: ReactNode }) {
   const [trailer, setTrailer] = useState(false);
   const meta = [item.release_year, item.kind === "movie" ? formatDuration(item.duration_minutes) : null, item.quality, item.language, item.country].filter(Boolean);
   const embed = item.trailer_url ? trailerEmbed(item.trailer_url) : null;
   return (
     <section className="relative w-full overflow-hidden">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-8 px-4 pb-10 pt-24 md:flex-row md:items-start md:px-10 md:pt-28">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-8 px-4 pb-10 pt-20 md:px-10">
+        {player && <div className="w-full min-w-0 max-w-5xl">{player}</div>}
+        <div className="flex min-w-0 flex-col gap-8 md:flex-row md:items-start">
         {item.poster_url && <img src={item.poster_url} alt={`Pôster de ${item.title}`} className="aspect-[2/3] w-32 shrink-0 animate-rise rounded-2xl object-cover shadow-glow ring-1 ring-primary/30 md:w-44" />}
         <div className="flex min-w-0 max-w-3xl animate-rise flex-1 flex-col gap-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">{item.kind === "movie" ? "Filme" : "Série"}</p>
@@ -43,7 +45,7 @@ export function DetailHero({ item, extraMeta, player }: { item: Item; extraMeta?
             )}
             <WatchlistButton item={item} className="size-11" />
           </div>
-          {player && <div className="pt-2">{player}</div>}
+        </div>
         </div>
       </div>
       {item.trailer_url && (
