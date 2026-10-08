@@ -50,6 +50,13 @@
       "when": 1791429307451,
       "tag": "0006_authorized_embed_playback",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791429734671,
+      "tag": "0007_embed_source_lifecycle_guards",
+      "breakpoints": true
     }
   ]
 }
