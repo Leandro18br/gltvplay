@@ -63,7 +63,9 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
             </span>
             {error && <span className="absolute inset-x-3 bottom-3 rounded-lg bg-background/85 px-3 py-2 text-center text-xs text-muted-foreground">{error}</span>}
           </button>
-        ) : source?.type === "embed" ? (
+        ) : !source ? (
+          <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">Não foi possível carregar o player. Tente novamente.</div>
+        ) : source.type === "embed" ? (
           <EmbedPlayer url={source.url} title={title} />
         ) : isHls ? (
           <InlineHls url={source.url} title={title} poster={poster} />
