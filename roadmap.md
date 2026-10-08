@@ -25,5 +25,6 @@
 - [ ] Confirm successful media playback: blocked by the tested existing movie and episode sources returning browser media error 4 (no supported source); URLs, player logic and catalog remain unchanged.
 
 # Professional movie and episode controls
-- [ ] Add shared native-video controls to inline and full movie/episode playback; retain existing HLS engines, embed controls, authorization and server selection.
-- [ ] Test control rules and real playback flows, errors, servers and all eight responsive widths; record unsupported/provider-blocked capabilities.
+- [x] Add shared native-video controls to inline and full movie/episode playback; retain existing HLS engines, embed controls, authorization and server selection.
+- [x] Verify controls with isolated WebM media: play/pause, clamped ±10s, accessible progress/volume sliders, mute, speed, fullscreen, keyboard, auto-hide, server selection and volume persistence. All 21 existing playback/routing tests pass. Screenshots and bounds verified at 320, 360, 375, 390, 412, 768, 1024 and 1280; no horizontal overflow or central/progress overlap.
+- [ ] Confirm real MP4/HLS and episode reproduction: existing catalog samples returned media error 4; isolated H.264 MP4 also failed in this automated Chromium, so provider failure cannot be inferred from that code alone. HLS quality selection remains based only on actual manifest levels; end-to-end HLS playback and compatible-device transmission remain unverified. Transmission is hidden when no compatible device is available. Catalog URLs, sources and data were not modified.
