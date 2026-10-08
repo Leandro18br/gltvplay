@@ -174,9 +174,9 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     {children}
     <div onClick={() => { if (!visible) reveal(); else toggle(); }} className="absolute inset-0" aria-hidden="true" />
     {waiting && !hasError && <div className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2"><Loader2 className="size-6 animate-spin text-primary" /></div>}
-    <div className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${visible || !playing || hasError ? "opacity-100" : "opacity-0"}`}>
+    <div inert={!visible && playing && !hasError} className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${visible || !playing || hasError ? "opacity-100" : "opacity-0"}`}>
       {(header || fullPage) && <div className="pointer-events-auto absolute inset-x-0 top-0 flex min-w-0 items-center gap-3 bg-player/70 p-3 md:p-5">{header ?? <p className="truncate text-sm font-semibold">{title}</p>}</div>}
-      {!hasError && <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-4 sm:gap-7">
+      {!hasError && <div className="absolute left-1/2 top-[calc(50%-1.25rem)] flex -translate-x-1/2 -translate-y-1/2 items-center gap-4 sm:top-1/2 sm:gap-7">
         <div className="pointer-events-auto">{iconButton("Voltar 10 segundos", <span className="relative"><RotateCcw className="size-7" /><span className="absolute inset-0 flex items-center justify-center pt-1 text-[9px] font-bold">10</span></span>, () => skip(-10), !canSeek)}</div>
         <Button type="button" variant="ghost" aria-label={playing ? "Pausar" : "Reproduzir"} title={playing ? "Pausar" : "Reproduzir"} onClick={toggle} className="pointer-events-auto size-14 shrink-0 rounded-full border border-player-foreground/20 bg-player/65 text-player-foreground backdrop-blur-sm transition hover:scale-105 hover:bg-primary hover:text-primary-foreground sm:size-20 [&_svg]:size-7 sm:[&_svg]:size-9">{playing ? <Pause className="fill-current" /> : <Play className="ml-1 fill-current" />}</Button>
         <div className="pointer-events-auto">{iconButton("Avançar 10 segundos", <span className="relative"><RotateCw className="size-7" /><span className="absolute inset-0 flex items-center justify-center pt-1 text-[9px] font-bold">10</span></span>, () => skip(10), !canSeek)}</div>
