@@ -135,13 +135,13 @@ export const importCatalog = createServerFn({ method: "POST" }).middleware([requ
         if (!season) { const s = await sb.from("seasons").insert({ series_id: id, season_number: sn, title: `Temporada ${sn}` }).select("id").single(); if (s.error) throw new Error(s.error.message); season = s.data; report.seasons++; }
         const er = await R.runEndpoint(full, episodesEp, { ...baseVars, season: String(sn) }, { actorId: context.userId, label: `Episódios: ${it.title} T${sn}` });
         if (!er.ok) continue;
-        const eps = mapCatalog(er.body, episodesEp.mapping ?? {}).filter(e => e.episode_number != null).slice(0, 100);
+        const eps = mapCatalog(er.body, episodesEp.mapping ?? {}).filter(e => e.episode_number != null && (e.season_number == null || e.season_number === sn)).slice(0, 100);
         const { data: have } = await sb.from("episodes").select("id,episode_number").eq("season_id", season.id);
         const map = new Map<number, string>((have ?? []).map((e: any) => [e.episode_number, e.id]));
         for (const e of eps) {
           let eid = map.get(e.episode_number!);
           if (!eid) {
-            const ins = await sb.from("episodes").insert({ season_id: season.id, episode_number: e.episode_number, title: e.title || `Episódio ${e.episode_number}`, description: e.description, thumbnail_url: https(e.thumbnail_url), duration_minutes: e.duration_minutes ? Math.round(e.duration_minutes) : null, status: "published" }).select("id").single();
+            const ins = await sb.from("episodes").insert({ season_id: season.id, episode_number: e.episode_number!, title: e.title || `Episódio ${e.episode_number}`, description: e.description, thumbnail_url: https(e.thumbnail_url), duration_minutes: e.duration_minutes ? Math.round(e.duration_minutes) : null, status: "published" }).select("id").single();
             if (ins.error) continue; eid = ins.data.id as string; report.episodes++;
           }
           if (data.autoPlayer && budget-- > 0) await autoPlayer("episode", eid);

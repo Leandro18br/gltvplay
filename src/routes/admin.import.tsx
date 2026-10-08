@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Check, DownloadCloud, Loader2, Search } from "lucide-react";
+import { ApiImport } from "@/components/admin/integrations/ApiImport";
 import { listImportProviders, searchImport, type ImportItem } from "@/lib/import/import.functions";
 import { db, errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,12 @@ function ImportPage() {
 
   return (
     <div className="space-y-5">
+      <section id="api" className="space-y-3">
+        <h1 className="text-2xl font-bold md:text-3xl">Importar pela API</h1>
+        <p className="text-sm text-muted-foreground">Use as APIs de Catálogo cadastradas em "APIs e Integrações". Nada é duplicado: itens já cadastrados são atualizados.</p>
+        <ApiImport />
+      </section>
+      <hr className="border-border" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Importação de catálogo</h1>

@@ -31,6 +31,7 @@ import { Route as AdminGenresRouteImport } from './routes/admin.genres'
 import { Route as AdminHighlightsRouteImport } from './routes/admin.highlights'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminImportRouteImport } from './routes/admin.import'
+import { Route as AdminIntegrationsRouteImport } from './routes/admin.integrations'
 import { Route as AdminLogsRouteImport } from './routes/admin.logs'
 import { Route as AdminMoviesRouteImport } from './routes/admin.movies'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
@@ -156,6 +157,11 @@ const AdminImportRoute = AdminImportRouteImport.update({
   path: '/import',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminIntegrationsRoute = AdminIntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLogsRoute = AdminLogsRouteImport.update({
   id: '/logs',
   path: '/logs',
@@ -254,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/import': typeof AdminImportRoute
+  '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
@@ -291,6 +298,7 @@ export interface FileRoutesByTo {
   '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/import': typeof AdminImportRoute
+  '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
@@ -331,6 +339,7 @@ export interface FileRoutesById {
   '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/import': typeof AdminImportRoute
+  '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
@@ -371,6 +380,7 @@ export interface FileRouteTypes {
     | '/admin/highlights'
     | '/admin/home'
     | '/admin/import'
+    | '/admin/integrations'
     | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/admin/highlights'
     | '/admin/home'
     | '/admin/import'
+    | '/admin/integrations'
     | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/admin/highlights'
     | '/admin/home'
     | '/admin/import'
+    | '/admin/integrations'
     | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
@@ -642,6 +654,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminImportRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/integrations': {
+      id: '/admin/integrations'
+      path: '/integrations'
+      fullPath: '/admin/integrations'
+      preLoaderRoute: typeof AdminIntegrationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/logs': {
       id: '/admin/logs'
       path: '/logs'
@@ -774,6 +793,7 @@ interface AdminRouteChildren {
   AdminHighlightsRoute: typeof AdminHighlightsRoute
   AdminHomeRoute: typeof AdminHomeRoute
   AdminImportRoute: typeof AdminImportRoute
+  AdminIntegrationsRoute: typeof AdminIntegrationsRoute
   AdminLogsRoute: typeof AdminLogsRoute
   AdminMoviesRoute: typeof AdminMoviesRoute
   AdminProfileRoute: typeof AdminProfileRoute
@@ -793,6 +813,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminHighlightsRoute: AdminHighlightsRoute,
   AdminHomeRoute: AdminHomeRoute,
   AdminImportRoute: AdminImportRoute,
+  AdminIntegrationsRoute: AdminIntegrationsRoute,
   AdminLogsRoute: AdminLogsRoute,
   AdminMoviesRoute: AdminMoviesRoute,
   AdminProfileRoute: AdminProfileRoute,
