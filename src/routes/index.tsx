@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Play, Info, Tv } from "lucide-react";
-import { homeCatalogQuery } from "@/lib/catalog";
+import { homeCatalogQuery, siteSettingsQuery } from "@/lib/catalog";
+import { useQuery } from "@tanstack/react-query";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 
@@ -53,7 +54,19 @@ function Row({ title, items }: { title: string; items: Card[] }) {
 
 function Home() {
   const { data } = useSuspenseQuery(homeCatalogQuery);
-  const hero = data.movies.find((m) => m.featured) ?? data.series.find((s) => s.featured) ?? data.movies[0] ?? data.series[0];
+  const { data: settings } = useQuery(siteSettingsQuery);
+  const texts = (settings?.texts ?? {}) as Record<string, string>;
+  const social = (settings?.social_links ?? {}) as Record<string, string>;
+  const defBanner = (settings?.banner ?? {}) as Record<string, string>;
+  const featuredItem = data.movies.find((m) => m.featured) ?? data.series.find((s) => s.featured) ?? data.movies[0] ?? data.series[0];
+  const b = data.banners[0];
+  const hero = b
+    ? { title: b.title, description: b.subtitle, backdrop_url: b.image_url, cta: b.button_label, href: b.button_url }
+    : featuredItem
+      ? { title: featuredItem.title, description: featuredItem.description, backdrop_url: featuredItem.backdrop_url, cta: null, href: null }
+      : defBanner.title
+        ? { title: defBanner.title, description: defBanner.subtitle ?? null, backdrop_url: defBanner.image_url ?? null, cta: null, href: null }
+        : null;
   const empty = !data.movies.length && !data.series.length && !data.channels.length;
 
   return (
@@ -66,11 +79,15 @@ function Home() {
           <div className="absolute inset-0 bg-side-fade" />
           <div className="absolute inset-0 bg-fade" />
           <div className="relative mx-auto flex h-full max-w-[1600px] flex-col justify-end gap-5 px-5 pb-20 md:px-10">
-            <span className="w-fit rounded-full border border-primary/40 bg-accent/60 px-3 py-1 text-xs font-medium text-accent-foreground">Em destaque</span>
+            <span className="w-fit rounded-full border border-primary/40 bg-accent/60 px-3 py-1 text-xs font-medium text-accent-foreground">{texts.tagline || "Em destaque"}</span>
             <h1 className="animate-rise max-w-2xl text-4xl font-bold md:text-6xl">{hero.title}</h1>
             {hero.description && <p className="max-w-xl text-muted-foreground line-clamp-3">{hero.description}</p>}
             <div className="flex gap-3">
-              <Button size="lg" className="rounded-full"><Play className="fill-current" /> Assistir</Button>
+              {hero.href ? (
+                <Button asChild size="lg" className="rounded-full"><a href={hero.href}><Play className="fill-current" /> {hero.cta || "Assistir"}</a></Button>
+              ) : (
+                <Button size="lg" className="rounded-full"><Play className="fill-current" /> {hero.cta || "Assistir"}</Button>
+              )}
               <Button size="lg" variant="secondary" className="rounded-full"><Info /> Detalhes</Button>
             </div>
           </div>
@@ -86,7 +103,7 @@ function Home() {
               <Tv />
             </div>
             <h1 className="text-2xl font-semibold">O catálogo está sendo preparado</h1>
-            <p className="mt-2 text-muted-foreground">Os conteúdos publicados pelo painel administrativo aparecerão aqui automaticamente.</p>
+            <p className="mt-2 text-muted-foreground">{texts.empty_catalog || "Os conteúdos publicados pelo painel administrativo aparecerão aqui automaticamente."}</p>
           </div>
         )}
         <Row title="Filmes" items={data.movies} />
@@ -104,6 +121,16 @@ function Home() {
           </section>
         )}
       </main>
+      <footer className="border-t border-border px-5 py-10 text-sm text-muted-foreground md:px-10">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4">
+          <p>{texts.footer || `© ${new Date().getFullYear()} ${settings?.platform_name ?? "Streaming"}`}</p>
+          <div className="flex gap-4">
+            {Object.entries(social).filter(([, v]) => v).map(([k, v]) => (
+              <a key={k} href={v} target="_blank" rel="noreferrer" className="capitalize hover:text-primary">{k}</a>
+            ))}
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
