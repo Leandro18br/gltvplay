@@ -6,7 +6,6 @@ import { db } from "@/lib/admin/db";
 import { domainSchema } from "@/lib/playback/embed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { ConfirmDelete } from "./ConfirmDelete";
 
 export function EmbedSettings() {
