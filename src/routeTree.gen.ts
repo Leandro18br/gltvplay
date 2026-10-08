@@ -26,7 +26,6 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBannersRouteImport } from './routes/admin.banners'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
-import { Route as AdminEpisodesRouteImport } from './routes/admin.episodes'
 import { Route as AdminGenresRouteImport } from './routes/admin.genres'
 import { Route as AdminHighlightsRouteImport } from './routes/admin.highlights'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
@@ -35,7 +34,6 @@ import { Route as AdminIntegrationsRouteImport } from './routes/admin.integratio
 import { Route as AdminLogsRouteImport } from './routes/admin.logs'
 import { Route as AdminMoviesRouteImport } from './routes/admin.movies'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
-import { Route as AdminSeasonsRouteImport } from './routes/admin.seasons'
 import { Route as AdminSeriesRouteImport } from './routes/admin.series'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -132,11 +130,6 @@ const AdminChannelsRoute = AdminChannelsRouteImport.update({
   path: '/channels',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminEpisodesRoute = AdminEpisodesRouteImport.update({
-  id: '/episodes',
-  path: '/episodes',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminGenresRoute = AdminGenresRouteImport.update({
   id: '/genres',
   path: '/genres',
@@ -175,11 +168,6 @@ const AdminMoviesRoute = AdminMoviesRouteImport.update({
 const AdminProfileRoute = AdminProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSeasonsRoute = AdminSeasonsRouteImport.update({
-  id: '/seasons',
-  path: '/seasons',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminSeriesRoute = AdminSeriesRouteImport.update({
@@ -255,7 +243,6 @@ export interface FileRoutesByFullPath {
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
-  '/admin/episodes': typeof AdminEpisodesRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
@@ -264,7 +251,6 @@ export interface FileRoutesByFullPath {
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
-  '/admin/seasons': typeof AdminSeasonsRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -293,7 +279,6 @@ export interface FileRoutesByTo {
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
-  '/admin/episodes': typeof AdminEpisodesRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
@@ -302,7 +287,6 @@ export interface FileRoutesByTo {
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
-  '/admin/seasons': typeof AdminSeasonsRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -334,7 +318,6 @@ export interface FileRoutesById {
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
-  '/admin/episodes': typeof AdminEpisodesRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
@@ -343,7 +326,6 @@ export interface FileRoutesById {
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
-  '/admin/seasons': typeof AdminSeasonsRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -375,7 +357,6 @@ export interface FileRouteTypes {
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
-    | '/admin/episodes'
     | '/admin/genres'
     | '/admin/highlights'
     | '/admin/home'
@@ -384,7 +365,6 @@ export interface FileRouteTypes {
     | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
-    | '/admin/seasons'
     | '/admin/series'
     | '/admin/settings'
     | '/admin/users'
@@ -413,7 +393,6 @@ export interface FileRouteTypes {
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
-    | '/admin/episodes'
     | '/admin/genres'
     | '/admin/highlights'
     | '/admin/home'
@@ -422,7 +401,6 @@ export interface FileRouteTypes {
     | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
-    | '/admin/seasons'
     | '/admin/series'
     | '/admin/settings'
     | '/admin/users'
@@ -453,7 +431,6 @@ export interface FileRouteTypes {
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
-    | '/admin/episodes'
     | '/admin/genres'
     | '/admin/highlights'
     | '/admin/home'
@@ -462,7 +439,6 @@ export interface FileRouteTypes {
     | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
-    | '/admin/seasons'
     | '/admin/series'
     | '/admin/settings'
     | '/admin/users'
@@ -619,13 +595,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChannelsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/episodes': {
-      id: '/admin/episodes'
-      path: '/episodes'
-      fullPath: '/admin/episodes'
-      preLoaderRoute: typeof AdminEpisodesRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/genres': {
       id: '/admin/genres'
       path: '/genres'
@@ -680,13 +649,6 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/admin/profile'
       preLoaderRoute: typeof AdminProfileRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/seasons': {
-      id: '/admin/seasons'
-      path: '/seasons'
-      fullPath: '/admin/seasons'
-      preLoaderRoute: typeof AdminSeasonsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/series': {
@@ -788,7 +750,6 @@ interface AdminRouteChildren {
   AdminBannersRoute: typeof AdminBannersRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminChannelsRoute: typeof AdminChannelsRoute
-  AdminEpisodesRoute: typeof AdminEpisodesRoute
   AdminGenresRoute: typeof AdminGenresRoute
   AdminHighlightsRoute: typeof AdminHighlightsRoute
   AdminHomeRoute: typeof AdminHomeRoute
@@ -797,7 +758,6 @@ interface AdminRouteChildren {
   AdminLogsRoute: typeof AdminLogsRoute
   AdminMoviesRoute: typeof AdminMoviesRoute
   AdminProfileRoute: typeof AdminProfileRoute
-  AdminSeasonsRoute: typeof AdminSeasonsRoute
   AdminSeriesRoute: typeof AdminSeriesRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -808,7 +768,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBannersRoute: AdminBannersRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminChannelsRoute: AdminChannelsRoute,
-  AdminEpisodesRoute: AdminEpisodesRoute,
   AdminGenresRoute: AdminGenresRoute,
   AdminHighlightsRoute: AdminHighlightsRoute,
   AdminHomeRoute: AdminHomeRoute,
@@ -817,7 +776,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLogsRoute: AdminLogsRoute,
   AdminMoviesRoute: AdminMoviesRoute,
   AdminProfileRoute: AdminProfileRoute,
-  AdminSeasonsRoute: AdminSeasonsRoute,
   AdminSeriesRoute: AdminSeriesRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
