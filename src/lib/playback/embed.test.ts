@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { domainSchema, normalizeEmbed, normalizePlayback, emptyPlayback } from "./embed";
+import { domainSchema, normalizeEmbed, normalizePlayback, emptyPlayback, embedHost, looksLikePlayerPage } from "./embed";
 
 const policy={domains:["youtube.com","youtube-nocookie.com","player.vimeo.com"],allowIframe:true};
 describe("authorized embeds",()=>{
@@ -12,5 +12,7 @@ describe("authorized embeds",()=>{
   it("validates domains against local addresses and invalid formats",()=>{for(const d of ["localhost","127.0.0.1","https://youtube.com","example.local","*.youtube.com","youtube.com/path"])expect(domainSchema.safeParse(d).success).toBe(false);expect(domainSchema.parse(" Player.Vimeo.com ")).toBe("player.vimeo.com");});
   it("does not require a source for no playback",()=>{expect(normalizePlayback(emptyPlayback,policy)).toBeNull();});
   it("preserves URL and HLS sources",()=>{expect(normalizePlayback({...emptyPlayback,type:"hls",input:"https://example.com/main.m3u8"},policy)).toBe("https://example.com/main.m3u8");expect(normalizePlayback({...emptyPlayback,type:"url",input:"https://example.com/movie.mp4"},policy)).toBe("https://example.com/movie.mp4");});
+  it("reads the host of a URL or iframe code for admin hints",()=>{expect(embedHost("https://Player.Vimeo.com/video/1")).toBe("player.vimeo.com");expect(embedHost('<iframe src="https://youtube.com/embed/1"></iframe>')).toBe("youtube.com");expect(embedHost("texto")).toBeNull();});
+  it("flags player pages saved as Vídeo/URL",()=>{expect(looksLikePlayerPage("https://site.com/filme/24099")).toBe(true);expect(looksLikePlayerPage("https://site.com/movie.mp4")).toBe(false);});
   it("limits normalized embed URL length to 2048",()=>{expect(()=>normalizeEmbed("https://youtube.com/"+"a".repeat(2048),policy)).toThrow();});
 });
