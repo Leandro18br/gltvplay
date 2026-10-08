@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Tv } from "lucide-react";
 import { homeCatalogQuery, siteSettingsQuery, type Item } from "@/lib/catalog";
-import { SiteShell, EmptyState } from "@/components/site/SiteShell";
+import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { Hero, type HeroSlide } from "@/components/site/Hero";
 import { Row, RowSkeleton } from "@/components/site/ContentCard";
 import { ContinueWatchingRow, MyListRow } from "@/components/site/UserRows";
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
   pendingComponent: () => (
     <SiteShell padTop={false}><div className="h-[70vh] animate-pulse bg-card" /><div className="space-y-10 py-10"><RowSkeleton /><RowSkeleton /></div></SiteShell>
   ),
-  errorComponent: () => <SiteShell><EmptyState title="Não foi possível carregar o catálogo" text="Tente novamente em instantes." /></SiteShell>,
+  errorComponent: () => <RetryState title="Não foi possível carregar o catálogo" />,
   notFoundComponent: () => <SiteShell><EmptyState title="Página não encontrada" /></SiteShell>,
   component: Home,
 });

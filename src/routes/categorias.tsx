@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Tags } from "lucide-react";
 import { categoriesQuery } from "@/lib/catalog";
-import { SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
+import { RetryState, SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
 
 export const Route = createFileRoute("/categorias")({
   loader: ({ context }) => context.queryClient.ensureQueryData(categoriesQuery),
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/categorias")({
     ],
     links: [{ rel: "canonical", href: "/categorias" }],
   }),
-  errorComponent: () => <SiteShell><EmptyState title="Não foi possível carregar as categorias" /></SiteShell>,
+  errorComponent: () => <RetryState title="Não foi possível carregar as categorias" />,
   notFoundComponent: () => <SiteShell><EmptyState title="Página não encontrada" /></SiteShell>,
   component: Page,
 });

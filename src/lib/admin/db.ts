@@ -45,7 +45,18 @@ export async function uploadMedia(file: File, folder: string): Promise<string> {
   return data.signedUrl;
 }
 
+export type StaffRole = "super_admin" | "admin" | "editor";
+export const ROLE_LABEL: Record<string, string> = { super_admin: "Super admin", admin: "Administrador", editor: "Editor", user: "Usuário" };
+export const isAdminRole = (r: string | null | undefined) => r === "admin" || r === "super_admin";
+
 export function errMsg(e: unknown) {
-  if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
-  return "Ocorreu um erro";
+  const raw = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "";
+  if (!raw) return "Ocorreu um erro";
+  if (/row-level security|permission denied|forbidden|violates row/i.test(raw)) return "Você não tem permissão para esta ação.";
+  if (/rate limit/i.test(raw)) return "Muitas ações em pouco tempo. Aguarde um minuto e tente de novo.";
+  if (/duplicate key|already exists/i.test(raw)) return "Já existe um registro com esses dados (slug ou identificador duplicado).";
+  if (/check constraint/i.test(raw)) return "Algum campo está fora do formato permitido (título, ano, duração, slug ou URL).";
+  if (/cannot remove your own/i.test(raw)) return "Você não pode remover a sua própria permissão.";
+  if (/Failed to fetch|NetworkError|timeout/i.test(raw)) return "Sem conexão com o servidor. Tente novamente.";
+  return raw;
 }

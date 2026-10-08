@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Play, Radio } from "lucide-react";
 import { channelDetailQuery } from "@/lib/catalog";
-import { SiteShell, EmptyState } from "@/components/site/SiteShell";
+import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { Row } from "@/components/site/ContentCard";
 import { Button } from "@/components/ui/button";
 
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/canal/$slug")({
       links: [{ rel: "canonical", href: `/canal/${params.slug}` }],
     };
   },
-  errorComponent: () => <SiteShell><EmptyState title="Não foi possível carregar este canal" /></SiteShell>,
+  errorComponent: () => <RetryState title="Não foi possível carregar este canal" />,
   notFoundComponent: () => <SiteShell><EmptyState title="Canal não encontrado" /></SiteShell>,
   component: ChannelPage,
 });

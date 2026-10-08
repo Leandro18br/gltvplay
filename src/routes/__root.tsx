@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -16,6 +16,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { useQuery } from "@tanstack/react-query";
 import { siteSettingsQuery } from "@/lib/catalog";
+
+// Admin → site sync: the database is the single source of truth. Realtime change events
+// (plus a periodic safety refresh) invalidate cached catalog reads so the public site re-queries.
+function CatalogSync() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const bump = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["catalog"] });
+        qc.invalidateQueries({ queryKey: ["site_settings"] });
+      }, 400);
+    };
+    const ch = supabase.channel("catalog-sync");
+    for (const table of ["movies", "series", "seasons", "episodes", "channels", "categories", "genres", "banners", "site_settings"]) {
+      ch.on("postgres_changes", { event: "*", schema: "public", table }, bump);
+    }
+    ch.subscribe();
+    const iv = setInterval(() => { if (document.visibilityState === "visible") bump(); }, 120_000);
+    return () => { clearTimeout(t); clearInterval(iv); supabase.removeChannel(ch); };
+  }, [qc]);
+  return null;
+}
 
 function SettingsSync() {
   const { data } = useQuery(siteSettingsQuery);
@@ -140,6 +164,10 @@ function RootComponent() {
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      if (event === "SIGNED_IN") {
+        const dest = sessionStorage.getItem("post_auth_redirect");
+        if (dest && dest.startsWith("/") && !dest.startsWith("//")) { sessionStorage.removeItem("post_auth_redirect"); router.navigate({ to: dest }); }
+      }
       router.invalidate();
       if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
       else queryClient.clear();
@@ -151,6 +179,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <SettingsSync />
+      <CatalogSync />
       <Outlet />
       <Toaster />
     </QueryClientProvider>

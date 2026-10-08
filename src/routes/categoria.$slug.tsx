@@ -2,7 +2,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Film } from "lucide-react";
 import { categoryQuery } from "@/lib/catalog";
-import { SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
+import { RetryState, SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
 import { Row } from "@/components/site/ContentCard";
 
 export const Route = createFileRoute("/categoria/$slug")({
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/categoria/$slug")({
       links: [{ rel: "canonical", href: `/categoria/${params.slug}` }],
     };
   },
-  errorComponent: () => <SiteShell><EmptyState title="Não foi possível carregar a categoria" /></SiteShell>,
+  errorComponent: () => <RetryState title="Não foi possível carregar a categoria" />,
   notFoundComponent: () => <SiteShell><EmptyState title="Categoria não encontrada" /></SiteShell>,
   component: Page,
 });

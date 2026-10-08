@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { catalogListQuery } from "@/lib/catalog";
-import { SiteShell, EmptyState } from "@/components/site/SiteShell";
+import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { CatalogPage, validateCatalogSearch } from "@/components/site/CatalogPage";
 
 export const Route = createFileRoute("/series")({
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/series")({
     ],
     links: [{ rel: "canonical", href: "/series" }],
   }),
-  errorComponent: () => <SiteShell><EmptyState title="Não foi possível carregar" /></SiteShell>,
+  errorComponent: () => <RetryState title="Não foi possível carregar" />,
   notFoundComponent: () => <SiteShell><EmptyState title="Página não encontrada" /></SiteShell>,
   component: Page,
 });

@@ -22,6 +22,20 @@
       "when": 1791426563115,
       "tag": "0002_public_site",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791427278622,
+      "tag": "0003_add_super_admin_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791427340326,
+      "tag": "0004_auth_permissions_profiles",
+      "breakpoints": true
     }
   ]
 }

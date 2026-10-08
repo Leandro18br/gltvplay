@@ -1,7 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { movieDetailQuery } from "@/lib/catalog";
-import { SiteShell, EmptyState } from "@/components/site/SiteShell";
+import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
 import { Row } from "@/components/site/ContentCard";
 
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/filme/$slug")({
       scripts: [{ type: "application/ld+json", children: JSON.stringify({ "@context": "https://schema.org", "@type": "Movie", name: loaderData.title, description: loaderData.description, image: img ?? undefined, dateCreated: loaderData.year ? String(loaderData.year) : undefined }) }],
     };
   },
-  errorComponent: () => <SiteShell><EmptyState title="Não foi possível carregar este filme" /></SiteShell>,
+  errorComponent: () => <RetryState title="Não foi possível carregar este filme" />,
   notFoundComponent: () => <SiteShell><EmptyState title="Filme não encontrado" text="Ele pode ter sido removido ou ainda não foi publicado." /></SiteShell>,
   component: MoviePage,
 });

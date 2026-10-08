@@ -18,29 +18,35 @@ export type Database = {
         Row: {
           action: string
           actor_id: string | null
+          actor_role: string | null
           changes: Json | null
           created_at: string
           entity: string
           entity_id: string | null
           id: string
+          summary: string | null
         }
         Insert: {
           action: string
           actor_id?: string | null
+          actor_role?: string | null
           changes?: Json | null
           created_at?: string
           entity: string
           entity_id?: string | null
           id?: string
+          summary?: string | null
         }
         Update: {
           action?: string
           actor_id?: string | null
+          actor_role?: string | null
           changes?: Json | null
           created_at?: string
           entity?: string
           entity_id?: string | null
           id?: string
+          summary?: string | null
         }
         Relationships: []
       }
@@ -789,7 +795,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      my_role: { Args: never; Returns: string }
       popular_content: {
         Args: {
           _kind: Database["public"]["Enums"]["content_kind"]
@@ -810,7 +818,7 @@ export type Database = {
     }
     Enums: {
       account_status: "active" | "suspended" | "banned"
-      app_role: "admin" | "editor" | "user"
+      app_role: "admin" | "editor" | "user" | "super_admin"
       content_kind: "movie" | "series" | "episode" | "channel"
       content_status: "draft" | "published" | "archived"
     }
@@ -941,7 +949,7 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["active", "suspended", "banned"],
-      app_role: ["admin", "editor", "user"],
+      app_role: ["admin", "editor", "user", "super_admin"],
       content_kind: ["movie", "series", "episode", "channel"],
       content_status: ["draft", "published", "archived"],
     },
