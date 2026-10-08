@@ -8,7 +8,7 @@ import { EmptyState, PageTitle } from "./SiteShell";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export type CatalogSearch = { genero?: string; ordem?: SortKey };
+export type CatalogSearch = { genero?: string | undefined; ordem?: SortKey | undefined };
 
 export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; title: string; subtitle: string; search: CatalogSearch }) {
   const navigate = useNavigate();
@@ -21,7 +21,7 @@ export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; tit
     const el = sentinel.current;
     if (!el) return;
     const io = new IntersectionObserver((e) => {
-      if (e[0].isIntersecting && q.hasNextPage && !q.isFetchingNextPage) q.fetchNextPage();
+      if (e[0]?.isIntersecting && q.hasNextPage && !q.isFetchingNextPage) q.fetchNextPage();
     }, { rootMargin: "600px" });
     io.observe(el);
     return () => io.disconnect();
@@ -69,6 +69,6 @@ export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; tit
 }
 
 export const validateCatalogSearch = (s: Record<string, unknown>): CatalogSearch => ({
-  genero: typeof s.genero === "string" && s.genero ? s.genero : undefined,
-  ordem: s.ordem === "year" || s.ordem === "title" ? s.ordem : undefined,
+  genero: typeof s["genero"] === "string" && s["genero"] ? s["genero"] : undefined,
+  ordem: s["ordem"] === "year" || s["ordem"] === "title" ? s["ordem"] : undefined,
 });

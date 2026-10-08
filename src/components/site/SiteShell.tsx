@@ -22,7 +22,7 @@ function MobileNav() {
           <li key={n.to}>
             <Link
               to={n.to}
-              search={n.to === "/buscar" ? { q: "" } : undefined}
+              {...(n.to === "/buscar" ? { search: { q: "" } } : {})}
               activeOptions={{ exact: "exact" in n }}
               className="flex flex-col items-center gap-1 py-2.5 text-[10px] text-muted-foreground transition-colors"
               activeProps={{ className: "!text-primary" }}
@@ -70,7 +70,7 @@ export function SiteShell({ children, padTop = true }: { children: ReactNode; pa
   );
 }
 
-export function PageTitle({ title, subtitle, children }: { title: string; subtitle?: string | null; children?: ReactNode }) {
+export function PageTitle({ title, subtitle, children }: { title: string; subtitle?: string | null | undefined; children?: ReactNode }) {
   return (
     <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 pb-6 md:flex-row md:items-end md:justify-between md:px-10">
       <div className="min-w-0">

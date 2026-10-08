@@ -7,7 +7,7 @@ import { SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { CardGrid, GridSkeleton } from "@/components/site/ContentCard";
 
 export const Route = createFileRoute("/buscar")({
-  validateSearch: (s: Record<string, unknown>) => ({ q: typeof s.q === "string" ? s.q : "" }),
+  validateSearch: (s: Record<string, unknown>) => ({ q: typeof s["q"] === "string" ? s["q"] : "" }),
   head: () => ({
     meta: [
       { title: "Buscar — Streaming" },

@@ -251,7 +251,7 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 my-auto h-1 rounded-full bg-foreground/25" style={{ width: dur ? `${(buffered / dur) * 100}%` : 0 }} />
                 <Slider aria-label="Progresso" value={[time]} max={dur || 1} step={1}
-                  onValueChange={([v]) => { if (video.current) video.current.currentTime = v; setTime(v); }} />
+                  onValueChange={([v = 0]) => { if (video.current) video.current.currentTime = v; setTime(v); }} />
               </div>
               <span>{fmt(dur)}</span>
             </div>
@@ -261,7 +261,7 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
             {!live && <><Ctrl label="Voltar 10s" onClick={() => seekBy(-10)}><RotateCcw /></Ctrl><Ctrl label="Avançar 10s" onClick={() => seekBy(10)}><RotateCw /></Ctrl></>}
             <div className="group/vol flex items-center">
               <Ctrl label={muted ? "Ativar som" : "Silenciar"} onClick={() => setMuted((m) => !m)}>{muted || vol === 0 ? <VolumeX /> : <Volume2 />}</Ctrl>
-              <div className="hidden w-24 md:block"><Slider aria-label="Volume" value={[muted ? 0 : vol]} max={1} step={0.05} onValueChange={([v]) => { setVol(v); setMuted(v === 0); }} /></div>
+              <div className="hidden w-24 md:block"><Slider aria-label="Volume" value={[muted ? 0 : vol]} max={1} step={0.05} onValueChange={([v = 0]) => { setVol(v); setMuted(v === 0); }} /></div>
             </div>
             {live && <span className="ml-2 flex items-center gap-1 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold uppercase text-destructive-foreground"><Radio className="size-3" /> Ao vivo</span>}
             <div className="ml-auto flex items-center gap-1 md:gap-2">

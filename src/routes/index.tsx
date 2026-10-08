@@ -41,7 +41,8 @@ function Home() {
   });
   if (!slides.length) {
     const featured = [...data.featuredMovies, ...data.featuredSeries].slice(0, 5);
-    const pool = featured.length ? featured : [data.movies[0] ?? data.series[0]].filter(Boolean);
+    const first = data.movies[0] ?? data.series[0];
+    const pool: Item[] = featured.length ? featured : first ? [first] : [];
     pool.forEach((i) => slides.push({ key: `i-${i.id}`, item: i, title: i.title, description: i.description, backdrop: i.backdrop_url || i.poster_url }));
   }
   if (!slides.length && defBanner.title) slides.push({ key: "default", item: null, title: defBanner.title, description: defBanner.subtitle ?? null, backdrop: defBanner.image_url ?? null });

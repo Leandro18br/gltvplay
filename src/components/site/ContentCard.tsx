@@ -24,7 +24,7 @@ export function WatchlistButton({ item, className = "" }: { item: Item; classNam
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!wl.user) return toast.info("Entre na sua conta para usar a Minha lista.");
+        if (!wl.user) { toast.info("Entre na sua conta para usar a Minha lista."); return; }
         wl.toggle.mutate(
           { id: item.id, kind: item.kind as "movie" | "series" },
           {

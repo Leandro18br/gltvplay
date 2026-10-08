@@ -26,7 +26,7 @@ export function WatchButton({ item, label = "Assistir", size = "lg" }: { item: I
   );
 }
 
-export function Hero({ slides, tagline }: { slides: HeroSlide[]; tagline?: string }) {
+export function Hero({ slides, tagline }: { slides: HeroSlide[]; tagline?: string | undefined }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     if (slides.length < 2) return;
