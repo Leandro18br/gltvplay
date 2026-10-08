@@ -109,7 +109,7 @@ function PlayGate({ data, onPlay }: { data: NonNullable<ReturnType<typeof usePla
         <button type="button" onClick={onPlay} aria-label={`Reproduzir ${data.title}`} className="group relative block aspect-[19/12] w-full max-w-[380px] cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border">
           {data.poster && <img src={data.poster} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
           <span className="absolute inset-0 bg-background/55 transition group-hover:bg-background/40" />
-          <span className="absolute left-1/2 top-1/2 flex size-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-glow transition duration-300 group-hover:scale-110 group-active:scale-95">
+          <span className="absolute left-1/2 top-1/2 flex size-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-foreground shadow-glow transition duration-300 group-hover:scale-110 group-active:scale-95">
             <Play className="ml-1 size-9 fill-current" />
           </span>
         </button>
