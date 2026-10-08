@@ -173,8 +173,14 @@ export const categoriesConfig: ResourceConfig = {
 
 export const genresConfig: ResourceConfig = {
   table: "genres", title: "Gêneros", singular: "Gênero", searchCol: "name",
+  select: "*, movie_genres(count), series_genres(count)",
   sortOptions: [{ value: "name:asc", label: "Nome A–Z" }, { value: "created_at:desc", label: "Mais recentes" }],
-  columns: [{ key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name}</span> }, { key: "slug", label: "Slug" }],
+  columns: [
+    { key: "name", label: "Nome", render: (r) => <div><p className="font-medium">{r.name}</p>{r.is_fixed && <p className="text-xs text-muted-foreground">Padrão do sistema</p>}</div> },
+    { key: "movies", label: "Filmes", render: (r) => r.movie_genres?.[0]?.count ?? 0 },
+    { key: "series", label: "Séries", render: (r) => r.series_genres?.[0]?.count ?? 0 },
+    { key: "active", label: "Status", render: () => <span className="rounded-full border border-primary/40 bg-accent px-2 py-0.5 text-xs text-accent-foreground">Ativa</span> },
+  ],
   fields: [
     { name: "name", label: "Nome", type: "text", required: true },
     { name: "slug", label: "Slug", type: "text", required: true, placeholder: "ex: comedia" },
