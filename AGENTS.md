@@ -20,3 +20,6 @@
 - Admin area lives under `/admin` (own ssr:false gate checking `is_staff`); login at `/admin/login` (`admin_.login.tsx`, un-nested). Why: separate admin entry from public auth.
 - Catalog import providers live in `src/lib/import/import.functions.ts` (licensed APIs only, keys via server secrets); imports dedupe on (external_source, external_id). Why: pluggable future integrations.
 - Public site reads go through query factories in `src/lib/catalog.ts`; viewer data (history/watchlist) through `src/lib/user-data.ts`; signed-in pages (player, Minha lista, Perfil) live under `_authenticated/`. Why: one source for catalog reads and RLS-scoped user data.
+- Permission levels: super_admin > admin > editor > user, enforced by RLS (`is_staff` = create/edit, `is_admin` = delete/settings/logs/users) and `admin_set_role`; UI hiding is cosmetic only. Why: backend is the security boundary.
+- Viewer history/watchlist rows carry `viewer_profile_id`; active profile is per-device (`useActiveProfile`). Why: multiple profiles per account.
+- Public site cache is invalidated by Realtime events on catalog tables (`CatalogSync` in __root) plus periodic refresh. Why: admin changes reflect without reloads.
