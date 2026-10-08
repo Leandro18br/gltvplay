@@ -4,8 +4,13 @@ import { publishedHomeQuery } from "@/lib/home/queries";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { RowSkeleton } from "@/components/site/ContentCard";
 import { HomeContent } from "@/components/site/HomeContent";
+import { siteSettingsQuery } from "@/lib/catalog";
 
 export const Route = createFileRoute("/")({
+  loader: async ({ context }) => {
+    const [home] = await Promise.all([context.queryClient.ensureQueryData(publishedHomeQuery), context.queryClient.ensureQueryData(siteSettingsQuery)]);
+    return home;
+  },
   head: ({ loaderData }) => ({
     meta: [
       { title: `${loaderData?.platformName ?? "Streaming"} — Filmes, séries e canais ao vivo` },
@@ -18,7 +23,6 @@ export const Route = createFileRoute("/")({
     ],
     links: [{ rel: "canonical", href: "/" }],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(publishedHomeQuery),
   pendingComponent: () => (
     <SiteShell padTop={false}><div className="h-[70vh] animate-pulse bg-card" /><div className="space-y-10 py-10"><RowSkeleton /><RowSkeleton /></div></SiteShell>
   ),
