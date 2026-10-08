@@ -20,7 +20,7 @@ export function HomeManager({ initialTab = "sections" }: { initialTab?: "section
   const query=useQuery({ ...homeDraftQuery, refetchOnWindowFocus: false });
   if(query.isPending) return <div className="animate-pulse space-y-4"><div className="h-12 bg-muted" /><div className="h-60 bg-muted" /></div>;
   if(query.isError) return <div className="space-y-4"><h1 className="text-xl">Não foi possível carregar a Home</h1><Button onClick={()=>query.refetch()}>Tentar novamente</Button></div>;
-  return <HomeEditor key={`${query.data.revision}:${query.dataUpdatedAt}`} initial={query.data.config} initialRevision={query.data.revision} initialTab={initialTab} />;
+  return <HomeEditor initial={query.data.config} initialRevision={query.data.revision} initialTab={initialTab} />;
 }
 function HomeEditor({initial,initialRevision,initialTab}:{initial:HomeConfig;initialRevision:number;initialTab:"sections"|"banners"}) {
   const [config,setConfig]=useState(initial); const [revision,setRevision]=useState(initialRevision);const [saved,setSaved]=useState(JSON.stringify(initial));
