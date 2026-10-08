@@ -1067,6 +1067,13 @@ export type Database = {
           general: Json
           id: number
           logo_url: string | null
+          megaembed_color: string | null
+          megaembed_enabled: boolean
+          megaembed_episode_template: string
+          megaembed_json_movies_url: string | null
+          megaembed_json_series_url: string | null
+          megaembed_movie_template: string
+          megaembed_player: string | null
           platform_name: string
           social_links: Json
           texts: Json
@@ -1080,6 +1087,13 @@ export type Database = {
           general?: Json
           id?: number
           logo_url?: string | null
+          megaembed_color?: string | null
+          megaembed_enabled?: boolean
+          megaembed_episode_template?: string
+          megaembed_json_movies_url?: string | null
+          megaembed_json_series_url?: string | null
+          megaembed_movie_template?: string
+          megaembed_player?: string | null
           platform_name?: string
           social_links?: Json
           texts?: Json
@@ -1093,6 +1107,13 @@ export type Database = {
           general?: Json
           id?: number
           logo_url?: string | null
+          megaembed_color?: string | null
+          megaembed_enabled?: boolean
+          megaembed_episode_template?: string
+          megaembed_json_movies_url?: string | null
+          megaembed_json_series_url?: string | null
+          megaembed_movie_template?: string
+          megaembed_player?: string | null
           platform_name?: string
           social_links?: Json
           texts?: Json

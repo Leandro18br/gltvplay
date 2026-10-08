@@ -6,6 +6,8 @@ import { ArrowDown, ArrowUp, CloudDownload, Loader2, Plus, Star, Trash2 } from "
 import { db, errMsg } from "@/lib/admin/db";
 import { addPlayerSource, findPlayer } from "@/lib/integrations/integrations.functions";
 import { detectPlayer } from "@/lib/integrations/engine";
+import { buildMegaEmbedUrl } from "@/lib/integrations/megaembed";
+import { megaEmbedQuery } from "./MegaEmbedCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -37,6 +39,30 @@ export function SourcesManager({ kind, contentId }: { kind: "movie" | "episode";
     [arr[i], arr[j]] = [arr[j]!, arr[i]!];
     await Promise.all(arr.map((x, n) => db.from("playback_sources").update({ sort_order: n }).eq("id", x.id))); refresh();
   }
+  async function addMega() {
+    setBusy(true);
+    try {
+      const cfg = await qc.fetchQuery(megaEmbedQuery);
+      if (!cfg.megaembed_enabled) throw new Error("O MegaEmbed está inativo em APIs e Integrações");
+      const base = { movieTemplate: cfg.megaembed_movie_template, episodeTemplate: cfg.megaembed_episode_template, player: cfg.megaembed_player, color: cfg.megaembed_color };
+      let url: string;
+      if (kind === "movie") {
+        const m = await db.from("movies").select("tmdb_id").eq("id", contentId).single();
+        if (m.error) throw m.error;
+        if (!m.data.tmdb_id) throw new Error("Este filme não tem TMDB ID");
+        url = buildMegaEmbedUrl(base, { kind: "movie", tmdbId: Number(m.data.tmdb_id) });
+      } else {
+        const e = await db.from("episodes").select("episode_number, seasons(season_number, series(tmdb_id))").eq("id", contentId).single();
+        if (e.error) throw e.error;
+        const d = e.data as unknown as { episode_number: number; seasons: { season_number: number; series: { tmdb_id: number | null } | null } | null };
+        const tmdb = d.seasons?.series?.tmdb_id;
+        if (!tmdb) throw new Error("A série deste episódio não tem TMDB ID");
+        url = buildMegaEmbedUrl(base, { kind: "episode", tmdbSeriesId: Number(tmdb), season: d.seasons!.season_number, episode: d.episode_number });
+      }
+      setBusy(false);
+      await save({ type: "embed", url }, null, "MegaEmbed");
+    } catch (e) { toast.error(errMsg(e)); setBusy(false); }
+  }
   const manualPlayer = manual.trim() ? detectPlayer(manual, ptype) : null;
   function editUrl(s: Src, raw: string) {
     if (!raw.trim() || raw.trim() === s.url) return;
@@ -47,7 +73,7 @@ export function SourcesManager({ kind, contentId }: { kind: "movie" | "episode";
 
   return (
     <div className="space-y-3 rounded-xl border border-border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">Fontes / Players {kind === "movie" ? "do filme" : "deste episódio"}</p><div className="flex flex-wrap gap-2"><Button type="button" size="sm" onClick={() => setAdding(true)}><Plus /> Adicionar fonte</Button><Button type="button" size="sm" variant="secondary" disabled={busy} onClick={lookup}>{busy ? <Loader2 className="animate-spin" /> : <CloudDownload />} Buscar player pela API</Button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">Fontes / Players {kind === "movie" ? "do filme" : "deste episódio"}</p><div className="flex flex-wrap gap-2"><Button type="button" size="sm" onClick={() => setAdding(true)}><Plus /> Adicionar fonte</Button><Button type="button" size="sm" variant="outline" disabled={busy} onClick={addMega}><Plus /> MegaEmbed</Button><Button type="button" size="sm" variant="secondary" disabled={busy} onClick={lookup}>{busy ? <Loader2 className="animate-spin" /> : <CloudDownload />} Buscar player pela API</Button></div></div>
       {found?.attempts.length ? <ul className="space-y-0.5 text-xs text-muted-foreground">{found.attempts.map((a, n) => <li key={n}>{n + 1}º {a.integration}: {a.ok ? "player encontrado" : a.error ?? `HTTP ${a.status}`}{a.cached && " (cache)"}</li>)}</ul> : null}
       {found?.player && <div className="space-y-2 rounded-lg border border-primary/40 bg-accent/30 p-3 text-sm">
         <p>Encontrado por <b>{found.integrationName}</b> · {found.player.type.toUpperCase()}</p><p className="break-all font-mono text-xs">{found.player.url}</p>
