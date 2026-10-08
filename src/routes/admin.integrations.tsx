@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IntegrationDialog } from "@/components/admin/integrations/IntegrationDialog";
 import { EndpointsDialog } from "@/components/admin/integrations/EndpointsDialog";
 import { TesterDialog } from "@/components/admin/integrations/TesterDialog";
+import { EmbedSettings } from "@/components/admin/EmbedSettings";
 import { TmdbIntegrationCard } from "@/components/admin/tmdb/TmdbTools";
 import { StatusBadge, fmtDate, type Integration } from "@/components/admin/integrations/shared";
 
@@ -90,6 +91,7 @@ function IntegrationsPage() {
       <IntegrationDialog open={form.open} row={form.row} onOpenChange={o => setForm(f => ({ ...f, open: o }))} onSaved={refresh} />
       <EndpointsDialog integration={eps} onOpenChange={o => !o && setEps(null)} />
       <TesterDialog integration={test} onOpenChange={o => !o && setTest(null)} onDone={refresh} />
+      <EmbedSettings />
     </div>
   );
 }
