@@ -16,5 +16,5 @@
 - [x] Verified with the real list (391k entries) and a no-duplicate import test.
 
 # M3U responsive interface
-- [ ] Fit M3U list cards, forms, explorer, progress and actions within the available width without changing import logic.
-- [ ] Verify authenticated M3U interface at 320, 360, 375, 390, 412, 768, 1024 and desktop widths.
+- [x] Fit M3U list cards, forms, explorer, progress and actions within the available width without changing import logic.
+- [x] Verify authenticated M3U interface at 320, 360, 375, 390, 412, 768, 1024 and desktop widths; real list search/selection, internal scrolling and create/edit dialogs checked. All nine existing M3U tests passed; no import or indexing rerun to avoid modifying catalog data.
