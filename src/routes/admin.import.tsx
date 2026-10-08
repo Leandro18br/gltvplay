@@ -73,6 +73,12 @@ function ImportPage() {
 
   return (
     <div className="space-y-5">
+      <section id="api" className="space-y-3">
+        <h1 className="text-2xl font-bold md:text-3xl">Importar pela API</h1>
+        <p className="text-sm text-muted-foreground">Use as APIs de Catálogo cadastradas em "APIs e Integrações". Nada é duplicado: itens já cadastrados são atualizados.</p>
+        <ApiImport />
+      </section>
+      <hr className="border-border" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Importação de catálogo</h1>
