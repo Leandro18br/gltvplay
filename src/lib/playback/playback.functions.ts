@@ -21,7 +21,9 @@ export const savePlayback = createServerFn({method:"POST"}).middleware([requireS
   const url=normalizePlayback(data.value,{domains:domains.data.map(d=>d.hostname),allowIframe:true});
   if((data.value.type==="embed"||isIframeCode(data.value.input)) && url && new URL(url).origin===new URL(getRequest().url).origin)throw new Error("Não incorpore a própria plataforma");
   if(data.value.type==="none") {
-    const r=await context.supabase.from("playback_sources").update({is_active:false}).eq("content_kind",data.kind).eq("content_id",data.contentId);
+    // Only the source shown in this form is turned off; alternative players (e.g. found by an API) stay untouched.
+    if(!data.value.id) return {id:null};
+    const r=await context.supabase.from("playback_sources").update({is_active:false}).eq("id",data.value.id).eq("content_kind",data.kind).eq("content_id",data.contentId);
     if(r.error) throw new Error("Não foi possível desativar as fontes"); return {id:null};
   }
   if(!url) throw new Error("Fonte inválida");
