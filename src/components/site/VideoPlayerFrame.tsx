@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type ComponentProps } from "react";
 import { Cast, Loader2, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Settings2, Volume2, VolumeX, AlertTriangle } from "lucide-react";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
+import * as SliderPrimitive from "@radix-ui/react-slider";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { CONTROLS_IDLE_MS, PLAYBACK_RATES, isTextEntry, playbackTime, seekTarget } from "@/lib/playback/controls";
 
 export type PlayerServer = { id: string; label: string | null };
+function Slider({ className, "aria-label": label, ...props }: ComponentProps<typeof SliderPrimitive.Root>) {
+  return <SliderPrimitive.Root {...props} className={`relative flex w-full touch-none select-none items-center ${className ?? ""}`}>
+    <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-player-foreground/20"><SliderPrimitive.Range className="absolute h-full bg-primary" /></SliderPrimitive.Track>
+    <SliderPrimitive.Thumb aria-label={label} className="block size-4 rounded-full border border-primary/50 bg-primary shadow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-player-foreground" />
+  </SliderPrimitive.Root>;
+}
 type RemoteVideo = HTMLVideoElement & {
   remote?: { watchAvailability: (callback: (available: boolean) => void) => Promise<number>; cancelWatchAvailability: (id: number) => Promise<void>; prompt: () => Promise<void> };
   webkitShowPlaybackTargetPicker?: () => void;
