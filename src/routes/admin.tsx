@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard, LayoutTemplate, Film, Tv, Layers, PlaySquare, Radio, Tags, Shapes, Users, Image, Star,
+  LayoutDashboard, LayoutTemplate, Film, Tv, Radio, Tags, Shapes, Users, Image, Star,
   Settings, ScrollText, UserCircle, LogOut, Menu, DownloadCloud, ExternalLink, Cable,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,8 +29,6 @@ const NAV = [
   { to: "/admin/home", label: "Home do site", icon: LayoutTemplate },
   { to: "/admin/movies", label: "Filmes", icon: Film },
   { to: "/admin/series", label: "Séries", icon: Tv },
-  { to: "/admin/seasons", label: "Temporadas", icon: Layers },
-  { to: "/admin/episodes", label: "Episódios", icon: PlaySquare },
   { to: "/admin/channels", label: "Canais", icon: Radio },
   { to: "/admin/categories", label: "Categorias", icon: Tags },
   { to: "/admin/genres", label: "Gêneros", icon: Shapes },

@@ -57,7 +57,7 @@ export const seriesConfig: ResourceConfig = {
     { key: "seasons", label: "Temporadas", render: (r) => r.seasons?.[0]?.count ?? 0 },
   ],
   rowActions: (r) => (
-    <Button asChild size="icon" variant="ghost" aria-label="Temporadas"><Link to="/admin/seasons" search={{ series: r.id }}><Layers /></Link></Button>
+    <Button asChild size="icon" variant="ghost" aria-label="Abrir série"><Link to="/admin/series/$id" params={{ id: r.id }}><Layers /></Link></Button>
   ),
   fields: [
     { name: "title", label: "Título", type: "text", required: true },
@@ -76,7 +76,8 @@ export const seriesConfig: ResourceConfig = {
 export const seasonsConfig: ResourceConfig = {
   table: "seasons", title: "Temporadas", singular: "Temporada", searchCol: "title",
   select: "*, series(title), episodes(count)",
-  sortOptions: [{ value: "season_number:asc", label: "Número" }, { value: "created_at:desc", label: "Mais recentes" }],
+  hasStatus: true, reorderCol: "season_number",
+  sortOptions: [{ value: "season_number:asc", label: "Número" }, { value: "sort_order:asc", label: "Ordem manual" }, { value: "created_at:desc", label: "Mais recentes" }],
   scope: { col: "series_id", table: "series", select: "id,title", label: "Série", labelOf: (r) => r.title },
   columns: [
     { key: "poster_url", label: "", render: (r) => <Thumb src={r.poster_url} />, className: "w-14" },
@@ -86,13 +87,15 @@ export const seasonsConfig: ResourceConfig = {
     { key: "episodes", label: "Episódios", render: (r) => r.episodes?.[0]?.count ?? 0 },
   ],
   rowActions: (r) => (
-    <Button asChild size="icon" variant="ghost" aria-label="Episódios"><Link to="/admin/episodes" search={{ season: r.id }}><PlaySquare /></Link></Button>
+    <Button asChild size="icon" variant="ghost" aria-label="Gerenciar episódios"><Link to="/admin/series/$id/temporada/$seasonId" params={{ id: r.series_id, seasonId: r.id }}><PlaySquare /></Link></Button>
   ),
   fields: [
     { name: "series_id", label: "Série", type: "relation", table: "series", select: "id,title", required: true },
     { name: "season_number", label: "Número da temporada", type: "number", required: true },
-    { name: "title", label: "Título", type: "text", full: true },
-    { name: "poster_url", label: "Poster", type: "image", folder: "seasons", aspect: "aspect-[2/3]" },
+    { name: "title", label: "Nome da temporada", type: "text" },
+    { name: "description", label: "Descrição", type: "textarea" },
+    { ...status, defaultValue: "published" }, sortOrder,
+    { name: "poster_url", label: "Poster/capa (opcional)", type: "image", folder: "seasons", aspect: "aspect-[2/3]" },
   ],
 };
 

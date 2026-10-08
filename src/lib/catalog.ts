@@ -227,7 +227,7 @@ export const seriesDetailQuery = (param: string) =>
       const item = toSeries(data);
       const { data: seasons, error: e2 } = await sb
         .from("seasons")
-        .select("id,season_number,title,poster_url,episodes(id,episode_number,title,description,thumbnail_url,duration_minutes,release_date,status)")
+        .select("id,season_number,title,poster_url,status,episodes(id,episode_number,title,description,thumbnail_url,duration_minutes,release_date,status)")
         .eq("series_id", item.id)
         .order("season_number");
       if (e2) throw e2;
