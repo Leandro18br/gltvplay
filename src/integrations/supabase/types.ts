@@ -1676,9 +1676,24 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      m3u_episode_counts: {
+        Args: { _keys: string[]; _list: string }
+        Returns: {
+          n: number
+          series_key: string
+        }[]
+      }
+      m3u_finalize_chunk: {
+        Args: { _from: number; _gen: number; _limit: number; _list: string }
+        Returns: Json
+      }
       m3u_finalize_index: {
         Args: { _gen: number; _list: string }
         Returns: Json
+      }
+      m3u_finalize_sources: {
+        Args: { _gen: number; _list: string }
+        Returns: undefined
       }
       m3u_groups: {
         Args: { _kind: string; _list: string }
