@@ -120,6 +120,7 @@ export const episodesConfig: ResourceConfig = {
     { key: "episode_number", label: "Nº" },
     { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{r.seasons ? seasonLabel(r.seasons) : ""}</p></div> },
     { key: "duration_minutes", label: "Duração", render: (r) => (r.duration_minutes ? `${r.duration_minutes} min` : "—") },
+    { key: "release_date", label: "Lançamento", render: (r) => (r.release_date ? String(r.release_date).split("-").reverse().join("/") : "—") },
     { key: "sources", label: "Fonte/Player", render: (r) => <SourcesCount id={r.id} /> },
   ],
   fields: [
