@@ -4,6 +4,17 @@ import type { ResourceConfig, Field } from "@/components/admin/ResourceManager";
 import { Thumb } from "@/components/admin/ResourceManager";
 import { KIND_OPTIONS, STATUS_OPTIONS, type Row } from "./db";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { db } from "./db";
+
+function SourcesCount({ id }: { id: string }) {
+  const q = useQuery({ queryKey: ["admin", "playback_sources", "count", id], queryFn: async () => {
+    const { count } = await db.from("playback_sources").select("id", { count: "exact", head: true }).eq("content_kind", "episode").eq("content_id", id).eq("is_active", true);
+    return count ?? 0;
+  } });
+  if (q.data == null) return <span className="text-muted-foreground">…</span>;
+  return q.data ? <span className="rounded-full border border-primary/40 bg-accent px-2 py-0.5 text-xs text-accent-foreground">{q.data} player(s)</span> : <span className="text-xs text-muted-foreground">Sem player</span>;
+}
 
 const status: Field = { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS, defaultValue: "draft" };
 const featured: Field = { name: "featured", label: "Marcar como destaque", type: "boolean" };
@@ -57,7 +68,7 @@ export const seriesConfig: ResourceConfig = {
     { key: "seasons", label: "Temporadas", render: (r) => r.seasons?.[0]?.count ?? 0 },
   ],
   rowActions: (r) => (
-    <Button asChild size="icon" variant="ghost" aria-label="Temporadas"><Link to="/admin/seasons" search={{ series: r.id }}><Layers /></Link></Button>
+    <Button asChild size="icon" variant="ghost" aria-label="Abrir série"><Link to="/admin/series/$id" params={{ id: r.id }}><Layers /></Link></Button>
   ),
   fields: [
     { name: "title", label: "Título", type: "text", required: true },
@@ -76,7 +87,8 @@ export const seriesConfig: ResourceConfig = {
 export const seasonsConfig: ResourceConfig = {
   table: "seasons", title: "Temporadas", singular: "Temporada", searchCol: "title",
   select: "*, series(title), episodes(count)",
-  sortOptions: [{ value: "season_number:asc", label: "Número" }, { value: "created_at:desc", label: "Mais recentes" }],
+  hasStatus: true, reorderCol: "season_number",
+  sortOptions: [{ value: "season_number:asc", label: "Número" }, { value: "sort_order:asc", label: "Ordem manual" }, { value: "created_at:desc", label: "Mais recentes" }],
   scope: { col: "series_id", table: "series", select: "id,title", label: "Série", labelOf: (r) => r.title },
   columns: [
     { key: "poster_url", label: "", render: (r) => <Thumb src={r.poster_url} />, className: "w-14" },
@@ -86,13 +98,15 @@ export const seasonsConfig: ResourceConfig = {
     { key: "episodes", label: "Episódios", render: (r) => r.episodes?.[0]?.count ?? 0 },
   ],
   rowActions: (r) => (
-    <Button asChild size="icon" variant="ghost" aria-label="Episódios"><Link to="/admin/episodes" search={{ season: r.id }}><PlaySquare /></Link></Button>
+    <Button asChild size="icon" variant="ghost" aria-label="Gerenciar episódios"><Link to="/admin/series/$id/temporada/$seasonId" params={{ id: r.series_id, seasonId: r.id }}><PlaySquare /></Link></Button>
   ),
   fields: [
     { name: "series_id", label: "Série", type: "relation", table: "series", select: "id,title", required: true },
     { name: "season_number", label: "Número da temporada", type: "number", required: true },
-    { name: "title", label: "Título", type: "text", full: true },
-    { name: "poster_url", label: "Poster", type: "image", folder: "seasons", aspect: "aspect-[2/3]" },
+    { name: "title", label: "Nome da temporada", type: "text" },
+    { name: "description", label: "Descrição", type: "textarea" },
+    { ...status, defaultValue: "published" }, sortOrder,
+    { name: "poster_url", label: "Poster/capa (opcional)", type: "image", folder: "seasons", aspect: "aspect-[2/3]" },
   ],
 };
 
@@ -108,6 +122,7 @@ export const episodesConfig: ResourceConfig = {
     { key: "episode_number", label: "Nº" },
     { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{r.seasons ? seasonLabel(r.seasons) : ""}</p></div> },
     { key: "duration_minutes", label: "Duração", render: (r) => (r.duration_minutes ? `${r.duration_minutes} min` : "—") },
+    { key: "sources", label: "Fonte/Player", render: (r) => <SourcesCount id={r.id} /> },
   ],
   fields: [
     { name: "season_id", label: "Temporada", type: "relation", table: "seasons", select: "id, season_number, series(title)", labelOf: seasonLabel, required: true },

@@ -107,7 +107,7 @@ function GenresPicker({ value, onChange }: { value: string[]; onChange: (v: stri
   );
 }
 
-export function ResourceManager({ config, initialScope }: { config: ResourceConfig; initialScope?: string | undefined }) {
+export function ResourceManager({ config, initialScope, lockScope, editId, title }: { config: ResourceConfig; initialScope?: string | undefined; lockScope?: boolean; editId?: string | undefined; title?: string }) {
   const qc = useQueryClient();
   const validateSource = useServerFn(validatePlayback);
   const saveSource = useServerFn(savePlayback);
@@ -145,6 +145,13 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
       return { rows: data as Row[], count: count ?? 0 };
     },
   });
+
+  // Opens a record directly (e.g. "Editar série" from the series page).
+  useEffect(() => {
+    if (!editId) return;
+    db.from(config.table).select(config.select ?? "*").eq("id", editId).maybeSingle().then(({ data }: { data: Row | null }) => { if (data) openEdit(data); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin", config.table] });
   const pages = Math.max(1, Math.ceil((list.data?.count ?? 0) / PAGE));
@@ -269,7 +276,7 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold md:text-3xl">{config.title}</h1>
+          <h1 className="text-2xl font-bold md:text-3xl">{title ?? config.title}</h1>
           <p className="text-sm text-muted-foreground">{list.data?.count ?? 0} registro(s)</p>
         </div>
         <Button onClick={() => openEdit(null)} className="rounded-full"><Plus /> Novo(a) {config.singular.toLowerCase()}</Button>
@@ -280,7 +287,7 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9" placeholder="Buscar…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        {config.scope && (
+        {config.scope && !lockScope && (
           <Select value={scope} onValueChange={(v) => { setScope(v); setPage(0); }}>
             <SelectTrigger className="md:w-56"><SelectValue placeholder={config.scope.label} /></SelectTrigger>
             <SelectContent>
@@ -376,7 +383,7 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader><DialogTitle>{editing?.id ? `Editar ${config.singular.toLowerCase()}` : `Novo(a) ${config.singular.toLowerCase()}`}</DialogTitle></DialogHeader>
           <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
-            {config.fields.map((f) => (
+            {config.fields.filter((f) => !(lockScope && f.name === config.scope?.col)).map((f) => (
               <div key={f.name} className={`space-y-1.5 ${f.full || ["textarea", "image", "genres", "playback"].includes(f.type) ? "md:col-span-2" : ""}`}>
                 {f.type !== "boolean" && <Label>{f.label}{f.required && " *"}</Label>}
                 {["text", "url", "number"].includes(f.type) && (
