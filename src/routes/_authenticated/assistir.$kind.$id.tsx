@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_authenticated/assistir/$kind/$id")({
   component: PlayerPage,
 });
 
+type Src = {id:string;url:string;type:"url"|"embed"|"hls";label:string|null};
 type Ep = { id: string; episode_number: number; title: string; thumbnail_url: string | null; season_number: number };
 
 function usePlaybackInfo(kind: PKind, id: string) {
@@ -30,7 +31,7 @@ function usePlaybackInfo(kind: PKind, id: string) {
     gcTime: 0,
     refetchInterval: 15000,
     queryFn: async () => {
-      const urlRes = await sb.rpc("get_playback_source", { _kind: kind, _content_id: id });
+      const urlRes = await sb.rpc("get_playback_sources", { _kind: kind, _content_id: id });
       if (urlRes.error) throw new Error(urlRes.error.message.includes("inactive") ? "Sua conta está inativa." : "Não foi possível autorizar a reprodução.");
       let title = "", subtitle: string | null = null, back: { to: string; slug?: string } = { to: "/" }, episodes: Ep[] = [], poster: string | null = null;
       if (kind === "movie") {
@@ -51,8 +52,9 @@ function usePlaybackInfo(kind: PKind, id: string) {
         episodes = (all.data ?? []).flatMap((se: { season_number: number; episodes: (Ep & { status: string })[] }) =>
           se.episodes.filter((e) => e.status === "published").sort((a, b) => a.episode_number - b.episode_number).map((e) => ({ ...e, season_number: se.season_number })));
       }
-      const source=urlRes.data as {id:string;url:string;type:"url"|"embed"|"hls"}|null;
-      return { url: source?.url ?? null, source, title, subtitle, back, episodes, poster };
+      const sources=((urlRes.data ?? []) as Src[]);
+      const source=sources[0] ?? null;
+      return { url: source?.url ?? null, source, sources, title, subtitle, back, episodes, poster };
     },
   });
 }
@@ -68,6 +70,8 @@ function PlayerPage() {
   const kind = (["movie", "episode", "channel"].includes(rawKind) ? rawKind : "movie") as PKind;
   const info = usePlaybackInfo(kind, id);
   const router = useRouter();
+  const [server, setServer] = useState(0);
+  useEffect(() => setServer(0), [kind, id]);
 
   if (info.isPending) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="size-10 animate-spin text-primary" /></div>;
   if (info.isError || !info.data?.url) {
@@ -80,10 +84,18 @@ function PlayerPage() {
       </div>
     );
   }
-  return <Player key={`${kind}-${id}-${info.data.source?.id}-${info.data.url}-${info.data.source?.type}`} kind={kind} id={id} data={info.data} />;
+  const all = info.data.sources;
+  const source = all[Math.min(server, all.length - 1)] ?? info.data.source;
+  const data = { ...info.data, source, url: source?.url ?? info.data.url };
+  const servers = all.length > 1 ? (
+    <div role="group" aria-label="Servidores" className="flex flex-wrap items-center gap-2">
+      {all.map((s, n) => <Button key={s.id} size="sm" variant={s.id === source?.id ? "default" : "secondary"} className="rounded-full" aria-pressed={s.id === source?.id} onClick={() => setServer(n)}>Servidor {n + 1}{s.label && !/^Servidor \d+$/i.test(s.label) ? ` · ${s.label}` : ""}</Button>)}
+    </div>
+  ) : null;
+  return <Player key={`${kind}-${id}-${source?.id}-${data.url}-${source?.type}`} kind={kind} id={id} data={data} servers={servers} />;
 }
 
-function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]> }) {
+function Player({ kind, id, data, servers }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]>; servers: React.ReactNode }) {
   const { user, profileId, loading: profileLoading } = useActiveProfile();
   const navigate = useNavigate();
   const video = useRef<HTMLVideoElement>(null);
@@ -209,6 +221,7 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
         <header className="mx-auto flex max-w-6xl items-center gap-3 py-5">{backLink}<div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div></header>
         <main className="mx-auto max-w-6xl space-y-5">
           <EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} />
+          {servers}
           {data.episodes.length>0 && <div className="flex flex-wrap items-center gap-3"><label htmlFor="embed-episode" className="text-sm">Episódio</label><select id="embed-episode" className="max-w-full rounded-md border border-border bg-background p-2 text-sm" value={id} onChange={e=>navigate({to:"/assistir/$kind/$id",params:{kind:"episode",id:e.target.value},replace:true})}>{data.episodes.map(e=><option key={e.id} value={e.id}>T{e.season_number}:E{e.episode_number} · {e.title}</option>)}</select>{next && <Button variant="secondary" onClick={goNext}><SkipForward /> Próximo episódio</Button>}</div>}
         </main>
       </div>
@@ -217,6 +230,7 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
 
   return (
     <div ref={wrap} onMouseMove={poke} onTouchStart={poke} className={`fixed inset-0 select-none bg-background ${ui ? "" : "cursor-none"}`}>
+      {servers && <div className={`absolute right-4 top-16 z-20 transition-opacity ${ui ? "opacity-100" : "pointer-events-none opacity-0"}`}>{servers}</div>}
       <video
         ref={video}
         className="h-full w-full bg-background object-contain"
