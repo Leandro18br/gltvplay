@@ -42,7 +42,7 @@ function AdminHome() {
       const res = await Promise.all(
         tables.map((t) => supabase.from(t.key).select("*", { count: "exact", head: true })),
       );
-      return Object.fromEntries(tables.map((t, i) => [t.key, res[i].count ?? 0]));
+      return Object.fromEntries(tables.map((t, i) => [t.key, res[i]?.count ?? 0])) as Record<string, number>;
     },
   });
 
