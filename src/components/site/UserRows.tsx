@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Play } from "lucide-react";
-import { continueWatchingQuery, useAuthUser, useWatchlist } from "@/lib/user-data";
+import { continueWatchingQuery, useActiveProfile, useWatchlist } from "@/lib/user-data";
 import { Row } from "./ContentCard";
 
 export function ContinueWatchingRow() {
-  const { user } = useAuthUser();
-  const { data = [] } = useQuery({ ...continueWatchingQuery(user?.id ?? "none"), enabled: !!user });
+  const { user, profileId, loading } = useActiveProfile();
+  const { data = [] } = useQuery({ ...continueWatchingQuery(user?.id ?? "none", profileId), enabled: !!user && !loading });
   if (!user || !data.length) return null;
   return (
     <section aria-label="Continue assistindo" className="animate-rise">

@@ -24,14 +24,54 @@ export function useAuthUser() {
   return { user, ready };
 }
 
+// ===== Viewer profiles (multiple profiles per account) =====
+export type ViewerProfile = { id: string; name: string; avatar_url: string | null; is_kids: boolean; preferences: Record<string, unknown> };
+
+export const viewerProfilesQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ["me", userId, "viewer_profiles"],
+    queryFn: async () => {
+      const { data, error } = await sb.from("viewer_profiles").select("id,name,avatar_url,is_kids,preferences").eq("user_id", userId).order("created_at");
+      if (error) throw error;
+      return data as ViewerProfile[];
+    },
+    staleTime: 60_000,
+  });
+
+const VP_EVENT = "viewer-profile-change";
+const vpKey = (uid: string) => `vp:${uid}`;
+export function setActiveProfileId(uid: string, id: string) {
+  localStorage.setItem(vpKey(uid), id);
+  window.dispatchEvent(new Event(VP_EVENT));
+}
+
+/** Active viewer profile for the signed-in account (persisted per device). */
+export function useActiveProfile() {
+  const { user, ready } = useAuthUser();
+  const list = useQuery({ ...viewerProfilesQuery(user?.id ?? "none"), enabled: !!user });
+  const [stored, setStored] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const read = () => setStored(localStorage.getItem(vpKey(user.id)));
+    read();
+    window.addEventListener(VP_EVENT, read);
+    return () => window.removeEventListener(VP_EVENT, read);
+  }, [user]);
+  const profiles = list.data ?? [];
+  const active = profiles.find((p) => p.id === stored) ?? profiles[0] ?? null;
+  return { user, ready, profiles, active, profileId: active?.id ?? null, loading: list.isLoading };
+}
+
 const MOVIE_MIN = "id,slug,title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,featured";
 const SERIES_MIN = "id,slug,title,description,poster_url,backdrop_url,release_year,age_rating,featured";
 
-export const watchlistQuery = (userId: string) =>
+export const watchlistQuery = (userId: string, profileId: string | null) =>
   queryOptions({
-    queryKey: ["me", userId, "watchlist"],
+    queryKey: ["me", userId, "watchlist", profileId],
     queryFn: async () => {
-      const { data, error } = await sb.from("watchlist").select("content_kind,content_id,added_at").eq("user_id", userId).order("added_at", { ascending: false });
+      let q = sb.from("watchlist").select("content_kind,content_id,added_at").eq("user_id", userId);
+      q = profileId ? q.eq("viewer_profile_id", profileId) : q.is("viewer_profile_id", null);
+      const { data, error } = await q.order("added_at", { ascending: false });
       if (error) throw error;
       const mIds = data.filter((r: Raw) => r.content_kind === "movie").map((r: Raw) => r.content_id);
       const sIds = data.filter((r: Raw) => r.content_kind === "series").map((r: Raw) => r.content_id);
@@ -47,19 +87,21 @@ export const watchlistQuery = (userId: string) =>
   });
 
 export function useWatchlist() {
-  const { user } = useAuthUser();
+  const { user, profileId, loading } = useActiveProfile();
   const qc = useQueryClient();
-  const q = useQuery({ ...watchlistQuery(user?.id ?? "none"), enabled: !!user });
+  const q = useQuery({ ...watchlistQuery(user?.id ?? "none", profileId), enabled: !!user && !loading });
   const ids = new Set((q.data ?? []).map((i) => i.id));
   const toggle = useMutation({
     mutationFn: async (item: { id: string; kind: "movie" | "series" }) => {
       if (!user) throw new Error("Entre na sua conta para usar a Minha lista.");
       if (ids.has(item.id)) {
-        const { error } = await sb.from("watchlist").delete().eq("user_id", user.id).eq("content_kind", item.kind).eq("content_id", item.id);
+        let d = sb.from("watchlist").delete().eq("user_id", user.id).eq("content_kind", item.kind).eq("content_id", item.id);
+        d = profileId ? d.eq("viewer_profile_id", profileId) : d.is("viewer_profile_id", null);
+        const { error } = await d;
         if (error) throw error;
         return false;
       }
-      const { error } = await sb.from("watchlist").insert({ user_id: user.id, content_kind: item.kind, content_id: item.id });
+      const { error } = await sb.from("watchlist").insert({ user_id: user.id, viewer_profile_id: profileId, content_kind: item.kind, content_id: item.id });
       if (error) throw error;
       return true;
     },
@@ -78,11 +120,15 @@ export type ContinueItem = {
   image: string | null;
 };
 
-export const continueWatchingQuery = (userId: string) =>
+const byProfile = (q: Raw, profileId: string | null) => (profileId ? q.eq("viewer_profile_id", profileId) : q.is("viewer_profile_id", null));
+
+export const continueWatchingQuery = (userId: string, profileId: string | null, all = false) =>
   queryOptions({
-    queryKey: ["me", userId, "continue"],
+    queryKey: ["me", userId, "continue", profileId, all],
     queryFn: async () => {
-      const { data, error } = await sb.from("watch_history").select("content_kind,content_id,position_seconds,progress_percent,watched_at").eq("user_id", userId).lt("progress_percent", 95).gt("position_seconds", 5).order("watched_at", { ascending: false }).limit(20);
+      let base = byProfile(sb.from("watch_history").select("content_kind,content_id,position_seconds,progress_percent,watched_at").eq("user_id", userId), profileId);
+      if (!all) base = base.lt("progress_percent", 95).gt("position_seconds", 5);
+      const { data, error } = await base("progress_percent", 95).gt("position_seconds", 5).order("watched_at", { ascending: false }).limit(20);
       if (error) throw error;
       const ids = (k: string) => data.filter((r: Raw) => r.content_kind === k).map((r: Raw) => r.content_id);
       const [m, e] = await Promise.all([
@@ -106,16 +152,21 @@ export const continueWatchingQuery = (userId: string) =>
     },
   });
 
-export async function getProgress(userId: string, kind: string, id: string) {
-  const { data } = await sb.from("watch_history").select("position_seconds,progress_percent").eq("user_id", userId).eq("content_kind", kind).eq("content_id", id).maybeSingle();
+export async function getProgress(userId: string, profileId: string | null, kind: string, id: string) {
+  const { data } = await byProfile(sb.from("watch_history").select("position_seconds,progress_percent").eq("user_id", userId).eq("content_kind", kind).eq("content_id", id), profileId).maybeSingle();
   return data as { position_seconds: number; progress_percent: number } | null;
 }
 
-export async function saveProgress(userId: string, kind: string, id: string, position: number, duration: number) {
+export async function removeHistory(userId: string, profileId: string | null, kind: string, id: string) {
+  const { error } = await byProfile(sb.from("watch_history").delete().eq("user_id", userId).eq("content_kind", kind).eq("content_id", id), profileId);
+  if (error) throw error;
+}
+
+export async function saveProgress(userId: string, profileId: string | null, kind: string, id: string, position: number, duration: number) {
   const percent = duration > 0 ? Math.min(100, Math.round((position / duration) * 1000) / 10) : 0;
   await sb.from("watch_history").upsert(
-    { user_id: userId, content_kind: kind, content_id: id, position_seconds: Math.floor(position), progress_percent: percent, watched_at: new Date().toISOString() },
-    { onConflict: "user_id,content_kind,content_id" },
+    { user_id: userId, viewer_profile_id: profileId, content_kind: kind, content_id: id, position_seconds: Math.floor(position), progress_percent: percent, watched_at: new Date().toISOString() },
+    { onConflict: "user_id,viewer_profile_id,content_kind,content_id" },
   );
 }
 

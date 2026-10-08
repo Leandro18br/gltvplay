@@ -5,7 +5,7 @@ import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipForward, ListVideo, Settings2, Loader2, RotateCcw, RotateCw, Radio,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuthUser, getProgress, saveProgress } from "@/lib/user-data";
+import { useActiveProfile, getProgress, saveProgress } from "@/lib/user-data";
 import { Slider } from "@/components/ui/slider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -81,7 +81,7 @@ function PlayerPage() {
 }
 
 function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]> }) {
-  const { user } = useAuthUser();
+  const { user, profileId, loading: profileLoading } = useActiveProfile();
   const navigate = useNavigate();
   const video = useRef<HTMLVideoElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -133,11 +133,11 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
 
   // Resume from history
   useEffect(() => {
-    if (!user || live) return;
-    getProgress(user.id, kind, id).then((p) => {
+    if (!user || live || profileLoading) return;
+    getProgress(user.id, profileId, kind, id).then((p) => {
       if (p && p.position_seconds > 5 && p.progress_percent < 95) setResumed(p.position_seconds);
     });
-  }, [user, kind, id, live]);
+  }, [user, profileId, profileLoading, kind, id, live]);
   useEffect(() => {
     const v = video.current;
     if (!v || resumed == null) return;
@@ -149,8 +149,8 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
   const persist = useCallback(() => {
     const v = video.current;
     if (!user || !v || live || !v.duration || v.currentTime < 1) return;
-    saveProgress(user.id, kind, id, v.currentTime, v.duration);
-  }, [user, kind, id, live]);
+    saveProgress(user.id, profileId, kind, id, v.currentTime, v.duration);
+  }, [user, profileId, kind, id, live]);
   useEffect(() => {
     const t = setInterval(() => { if (!video.current?.paused) persist(); }, 10_000);
     const onHide = () => persist();
@@ -158,8 +158,8 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
     return () => { clearInterval(t); window.removeEventListener("pagehide", onHide); persist(); };
   }, [persist]);
   useEffect(() => {
-    if (live && user) saveProgress(user.id, "channel", id, 1, 0);
-  }, [live, user, id]);
+    if (live && user && !profileLoading) saveProgress(user.id, profileId, "channel", id, 1, 0);
+  }, [live, user, profileId, profileLoading, id]);
 
   // Auto-hide controls
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
