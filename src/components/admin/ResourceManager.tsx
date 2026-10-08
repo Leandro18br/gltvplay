@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { PlaybackField } from "./PlaybackField";
+import { validatePlayback, savePlayback } from "@/lib/playback/playback.functions";
+import { emptyPlayback, playbackSchema, type PlaybackValue } from "@/lib/playback/embed";
 import { toast } from "sonner";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, Search, Star, Trash2 } from "lucide-react";
 import { db, errMsg, slugify, STATUS_OPTIONS, type Row } from "@/lib/admin/db";
@@ -104,6 +108,8 @@ function GenresPicker({ value, onChange }: { value: string[]; onChange: (v: stri
 
 export function ResourceManager({ config, initialScope }: { config: ResourceConfig; initialScope?: string | undefined }) {
   const qc = useQueryClient();
+  const validateSource = useServerFn(validatePlayback);
+  const saveSource = useServerFn(savePlayback);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [status, setStatus] = useState("all");
@@ -155,8 +161,10 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
           base[f.name] = (data ?? []).map((d: Row) => d.genre_id);
         }
         if (f.type === "playback") {
-          const { data } = await db.from("playback_sources").select("url").eq("content_kind", f.kind).eq("content_id", row.id).order("created_at", { ascending: false }).limit(1);
-          base[f.name] = data?.[0]?.url ?? null;
+          const { data, error } = await db.from("playback_sources").select("id,url,source_type,is_active,is_primary").eq("content_kind", f.kind).eq("content_id", row.id).order("is_primary", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+          if(error){toast.error("Não foi possível carregar a fonte");return;}
+          const source=data?.[0];
+          base[f.name] = source ? {id:source.id,input:source.url,type:source.source_type,active:source.is_active,primary:source.is_primary} : {...emptyPlayback};
         }
       }
     }
@@ -168,6 +176,10 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
     e.preventDefault();
     setSaving(true);
     try {
+      for(const f of config.fields.filter(f=>f.type==="playback")) {
+        const value=playbackSchema.parse(values[f.name] ?? emptyPlayback);
+        await validateSource({data:value});
+      }
       const payload: Row = {};
       for (const f of config.fields) {
         if (f.type === "genres" || f.type === "playback") continue;
@@ -196,22 +208,15 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
           }
         }
         if (f.type === "playback") {
-          const url = (values[f.name] as string | null)?.trim() || null;
-          const { data: existing } = await db.from("playback_sources").select("id").eq("content_kind", f.kind).eq("content_id", id);
-          if (url && existing?.length) {
-            const { error } = await db.from("playback_sources").update({ url, is_active: true }).eq("id", existing[0].id);
-            if (error) throw error;
-          } else if (url) {
-            const { error } = await db.from("playback_sources").insert({ content_kind: f.kind, content_id: id, url });
-            if (error) throw error;
-          } else if (existing?.length) {
-            await db.from("playback_sources").delete().eq("content_kind", f.kind).eq("content_id", id);
-          }
+          if(f.kind!=="movie" && f.kind!=="episode" && f.kind!=="channel")throw new Error("Configure a reprodução por episódio");
+          const result=await saveSource({data:{kind:f.kind,contentId:id,value:values[f.name] ?? emptyPlayback}});
+          if(result.id) setValues(v=>({...v,[f.name]:{...v[f.name],id:result.id}}));
         }
       }
       toast.success(isNew ? `${config.singular} criado(a)` : "Alterações salvas");
       setEditing(null);
       refresh();
+      qc.invalidateQueries({queryKey:["player"]});
     } catch (err) {
       toast.error(errMsg(err));
     } finally {
@@ -394,10 +399,7 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
                 )}
                 {f.type === "genres" && <GenresPicker value={values[f.name] ?? []} onChange={(v) => set(f.name, v)} />}
                 {f.type === "playback" && (
-                  <>
-                    <Input type="url" placeholder="https://… (somente fontes licenciadas/autorizadas)" value={values[f.name] ?? ""} onChange={(e) => set(f.name, e.target.value)} />
-                    <p className="text-xs text-muted-foreground">Fica protegido: só usuários logados com conta ativa recebem este link.</p>
-                  </>
+                  <PlaybackField value={values[f.name] as PlaybackValue | undefined} onChange={v=>set(f.name,v)} />
                 )}
               </div>
             ))}

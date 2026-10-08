@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { EmbedSettings } from "@/components/admin/EmbedSettings";
 
 export const Route = createFileRoute("/admin/settings")({
   beforeLoad: ({ context }) => { if (!isAdminRoleGuard(context.role)) throw redirect({ to: "/admin" }); },
@@ -50,7 +51,8 @@ function SettingsPage() {
 
   async function save() {
     setSaving(true);
-    const { id: _id, updated_at: _u, ...payload } = s!;
+    if (!s) { setSaving(false); return; }
+    const { id: _id, updated_at: _u, embed_allow_iframe: _embed, ...payload } = s;
     const { error } = await db.from("site_settings").update(payload).eq("id", 1);
     setSaving(false);
     if (error) { toast.error(errMsg(error)); return; }
@@ -104,6 +106,7 @@ function SettingsPage() {
         {txt("social_links", "tiktok", "TikTok")}
       </Section>
 
+      <EmbedSettings />
       <Section title="Geral">
         {txt("general", "contact_email", "E-mail de contato")}
         {txt("general", "support_url", "Link de suporte")}
