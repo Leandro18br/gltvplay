@@ -29,6 +29,7 @@ import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
 import { Route as AdminEpisodesRouteImport } from './routes/admin.episodes'
 import { Route as AdminGenresRouteImport } from './routes/admin.genres'
 import { Route as AdminHighlightsRouteImport } from './routes/admin.highlights'
+import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminImportRouteImport } from './routes/admin.import'
 import { Route as AdminLogsRouteImport } from './routes/admin.logs'
 import { Route as AdminMoviesRouteImport } from './routes/admin.movies'
@@ -37,11 +38,13 @@ import { Route as AdminSeasonsRouteImport } from './routes/admin.seasons'
 import { Route as AdminSeriesRouteImport } from './routes/admin.series'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminHomePreviewRouteImport } from './routes/admin_.home-preview'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
 import { Route as CanalSlugRouteImport } from './routes/canal.$slug'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as FilmeSlugRouteImport } from './routes/filme.$slug'
 import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
+import { Route as HomeSecoesIdRouteImport } from './routes/home.secoes.$id'
 import { Route as AuthenticatedAssistirKindIdRouteImport } from './routes/_authenticated/assistir.$kind.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -143,6 +146,11 @@ const AdminHighlightsRoute = AdminHighlightsRouteImport.update({
   path: '/highlights',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminHomeRoute = AdminHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminImportRoute = AdminImportRouteImport.update({
   id: '/import',
   path: '/import',
@@ -183,6 +191,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminHomePreviewRoute = AdminHomePreviewRouteImport.update({
+  id: '/admin_/home-preview',
+  path: '/admin/home-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin_/login',
   path: '/admin/login',
@@ -206,6 +219,11 @@ const FilmeSlugRoute = FilmeSlugRouteImport.update({
 const SerieSlugRoute = SerieSlugRouteImport.update({
   id: '/serie/$slug',
   path: '/serie/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeSecoesIdRoute = HomeSecoesIdRouteImport.update({
+  id: '/home/secoes/$id',
+  path: '/home/secoes/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAssistirKindIdRoute =
@@ -234,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/admin/episodes': typeof AdminEpisodesRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/highlights': typeof AdminHighlightsRoute
+  '/admin/home': typeof AdminHomeRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
@@ -242,12 +261,14 @@ export interface FileRoutesByFullPath {
   '/admin/series': typeof AdminSeriesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/home-preview': typeof AdminHomePreviewRoute
   '/admin/login': typeof AdminLoginRoute
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
 }
 export interface FileRoutesByTo {
@@ -268,6 +289,7 @@ export interface FileRoutesByTo {
   '/admin/episodes': typeof AdminEpisodesRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/highlights': typeof AdminHighlightsRoute
+  '/admin/home': typeof AdminHomeRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
@@ -276,12 +298,14 @@ export interface FileRoutesByTo {
   '/admin/series': typeof AdminSeriesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/home-preview': typeof AdminHomePreviewRoute
   '/admin/login': typeof AdminLoginRoute
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin': typeof AdminIndexRoute
+  '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
 }
 export interface FileRoutesById {
@@ -305,6 +329,7 @@ export interface FileRoutesById {
   '/admin/episodes': typeof AdminEpisodesRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/highlights': typeof AdminHighlightsRoute
+  '/admin/home': typeof AdminHomeRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
@@ -313,12 +338,14 @@ export interface FileRoutesById {
   '/admin/series': typeof AdminSeriesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin_/home-preview': typeof AdminHomePreviewRoute
   '/admin_/login': typeof AdminLoginRoute
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/_authenticated/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
 }
 export interface FileRouteTypes {
@@ -342,6 +369,7 @@ export interface FileRouteTypes {
     | '/admin/episodes'
     | '/admin/genres'
     | '/admin/highlights'
+    | '/admin/home'
     | '/admin/import'
     | '/admin/logs'
     | '/admin/movies'
@@ -350,12 +378,14 @@ export interface FileRouteTypes {
     | '/admin/series'
     | '/admin/settings'
     | '/admin/users'
+    | '/admin/home-preview'
     | '/admin/login'
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin/'
+    | '/home/secoes/$id'
     | '/assistir/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -376,6 +406,7 @@ export interface FileRouteTypes {
     | '/admin/episodes'
     | '/admin/genres'
     | '/admin/highlights'
+    | '/admin/home'
     | '/admin/import'
     | '/admin/logs'
     | '/admin/movies'
@@ -384,12 +415,14 @@ export interface FileRouteTypes {
     | '/admin/series'
     | '/admin/settings'
     | '/admin/users'
+    | '/admin/home-preview'
     | '/admin/login'
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin'
+    | '/home/secoes/$id'
     | '/assistir/$kind/$id'
   id:
     | '__root__'
@@ -412,6 +445,7 @@ export interface FileRouteTypes {
     | '/admin/episodes'
     | '/admin/genres'
     | '/admin/highlights'
+    | '/admin/home'
     | '/admin/import'
     | '/admin/logs'
     | '/admin/movies'
@@ -420,12 +454,14 @@ export interface FileRouteTypes {
     | '/admin/series'
     | '/admin/settings'
     | '/admin/users'
+    | '/admin_/home-preview'
     | '/admin_/login'
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin/'
+    | '/home/secoes/$id'
     | '/_authenticated/assistir/$kind/$id'
   fileRoutesById: FileRoutesById
 }
@@ -441,11 +477,13 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SeriesRoute: typeof SeriesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  AdminHomePreviewRoute: typeof AdminHomePreviewRoute
   AdminLoginRoute: typeof AdminLoginRoute
   CanalSlugRoute: typeof CanalSlugRoute
   CategoriaSlugRoute: typeof CategoriaSlugRoute
   FilmeSlugRoute: typeof FilmeSlugRoute
   SerieSlugRoute: typeof SerieSlugRoute
+  HomeSecoesIdRoute: typeof HomeSecoesIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -590,6 +628,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHighlightsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/home': {
+      id: '/admin/home'
+      path: '/home'
+      fullPath: '/admin/home'
+      preLoaderRoute: typeof AdminHomeRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/import': {
       id: '/admin/import'
       path: '/import'
@@ -646,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin_/home-preview': {
+      id: '/admin_/home-preview'
+      path: '/admin/home-preview'
+      fullPath: '/admin/home-preview'
+      preLoaderRoute: typeof AdminHomePreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/login': {
       id: '/admin_/login'
       path: '/admin/login'
@@ -681,6 +733,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SerieSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/home/secoes/$id': {
+      id: '/home/secoes/$id'
+      path: '/home/secoes/$id'
+      fullPath: '/home/secoes/$id'
+      preLoaderRoute: typeof HomeSecoesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/assistir/$kind/$id': {
       id: '/_authenticated/assistir/$kind/$id'
       path: '/assistir/$kind/$id'
@@ -713,6 +772,7 @@ interface AdminRouteChildren {
   AdminEpisodesRoute: typeof AdminEpisodesRoute
   AdminGenresRoute: typeof AdminGenresRoute
   AdminHighlightsRoute: typeof AdminHighlightsRoute
+  AdminHomeRoute: typeof AdminHomeRoute
   AdminImportRoute: typeof AdminImportRoute
   AdminLogsRoute: typeof AdminLogsRoute
   AdminMoviesRoute: typeof AdminMoviesRoute
@@ -731,6 +791,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEpisodesRoute: AdminEpisodesRoute,
   AdminGenresRoute: AdminGenresRoute,
   AdminHighlightsRoute: AdminHighlightsRoute,
+  AdminHomeRoute: AdminHomeRoute,
   AdminImportRoute: AdminImportRoute,
   AdminLogsRoute: AdminLogsRoute,
   AdminMoviesRoute: AdminMoviesRoute,
@@ -756,11 +817,13 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SeriesRoute: SeriesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  AdminHomePreviewRoute: AdminHomePreviewRoute,
   AdminLoginRoute: AdminLoginRoute,
   CanalSlugRoute: CanalSlugRoute,
   CategoriaSlugRoute: CategoriaSlugRoute,
   FilmeSlugRoute: FilmeSlugRoute,
   SerieSlugRoute: SerieSlugRoute,
+  HomeSecoesIdRoute: HomeSecoesIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

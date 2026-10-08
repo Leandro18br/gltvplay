@@ -1,0 +1,9 @@
+import { describe, it, expect } from "vitest";
+import { homeSchema, newSection, moveItem, orderedReferences } from "./model";
+describe("Home configuration rules",()=>{
+  it("accepts the requested automatic section with ten items",()=>{const section={...newSection(),title:"Filmes Recentes",limit:10};const result=homeSchema.parse({sections:[section],banners:[],bannerMode:"automatic",bannerLimit:5});expect(result.sections[0].limit).toBe(10);expect(result.sections[0].mode).toBe("automatic");});
+  it("keeps exact manual content order and omits unavailable content",()=>{const refs=[{kind:"movie" as const,id:"b"},{kind:"series" as const,id:"missing"},{kind:"movie" as const,id:"a"}];expect(orderedReferences(refs,[{kind:"movie",id:"a"},{kind:"movie",id:"b"}],10).map(i=>i.id)).toEqual(["b","a"]);});
+  it("moves sections into the exact chosen order",()=>{expect(moveItem(["banner","series","movies"],2,1)).toEqual(["banner","movies","series"]);});
+  it("preserves inactive sections without deleting their selections",()=>{const s={...newSection(),active:false,items:[{kind:"movie" as const,id:"00000000-0000-4000-8000-000000000001"}]};const c=homeSchema.parse({sections:[s],banners:[],bannerMode:"manual",bannerLimit:5});expect(c.sections.filter(s=>s.active)).toHaveLength(0);expect(c.sections[0].items).toHaveLength(1);});
+  it("preserves independently configured Ver todos visibility",()=>{const a={...newSection(),showAll:true};const b={...newSection(),showAll:false};const c=homeSchema.parse({sections:[a,b],banners:[],bannerMode:"manual",bannerLimit:5});expect(c.sections.map(s=>s.showAll)).toEqual([true,false]);});
+});
