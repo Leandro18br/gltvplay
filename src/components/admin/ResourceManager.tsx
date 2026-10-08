@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PlaybackField } from "./PlaybackField";
+import { SourcesManager } from "./integrations/SourcesManager";
 import { validatePlayback, savePlayback } from "@/lib/playback/playback.functions";
 import { emptyPlayback, playbackSchema, type PlaybackValue } from "@/lib/playback/embed";
 import { toast } from "sonner";
@@ -403,6 +404,11 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
                 {f.type === "genres" && <GenresPicker value={values[f.name] ?? []} onChange={(v) => set(f.name, v)} />}
                 {f.type === "playback" && (
                   <PlaybackField value={values[f.name] as PlaybackValue | undefined} onChange={v=>set(f.name,v)} />
+                )}
+                {f.type === "playback" && (f.kind === "movie" || f.kind === "episode") && (
+                  editing?.id
+                    ? <SourcesManager kind={f.kind} contentId={editing.id as string} />
+                    : <p className="text-xs text-muted-foreground">Salve primeiro para buscar players pela API ou adicionar players alternativos.</p>
                 )}
               </div>
             ))}
