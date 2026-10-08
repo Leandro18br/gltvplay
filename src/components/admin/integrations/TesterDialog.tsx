@@ -63,7 +63,7 @@ export function TesterDialog({ integration, onOpenChange, onDone }: { integratio
             {preview && <EmbedPlayer url={res.player.url} title="Prévia" preview />}
           </div>}
           {res.items.length > 0 && <div className="grid grid-cols-3 gap-2 md:grid-cols-5">{res.items.map((i, n) => <div key={n} className="overflow-hidden rounded-lg border border-border text-xs"><div className="aspect-[2/3] bg-muted">{i.poster_url && <img src={i.poster_url} alt="" className="h-full w-full object-cover" />}</div><p className="truncate p-1.5">{i.title || `#${i.episode_number ?? i.season_number}`} {i.release_year && `(${i.release_year})`}</p></div>)}</div>}
-          <details open><summary className="cursor-pointer text-sm font-medium">Resposta JSON</summary><pre className="mt-2 max-h-96 overflow-auto rounded-xl bg-muted p-3 text-xs">{res.json}</pre></details>
+          <details open><summary className="cursor-pointer text-sm font-medium">Resposta JSON</summary><pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-muted p-3 text-xs">{res.json}</pre></details>
         </div>}
       </DialogContent>
     </Dialog>
