@@ -12,6 +12,11 @@ export const playbackSchema = z.object({
 export type PlaybackValue = z.infer<typeof playbackSchema>;
 export const emptyPlayback: PlaybackValue = {type:"none",input:"",active:true,primary:true};
 export type EmbedPolicy = { domains: string[]; allowIframe: boolean };
+/** Exact host or a subdomain of an authorized domain. */
+export function embedDomainAllowed(host: string, domains: string[]): boolean {
+  return domains.some(d => host === d || host.endsWith(`.${d}`));
+}
+export function isIframeCode(input: string): boolean { return /^<iframe[\s>]/i.test(input.trim()); }
 export function normalizeEmbed(input: string, policy: EmbedPolicy): string {
   let value = z.string().trim().min(1, "Informe a fonte").max(8192).parse(input);
   if (value.startsWith("<")) {
@@ -21,15 +26,15 @@ export function normalizeEmbed(input: string, policy: EmbedPolicy): string {
     const frame = nodes[0];
     if (nodes.length !== 1 || !frame || !("tagName" in frame) || frame.tagName !== "iframe") throw new Error("Insira somente um iframe, sem outros elementos");
     if (frame.childNodes.some(n => n.nodeName !== "#text" || ("value" in n && n.value.trim() !== ""))) throw new Error("Conteúdo interno do iframe não permitido");
-    const allowed = new Set(["src","title","width","height","allow","allowfullscreen","frameborder","loading","referrerpolicy","sandbox","style","class"]);
-    if (frame.attrs.some(a => !allowed.has(a.name))) throw new Error("Atributos não permitidos no iframe");
+    // Only src is kept; every other attribute (width, allow, frameborder, handlers…) is discarded and the
+    // player regenerates its own iframe, so nothing admin-provided runs in the main document.
     value = frame.attrs.find(a => a.name === "src")?.value ?? "";
   }
   const url = new URL(z.string().max(2048).parse(value));
   const host = url.hostname.toLowerCase();
   if (url.protocol !== "https:" || url.username || url.password || url.port || /[\s<>]/.test(value)) throw new Error("Use uma URL HTTPS sem credenciais ou portas personalizadas");
   domainSchema.parse(host);
-  if (!policy.domains.includes(host)) throw new Error(`Domínio não autorizado: ${host}`);
+  if (!embedDomainAllowed(host, policy.domains)) throw new Error(`Domínio não autorizado: ${host}`);
   url.hash = "";
   return url.href;
 }
@@ -45,7 +50,8 @@ export function looksLikePlayerPage(input: string): boolean {
 export function normalizePlayback(value: PlaybackValue, policy: EmbedPolicy): string | null {
   const v = playbackSchema.parse(value);
   if (v.type === "none") return null;
-  if (v.type === "embed") return normalizeEmbed(v.input, policy);
+  // Pasted iframe code is always an embed, never a video URL.
+  if (v.type === "embed" || isIframeCode(v.input)) return normalizeEmbed(v.input, policy);
   const url = new URL(z.string().trim().min(1,"Informe a URL de reprodução").max(2048).parse(v.input));
   if (!["https:","http:"].includes(url.protocol) || url.username || url.password) throw new Error("URL de reprodução inválida");
   return url.href;
