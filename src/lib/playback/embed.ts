@@ -33,6 +33,15 @@ export function normalizeEmbed(input: string, policy: EmbedPolicy): string {
   url.hash = "";
   return url.href;
 }
+/** Best-effort hostname of an embed URL or iframe code, for admin hints only (not a security check). */
+export function embedHost(input: string): string | null {
+  const raw = input.trim().startsWith("<") ? /\bsrc\s*=\s*["']?([^"'\s>]+)/i.exec(input)?.[1] ?? "" : input.trim();
+  try { const u = new URL(raw); return u.protocol === "https:" ? u.hostname.toLowerCase() : null; } catch { return null; }
+}
+/** Heuristic: a "Vídeo/URL" value that is a web page rather than a media file. */
+export function looksLikePlayerPage(input: string): boolean {
+  try { const u = new URL(input.trim()); return !/\.(mp4|m4v|webm|ogv|ogg|mov|m3u8|mpd)$/i.test(u.pathname); } catch { return false; }
+}
 export function normalizePlayback(value: PlaybackValue, policy: EmbedPolicy): string | null {
   const v = playbackSchema.parse(value);
   if (v.type === "none") return null;
