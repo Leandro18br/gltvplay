@@ -11,5 +11,5 @@ export const Route = createFileRoute("/admin/series")({ validateSearch: z.object
 
 function SeriesPage() {
   const { edit } = Route.useSearch();
-  return <div className="space-y-3"><div className="flex flex-wrap justify-end gap-2"><TmdbSearchButton kind="series" /><Button asChild variant="outline" size="sm" className="rounded-full"><Link to="/admin/import" hash="api"><DownloadCloud /> Importar pela API</Link></Button></div><ResourceManager config={seriesConfig} editId={edit} /></div>;
+  return <div className="space-y-3"><div className="flex flex-wrap justify-end gap-2"><TmdbSearchButton kind="series" /></div><ResourceManager config={seriesConfig} editId={edit} /></div>;
 }
