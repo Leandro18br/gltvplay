@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Pencil } from "lucide-react";
 import { ResourceManager } from "@/components/admin/ResourceManager";
+import { TmdbRefreshButton, TmdbSeasonsButton } from "@/components/admin/tmdb/TmdbTools";
 import { seasonsConfig } from "@/lib/admin/configs";
 import { adminHead } from "@/lib/admin/head";
 import { db, STATUS_OPTIONS, type Row } from "@/lib/admin/db";
@@ -47,7 +48,7 @@ function SeriesManage() {
               {(s.series_genres ?? []).map((g: Row, i: number) => <span key={i} className="rounded-full bg-muted px-2 py-0.5">{g.genres?.name}</span>)}
             </div>
             <p className="line-clamp-4 text-sm text-muted-foreground">{s.description || "Sem descrição."}</p>
-            <Button asChild variant="outline" size="sm" className="rounded-full"><Link to="/admin/series" search={{ edit: s.id }}><Pencil /> Editar série</Link></Button>
+            <div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm" className="rounded-full"><Link to="/admin/series" search={{ edit: s.id }}><Pencil /> Editar série</Link></Button>{s.tmdb_id && <><TmdbRefreshButton kind="series" id={s.id} /><TmdbSeasonsButton seriesId={s.id} /></>}</div>
           </div>
         </section>
       )}

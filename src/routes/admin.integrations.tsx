@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IntegrationDialog } from "@/components/admin/integrations/IntegrationDialog";
 import { EndpointsDialog } from "@/components/admin/integrations/EndpointsDialog";
 import { TesterDialog } from "@/components/admin/integrations/TesterDialog";
+import { TmdbIntegrationCard } from "@/components/admin/tmdb/TmdbTools";
 import { StatusBadge, fmtDate, type Integration } from "@/components/admin/integrations/shared";
 
 export const Route = createFileRoute("/admin/integrations")({
@@ -49,6 +50,7 @@ function IntegrationsPage() {
       <Tabs defaultValue="apis">
         <TabsList><TabsTrigger value="apis"><Cable className="mr-1 size-4" />APIs</TabsTrigger><TabsTrigger value="logs"><Activity className="mr-1 size-4" />Histórico de requisições</TabsTrigger></TabsList>
         <TabsContent value="apis" className="space-y-3">
+          <TmdbIntegrationCard />
           {list.isPending && <Loader2 className="animate-spin text-primary" />}
           {list.data?.length === 0 && <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhuma API cadastrada. Clique em "Adicionar API".</div>}
           {all.map(i => (

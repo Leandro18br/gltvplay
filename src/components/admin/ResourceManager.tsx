@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PlaybackField } from "./PlaybackField";
 import { SourcesManager } from "./integrations/SourcesManager";
+import { TmdbRefreshButton } from "./tmdb/TmdbTools";
 import { validatePlayback, savePlayback } from "@/lib/playback/playback.functions";
 import { emptyPlayback, playbackSchema, type PlaybackValue } from "@/lib/playback/embed";
 import { toast } from "sonner";
@@ -419,6 +420,9 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
                 )}
               </div>
             ))}
+            {editing?.tmdb_id && (config.table === "movies" || config.table === "series") && (
+              <div className="flex flex-wrap items-center gap-2 md:col-span-2"><span className="text-xs text-muted-foreground">TMDB ID {editing.tmdb_id}</span><TmdbRefreshButton kind={config.table === "movies" ? "movie" : "series"} id={editing.id as string} onDone={() => setEditing(null)} /></div>
+            )}
             <DialogFooter className="md:col-span-2">
               <Button type="button" variant="ghost" onClick={() => setEditing(null)} disabled={saving}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving && <Loader2 className="animate-spin" />} Salvar</Button>

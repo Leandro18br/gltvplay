@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { DownloadCloud } from "lucide-react";
 import { ResourceManager } from "@/components/admin/ResourceManager";
+import { TmdbSearchButton } from "@/components/admin/tmdb/TmdbTools";
 import { seriesConfig } from "@/lib/admin/configs";
 import { adminHead } from "@/lib/admin/head";
 import { Button } from "@/components/ui/button";
@@ -10,5 +11,5 @@ export const Route = createFileRoute("/admin/series")({ validateSearch: z.object
 
 function SeriesPage() {
   const { edit } = Route.useSearch();
-  return <div className="space-y-3"><div className="flex justify-end"><Button asChild variant="outline" size="sm" className="rounded-full"><Link to="/admin/import" hash="api"><DownloadCloud /> Importar pela API</Link></Button></div><ResourceManager config={seriesConfig} editId={edit} /></div>;
+  return <div className="space-y-3"><div className="flex flex-wrap justify-end gap-2"><TmdbSearchButton kind="series" /><Button asChild variant="outline" size="sm" className="rounded-full"><Link to="/admin/import" hash="api"><DownloadCloud /> Importar pela API</Link></Button></div><ResourceManager config={seriesConfig} editId={edit} /></div>;
 }
