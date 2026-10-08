@@ -4,6 +4,7 @@ import { Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmbedPlayer } from "./EmbedPlayer";
 import { Button } from "@/components/ui/button";
+import { VideoPlayerFrame } from "./VideoPlayerFrame";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
@@ -53,7 +54,7 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
 
   return (
     <div className="w-full min-w-0 space-y-3">
-      <div className={`relative w-full ${started && source?.type === "embed" ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
+      <div className={`relative w-full ${started ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
         {!started ? (
           <Button type="button" variant="ghost" onClick={start} disabled={loading} aria-label={`Reproduzir ${title}`} className="group relative block h-full w-full rounded-none p-0 [&_svg]:size-9">
             {poster && <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
@@ -68,12 +69,14 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
         ) : source.type === "embed" ? (
           <EmbedPlayer url={source.url} title={title} />
         ) : isHls ? (
-          <InlineHls url={source.url} title={title} poster={poster} />
+          <InlineHls key={source.id} url={source.url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
         ) : (
-          <video key={source.url} src={source.url} poster={poster ?? undefined} controls autoPlay playsInline className="h-full w-full bg-background object-contain" />
+          <VideoPlayerFrame key={source.id} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer}>
+            <video src={source.url} autoPlay playsInline className="h-full w-full bg-player object-contain" />
+          </VideoPlayerFrame>
         )}
       </div>
-      {started && sources.length > 1 && (
+      {started && source?.type === "embed" && sources.length > 1 && (
         <div role="group" aria-label="Servidores" className="flex flex-wrap items-center gap-2">
           {sources.map((s, n) => (
             <Button key={s.id} size="sm" variant={s.id === source?.id ? "default" : "secondary"} className="rounded-full" aria-pressed={s.id === source?.id} onClick={() => setServer(n)}>
@@ -87,7 +90,7 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
 }
 
 /** Minimal HLS playback inside the compact block (hls.js when needed). */
-function InlineHls({ url, title, poster }: { url: string; title: string; poster: string | null }) {
+function InlineHls({ url, title, servers, selectedServer, onServerChange }: { url: string; title: string; poster: string | null; servers: Src[]; selectedServer: string; onServerChange: (index: number) => void }) {
   const [el, setEl] = useState<HTMLVideoElement | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -105,12 +108,20 @@ function InlineHls({ url, title, poster }: { url: string; title: string; poster:
         hls = new Hls({ enableWorker: true });
         hls.loadSource(url);
         hls.attachMedia(el);
+        hls.on(Hls.Events.MANIFEST_PARSED, (_e: unknown, data: { levels: { height: number; bitrate: number }[] }) => {
+          setLevels(data.levels.map((item, i) => ({ i, label: item.height ? `${item.height}p` : `${Math.round(item.bitrate / 1000)} kbps` })));
+        });
+        setEngine(hls);
         hls.on(Hls.Events.ERROR, (_e: unknown, d: { fatal: boolean }) => { if (d.fatal) setFailed(true); });
       });
     }
     return () => { cancelled = true; hls?.destroy(); };
   }, [el, url]);
 
-  if (failed) return <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">Não foi possível carregar o player. Tente novamente.</div>;
-  return <video ref={setEl} title={title} poster={poster ?? undefined} controls autoPlay playsInline className="h-full w-full bg-background object-contain" />;
+  const [levels, setLevels] = useState<{ i: number; label: string }[]>([]);
+  const [level, setLevel] = useState(-1);
+  const [engine, setEngine] = useState<{ currentLevel: number } | null>(null);
+  return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={failed ? "HLS" : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
+    <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player object-contain" />
+  </VideoPlayerFrame>;
 }

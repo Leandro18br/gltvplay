@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
+import { VideoPlayerFrame } from "@/components/site/VideoPlayerFrame";
 
 type PKind = "movie" | "episode" | "channel";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,7 +95,7 @@ function PlayerPage() {
     </div>
   ) : null;
   if (!started) return <PlayGate data={data} onPlay={() => setStarted(true)} />;
-  return <Player key={`${kind}-${id}-${source?.id}-${data.url}-${source?.type}`} kind={kind} id={id} data={data} servers={servers} />;
+  return <Player key={`${kind}-${id}-${source?.id}-${data.url}-${source?.type}`} kind={kind} id={id} data={data} servers={servers} onServerChange={setServer} />;
 }
 
 /** Cover + centered Play; nothing external loads until the viewer clicks. */
@@ -106,19 +107,19 @@ function PlayGate({ data, onPlay }: { data: NonNullable<ReturnType<typeof usePla
         <div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div>
       </header>
       <main className="mx-auto max-w-6xl">
-        <button type="button" onClick={onPlay} aria-label={`Reproduzir ${data.title}`} className="group relative block aspect-[19/12] w-full max-w-[380px] cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border">
+        <Button type="button" variant="ghost" onClick={onPlay} aria-label={`Reproduzir ${data.title}`} className={`group relative block h-auto w-full cursor-pointer overflow-hidden rounded-xl bg-card p-0 ring-1 ring-border ${data.subtitle === "Ao vivo" ? "aspect-[19/12] max-w-[380px]" : "aspect-video"}`}>
           {data.poster && <img src={data.poster} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
           <span className="absolute inset-0 bg-background/55 transition group-hover:bg-background/40" />
           <span className="absolute left-1/2 top-1/2 flex size-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-foreground shadow-glow transition duration-300 group-hover:scale-110 group-active:scale-95">
             <Play className="ml-1 size-9 fill-current" />
           </span>
-        </button>
+        </Button>
       </main>
     </div>
   );
 }
 
-function Player({ kind, id, data, servers }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]>; servers: React.ReactNode }) {
+function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]>; servers: React.ReactNode; onServerChange: (index: number) => void }) {
   const { user, profileId, loading: profileLoading } = useActiveProfile();
   const navigate = useNavigate();
   const video = useRef<HTMLVideoElement>(null);
@@ -217,6 +218,7 @@ function Player({ kind, id, data, servers }: { kind: PKind; id: string; data: No
   const goNext = () => { if (next) { persist(); navigate({ to: "/assistir/$kind/$id", params: { kind: "episode", id: next.id }, replace: true }); } };
 
   useEffect(() => {
+    if (!live || embed) return;
     const onFs = () => setFs(!!document.fullscreenElement);
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
@@ -230,9 +232,9 @@ function Player({ kind, id, data, servers }: { kind: PKind; id: string; data: No
     document.addEventListener("fullscreenchange", onFs);
     window.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("fullscreenchange", onFs); window.removeEventListener("keydown", onKey); };
-  }, [toggle, poke]);
+  }, [toggle, poke, live, embed]);
 
-  useEffect(() => { if (video.current) { video.current.volume = vol; video.current.muted = muted; } }, [vol, muted]);
+  useEffect(() => { if (live && video.current) { video.current.volume = vol; video.current.muted = muted; } }, [vol, muted, live]);
 
   const backLink = data.back.slug
     ? <Link to={data.back.to as "/filme/$slug"} params={{ slug: data.back.slug }} aria-label="Voltar" className="rounded-full p-2 hover:bg-foreground/10"><ArrowLeft /></Link>
@@ -243,13 +245,29 @@ function Player({ kind, id, data, servers }: { kind: PKind; id: string; data: No
       <div className="min-h-svh bg-background px-2 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] md:px-8">
         <header className="mx-auto flex max-w-6xl items-center gap-3 py-5">{backLink}<div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div></header>
         <main className="mx-auto max-w-6xl space-y-5">
-          <div className="w-full max-w-[380px]"><EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} /></div>
+          <div className={live ? "w-full max-w-[380px]" : "w-full"}><EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} /></div>
           {servers}
           {data.episodes.length>0 && <div className="flex flex-wrap items-center gap-3"><label htmlFor="embed-episode" className="text-sm">Episódio</label><select id="embed-episode" className="max-w-full rounded-md border border-border bg-background p-2 text-sm" value={id} onChange={e=>navigate({to:"/assistir/$kind/$id",params:{kind:"episode",id:e.target.value},replace:true})}>{data.episodes.map(e=><option key={e.id} value={e.id}>T{e.season_number}:E{e.episode_number} · {e.title}</option>)}</select>{next && <Button variant="secondary" onClick={goNext}><SkipForward /> Próximo episódio</Button>}</div>}
         </main>
       </div>
     );
   }
+
+  if (!live) return <>
+    <VideoPlayerFrame title={data.title} fullPage header={<>{backLink}<div className="min-w-0"><p className="truncate font-semibold">{data.title}</p>{data.subtitle && <p className="truncate text-xs text-muted-foreground">{data.subtitle}</p>}</div></>}
+      servers={data.sources} selectedServer={data.source?.id ?? ""} onServerChange={onServerChange} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (hlsRef.current) hlsRef.current.currentLevel = value; }} error={error} onRetry={() => location.reload()}
+      actions={<>{next && <Button variant="ghost" size="icon" title="Próximo episódio" aria-label="Próximo episódio" onClick={goNext}><SkipForward /></Button>}{data.episodes.length > 0 && <Button variant="ghost" size="icon" title="Episódios" aria-label="Episódios" onClick={() => setEpOpen(true)}><ListVideo /></Button>}</>}>
+      <video ref={video} autoPlay playsInline onPause={persist} onEnded={() => { persist(); if (next) goNext(); }} onError={() => setError("Não foi possível reproduzir este vídeo.")} />
+    </VideoPlayerFrame>
+    <Sheet open={epOpen} onOpenChange={setEpOpen}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md"><SheetTitle>Episódios</SheetTitle>
+        <ol className="mt-4 space-y-2">{data.episodes.map(e => <li key={e.id}><Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} replace onClick={() => { persist(); setEpOpen(false); }} className={`flex items-center gap-3 rounded-xl p-2 transition hover:bg-accent ${e.id === id ? "bg-accent ring-1 ring-primary/50" : ""}`}>
+          <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-muted">{e.thumbnail_url && <img src={e.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
+          <div className="min-w-0"><p className="text-xs text-primary">T{e.season_number}:E{e.episode_number}</p><p className="truncate text-sm font-medium">{e.title}</p></div>
+        </Link></li>)}</ol>
+      </SheetContent>
+    </Sheet>
+  </>;
 
   return (
     <div ref={wrap} onMouseMove={poke} onTouchStart={poke} className={`fixed inset-0 select-none bg-background ${ui ? "" : "cursor-none"}`}>
