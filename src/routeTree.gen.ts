@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CanaisRouteImport } from './routes/canais'
+import { Route as FilmesRouteImport } from './routes/filmes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SeriesRouteImport } from './routes/series'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBannersRouteImport } from './routes/admin.banners'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
@@ -45,9 +48,24 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CanaisRoute = CanaisRouteImport.update({
+  id: '/canais',
+  path: '/canais',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilmesRoute = FilmesRouteImport.update({
+  id: '/filmes',
+  path: '/filmes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeriesRoute = SeriesRouteImport.update({
+  id: '/series',
+  path: '/series',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -135,7 +153,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/canais': typeof CanaisRoute
+  '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/series': typeof SeriesRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
@@ -156,7 +177,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/canais': typeof CanaisRoute
+  '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/series': typeof SeriesRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
@@ -179,7 +203,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/canais': typeof CanaisRoute
+  '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/series': typeof SeriesRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
@@ -203,7 +230,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/canais'
+    | '/filmes'
     | '/reset-password'
+    | '/series'
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
@@ -224,7 +254,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/canais'
+    | '/filmes'
     | '/reset-password'
+    | '/series'
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
@@ -246,7 +279,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/canais'
+    | '/filmes'
     | '/reset-password'
+    | '/series'
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
@@ -269,7 +305,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  CanaisRoute: typeof CanaisRoute
+  FilmesRoute: typeof FilmesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SeriesRoute: typeof SeriesRoute
   AdminLoginRoute: typeof AdminLoginRoute
 }
 
@@ -296,11 +335,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/canais': {
+      id: '/canais'
+      path: '/canais'
+      fullPath: '/canais'
+      preLoaderRoute: typeof CanaisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/filmes': {
+      id: '/filmes'
+      path: '/filmes'
+      fullPath: '/filmes'
+      preLoaderRoute: typeof FilmesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/series': {
+      id: '/series'
+      path: '/series'
+      fullPath: '/series'
+      preLoaderRoute: typeof SeriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -460,7 +520,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  CanaisRoute: CanaisRoute,
+  FilmesRoute: FilmesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SeriesRoute: SeriesRoute,
   AdminLoginRoute: AdminLoginRoute,
 }
 export const routeTree = rootRouteImport
