@@ -49,7 +49,7 @@ function SettingsPage() {
     const { id: _id, updated_at: _u, ...payload } = s!;
     const { error } = await db.from("site_settings").update(payload).eq("id", 1);
     setSaving(false);
-    if (error) return toast.error(errMsg(error));
+    if (error) { toast.error(errMsg(error)); return; }
     toast.success("Configurações salvas — o site público já reflete as mudanças");
     qc.invalidateQueries({ queryKey: ["admin", "settings"] });
     qc.invalidateQueries({ queryKey: ["site_settings"] });

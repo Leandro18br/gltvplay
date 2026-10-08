@@ -55,9 +55,9 @@ function Row({ title, items }: { title: string; items: Card[] }) {
 function Home() {
   const { data } = useSuspenseQuery(homeCatalogQuery);
   const { data: settings } = useQuery(siteSettingsQuery);
-  const texts = (settings?.texts ?? {}) as Record<string, string>;
+  const texts = (settings?.texts ?? {}) as { tagline?: string; empty_catalog?: string; footer?: string };
   const social = (settings?.social_links ?? {}) as Record<string, string>;
-  const defBanner = (settings?.banner ?? {}) as Record<string, string>;
+  const defBanner = (settings?.banner ?? {}) as { title?: string; subtitle?: string; image_url?: string };
   const featuredItem = data.movies.find((m) => m.featured) ?? data.series.find((s) => s.featured) ?? data.movies[0] ?? data.series[0];
   const b = data.banners[0];
   const hero = b
