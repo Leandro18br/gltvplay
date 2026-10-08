@@ -11,5 +11,5 @@ export const Route = createFileRoute("/admin/movies")({ validateSearch: z.object
 
 function MoviesPage() {
   const { edit } = Route.useSearch();
-  return <div className="space-y-3"><div className="flex flex-wrap justify-end gap-2"><TmdbSearchButton kind="movie" /><Button asChild variant="outline" size="sm" className="rounded-full"><Link to="/admin/import" hash="api"><DownloadCloud /> Importar pela API</Link></Button></div><ResourceManager config={moviesConfig} editId={edit} /></div>;
+  return <div className="space-y-3"><div className="flex flex-wrap justify-end gap-2"><TmdbSearchButton kind="movie" /></div><ResourceManager config={moviesConfig} editId={edit} /></div>;
 }

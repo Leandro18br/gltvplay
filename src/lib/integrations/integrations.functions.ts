@@ -114,7 +114,7 @@ export const importCatalog = createServerFn({ method: "POST" }).middleware([requ
       if (ex) { const u = await sb.from(table).update(row).eq("id", ex.id); if (u.error) throw new Error(u.error.message); id = ex.id; report.updated++; }
       else {
         const slug = `${it.title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Math.random().toString(36).slice(2, 6)}`;
-        const ins = await sb.from(table).insert({ ...row, slug, status: "draft" }).select("id").single();
+        const ins = await sb.from(table).insert({ ...row, slug, status: "published" }).select("id").single();
         if (ins.error) throw new Error(ins.error.message); id = ins.data.id; report.created++;
       }
       if (data.kind === "movie") {

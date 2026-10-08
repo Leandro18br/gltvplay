@@ -16,7 +16,7 @@ function SourcesCount({ id }: { id: string }) {
   return q.data ? <span className="rounded-full border border-primary/40 bg-accent px-2 py-0.5 text-xs text-accent-foreground">{q.data} player(s)</span> : <span className="text-xs text-muted-foreground">Sem player</span>;
 }
 
-const status: Field = { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS, defaultValue: "draft" };
+const status: Field = { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS, defaultValue: "published", editOnly: true };
 const featured: Field = { name: "featured", label: "Marcar como destaque", type: "boolean" };
 const category: Field = { name: "category_id", label: "Categoria", type: "relation", table: "categories", select: "id,name" };
 const sortOrder: Field = { name: "sort_order", label: "Ordem", type: "number", defaultValue: 0 };
@@ -37,7 +37,6 @@ export const moviesConfig: ResourceConfig = {
     { key: "poster_url", label: "", render: (r) => <Thumb src={r.poster_url} />, className: "w-14" },
     { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{r.categories?.name ?? "Sem categoria"}</p></div> },
     { key: "release_year", label: "Ano" },
-    { key: "quality", label: "Qualidade" },
   ],
   fields: [
     { name: "title", label: "Título", type: "text", required: true },
@@ -46,7 +45,6 @@ export const moviesConfig: ResourceConfig = {
     { name: "release_year", label: "Ano", type: "number" },
     { name: "duration_minutes", label: "Duração (min)", type: "number" },
     { name: "age_rating", label: "Classificação indicativa", type: "select", options: ["L", "10", "12", "14", "16", "18"].map((v) => ({ value: v, label: v })) },
-    { name: "quality", label: "Qualidade", type: "select", options: ["SD", "HD", "Full HD", "4K"].map((v) => ({ value: v, label: v })) },
     { name: "language", label: "Idioma", type: "text", placeholder: "Português" },
     { name: "country", label: "País", type: "text" },
     category, status, sortOrder, featured,
