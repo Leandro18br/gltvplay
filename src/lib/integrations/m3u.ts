@@ -25,7 +25,7 @@ export function classify(info: string, url: string): M3uEntry | null {
   if (!name) return null;
   const group = a["group-title"]?.trim() || null;
   const g = norm(group ?? "");
-  const path = url.split("?")[0].toLowerCase();
+  const path = (url.split("?")[0] ?? "").toLowerCase();
   const sxe = name.match(SXE);
   const isSeriesUrl = /\/series\//.test(path);
   const isMovieUrl = /\/movies?\//.test(path);
