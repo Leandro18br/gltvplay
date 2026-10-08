@@ -9,7 +9,7 @@ export const validatePlayback = createServerFn({method:"POST"}).middleware([requ
   if (role.error || !role.data) throw new Error("Acesso negado");
   const [domains,settings] = await Promise.all([context.supabase.from("embed_domains").select("hostname"),context.supabase.from("site_settings").select("embed_allow_iframe").eq("id",1).single()]);
   if (domains.error || settings.error) throw new Error("Não foi possível consultar as regras de embed");
-  const url=normalizePlayback(data,{domains:domains.data.map(d=>d.hostname),allowIframe:settings.data.embed_allow_iframe});
+  const url=normalizePlayback(data,{domains:domains.data.map(d=>d.hostname),allowIframe:true});
   if(data.type==="embed" && url && new URL(url).origin===new URL(getRequest().url).origin)throw new Error("Não incorpore a própria plataforma");
   return {url};
 });
@@ -18,7 +18,7 @@ export const savePlayback = createServerFn({method:"POST"}).middleware([requireS
   if(role.error || !role.data) throw new Error("Acesso negado");
   const [domains,settings]=await Promise.all([context.supabase.from("embed_domains").select("hostname"),context.supabase.from("site_settings").select("embed_allow_iframe").eq("id",1).single()]);
   if(domains.error || settings.error) throw new Error("Não foi possível consultar as regras");
-  const url=normalizePlayback(data.value,{domains:domains.data.map(d=>d.hostname),allowIframe:settings.data.embed_allow_iframe});
+  const url=normalizePlayback(data.value,{domains:domains.data.map(d=>d.hostname),allowIframe:true});
   if(data.value.type==="embed" && url && new URL(url).origin===new URL(getRequest().url).origin)throw new Error("Não incorpore a própria plataforma");
   if(data.value.type==="none") {
     const r=await context.supabase.from("playback_sources").update({is_active:false}).eq("content_kind",data.kind).eq("content_id",data.contentId);
