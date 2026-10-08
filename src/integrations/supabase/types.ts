@@ -14,6 +14,267 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_credentials: {
+        Row: {
+          api_key: string | null
+          integration_id: string
+          token: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string | null
+          integration_id: string
+          token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string | null
+          integration_id?: string
+          token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_credentials_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: true
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_endpoints: {
+        Row: {
+          body: string | null
+          created_at: string
+          description: string | null
+          headers: Json
+          id: string
+          integration_id: string
+          is_active: boolean
+          kind: string
+          mapping: Json
+          method: string
+          name: string
+          path: string
+          query: Json
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          description?: string | null
+          headers?: Json
+          id?: string
+          integration_id: string
+          is_active?: boolean
+          kind: string
+          mapping?: Json
+          method?: string
+          name: string
+          path?: string
+          query?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          description?: string | null
+          headers?: Json
+          id?: string
+          integration_id?: string
+          is_active?: boolean
+          kind?: string
+          mapping?: Json
+          method?: string
+          name?: string
+          path?: string
+          query?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_endpoints_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_integrations: {
+        Row: {
+          auth_method: string
+          auth_param: string | null
+          auto_fetch_player: boolean
+          base_url: string
+          cache_ttl_seconds: number
+          created_at: string
+          default_method: string
+          description: string | null
+          headers: Json
+          id: string
+          is_active: boolean
+          key_hint: string | null
+          kind: string
+          last_error: string | null
+          last_status: string
+          last_tested_at: string | null
+          name: string
+          params: Json
+          priority: number
+          rate_limit_per_minute: number
+          request_count: number
+          token_hint: string | null
+          updated_at: string
+        }
+        Insert: {
+          auth_method?: string
+          auth_param?: string | null
+          auto_fetch_player?: boolean
+          base_url: string
+          cache_ttl_seconds?: number
+          created_at?: string
+          default_method?: string
+          description?: string | null
+          headers?: Json
+          id?: string
+          is_active?: boolean
+          key_hint?: string | null
+          kind: string
+          last_error?: string | null
+          last_status?: string
+          last_tested_at?: string | null
+          name: string
+          params?: Json
+          priority?: number
+          rate_limit_per_minute?: number
+          request_count?: number
+          token_hint?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auth_method?: string
+          auth_param?: string | null
+          auto_fetch_player?: boolean
+          base_url?: string
+          cache_ttl_seconds?: number
+          created_at?: string
+          default_method?: string
+          description?: string | null
+          headers?: Json
+          id?: string
+          is_active?: boolean
+          key_hint?: string | null
+          kind?: string
+          last_error?: string | null
+          last_status?: string
+          last_tested_at?: string | null
+          name?: string
+          params?: Json
+          priority?: number
+          rate_limit_per_minute?: number
+          request_count?: number
+          token_hint?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_request_logs: {
+        Row: {
+          actor_id: string | null
+          cached: boolean
+          content_label: string | null
+          created_at: string
+          duration_ms: number | null
+          endpoint_id: string | null
+          error: string | null
+          http_status: number | null
+          id: string
+          integration_id: string | null
+          success: boolean
+        }
+        Insert: {
+          actor_id?: string | null
+          cached?: boolean
+          content_label?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint_id?: string | null
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          integration_id?: string | null
+          success?: boolean
+        }
+        Update: {
+          actor_id?: string | null
+          cached?: boolean
+          content_label?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint_id?: string | null
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          integration_id?: string | null
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_request_logs_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "api_endpoints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_request_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_response_cache: {
+        Row: {
+          body: string
+          cache_key: string
+          created_at: string
+          expires_at: string
+          http_status: number
+          integration_id: string
+        }
+        Insert: {
+          body: string
+          cache_key: string
+          created_at?: string
+          expires_at: string
+          http_status: number
+          integration_id: string
+        }
+        Update: {
+          body?: string
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          http_status?: number
+          integration_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_response_cache_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -448,13 +709,16 @@ export type Database = {
       }
       playback_sources: {
         Row: {
+          api_integration_id: string | null
           content_id: string
           content_kind: Database["public"]["Enums"]["content_kind"]
           created_at: string
           drm: Json
+          external_ref: string | null
           id: string
           is_active: boolean
           is_primary: boolean
+          label: string | null
           provider: string | null
           quality: string | null
           sort_order: number
@@ -463,13 +727,16 @@ export type Database = {
           url: string
         }
         Insert: {
+          api_integration_id?: string | null
           content_id: string
           content_kind: Database["public"]["Enums"]["content_kind"]
           created_at?: string
           drm?: Json
+          external_ref?: string | null
           id?: string
           is_active?: boolean
           is_primary?: boolean
+          label?: string | null
           provider?: string | null
           quality?: string | null
           sort_order?: number
@@ -478,13 +745,16 @@ export type Database = {
           url: string
         }
         Update: {
+          api_integration_id?: string | null
           content_id?: string
           content_kind?: Database["public"]["Enums"]["content_kind"]
           created_at?: string
           drm?: Json
+          external_ref?: string | null
           id?: string
           is_active?: boolean
           is_primary?: boolean
+          label?: string | null
           provider?: string | null
           quality?: string | null
           sort_order?: number
@@ -492,7 +762,15 @@ export type Database = {
           updated_at?: string
           url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "playback_sources_api_integration_id_fkey"
+            columns: ["api_integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -876,6 +1154,13 @@ export type Database = {
       admin_stats: { Args: never; Returns: Json }
       embed_url_allowed: { Args: { u: string }; Returns: boolean }
       get_playback_source: {
+        Args: {
+          _content_id: string
+          _kind: Database["public"]["Enums"]["content_kind"]
+        }
+        Returns: Json
+      }
+      get_playback_sources: {
         Args: {
           _content_id: string
           _kind: Database["public"]["Enums"]["content_kind"]
