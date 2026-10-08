@@ -22,6 +22,7 @@ describe("tipo do player", () => {
 describe("proteção contra proxy aberto", () => {
   it("bloqueia localhost e IPs", () => { expect(isBlockedHost("localhost")).toBe(true); expect(isBlockedHost("127.0.0.1")).toBe(true); expect(isBlockedHost("169.254.169.254")).toBe(true); });
   it("mantém o mesmo domínio da URL base", () => expect(() => buildUrl("https://api.exemplo.com", "//evil.com/x", {}, {})).toThrow());
-  it("variável não troca o domínio", () => expect(buildUrl("https://api.exemplo.com/v1", "/movie/{tmdb_id}", { tmdb_id: "../../x@evil.com" }, {}).host).toBe("api.exemplo.com"));
+  it("variável com .. é recusada", () => expect(() => buildUrl("https://api.exemplo.com/v1", "/movie/{tmdb_id}", { tmdb_id: "../../x" }, {})).toThrow());
+  it("variável não troca o domínio", () => expect(buildUrl("https://api.exemplo.com/v1", "/movie/{tmdb_id}", { tmdb_id: "x@evil.com/y" }, {}).host).toBe("api.exemplo.com"));
   it("monta URL com query", () => expect(buildUrl("https://api.exemplo.com/v1", "/player/{tmdb_id}", { tmdb_id: "20558" }, { lang: "pt" }).href).toBe("https://api.exemplo.com/v1/player/20558?lang=pt"));
 });
