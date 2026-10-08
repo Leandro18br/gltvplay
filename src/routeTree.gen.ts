@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BuscarRouteImport } from './routes/buscar'
@@ -18,6 +19,8 @@ import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as FilmesRouteImport } from './routes/filmes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SeriesRouteImport } from './routes/series'
+import { Route as AuthenticatedMinhaListaRouteImport } from './routes/_authenticated/minha-lista'
+import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBannersRouteImport } from './routes/admin.banners'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
@@ -42,6 +45,10 @@ import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -83,6 +90,16 @@ const SeriesRoute = SeriesRouteImport.update({
   id: '/series',
   path: '/series',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedMinhaListaRoute = AuthenticatedMinhaListaRouteImport.update({
+  id: '/minha-lista',
+  path: '/minha-lista',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPerfilRoute = AuthenticatedPerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
@@ -195,6 +212,8 @@ export interface FileRoutesByFullPath {
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
+  '/minha-lista': typeof AuthenticatedMinhaListaRoute
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
@@ -225,6 +244,8 @@ export interface FileRoutesByTo {
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
+  '/minha-lista': typeof AuthenticatedMinhaListaRoute
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
@@ -249,6 +270,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/buscar': typeof BuscarRoute
@@ -257,6 +279,8 @@ export interface FileRoutesById {
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
+  '/_authenticated/minha-lista': typeof AuthenticatedMinhaListaRoute
+  '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
@@ -290,6 +314,8 @@ export interface FileRouteTypes {
     | '/filmes'
     | '/reset-password'
     | '/series'
+    | '/minha-lista'
+    | '/perfil'
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
@@ -320,6 +346,8 @@ export interface FileRouteTypes {
     | '/filmes'
     | '/reset-password'
     | '/series'
+    | '/minha-lista'
+    | '/perfil'
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
@@ -343,6 +371,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/admin'
     | '/auth'
     | '/buscar'
@@ -351,6 +380,8 @@ export interface FileRouteTypes {
     | '/filmes'
     | '/reset-password'
     | '/series'
+    | '/_authenticated/minha-lista'
+    | '/_authenticated/perfil'
     | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
@@ -375,6 +406,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   BuscarRoute: typeof BuscarRoute
@@ -397,6 +429,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -454,6 +493,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/series'
       preLoaderRoute: typeof SeriesRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/minha-lista': {
+      id: '/_authenticated/minha-lista'
+      path: '/minha-lista'
+      fullPath: '/minha-lista'
+      preLoaderRoute: typeof AuthenticatedMinhaListaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/perfil': {
+      id: '/_authenticated/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof AuthenticatedPerfilRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/admin/': {
       id: '/admin/'
@@ -598,6 +651,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedMinhaListaRoute: typeof AuthenticatedMinhaListaRoute
+  AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedMinhaListaRoute: AuthenticatedMinhaListaRoute,
+  AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 interface AdminRouteChildren {
   AdminBannersRoute: typeof AdminBannersRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
@@ -638,6 +704,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   BuscarRoute: BuscarRoute,
