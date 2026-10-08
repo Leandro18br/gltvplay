@@ -16,13 +16,13 @@ import { SortableList } from "./SortableList";
 import { SectionEditor, Options } from "./SectionEditor";
 import { BannerEditor } from "./BannerEditor";
 
-export function HomeManager() {
-  const query=useQuery(homeDraftQuery);
+export function HomeManager({ initialTab = "sections" }: { initialTab?: "sections" | "banners" } = {}) {
+  const query=useQuery({ ...homeDraftQuery, refetchOnWindowFocus: false });
   if(query.isPending) return <div className="animate-pulse space-y-4"><div className="h-12 bg-muted" /><div className="h-60 bg-muted" /></div>;
   if(query.isError) return <div className="space-y-4"><h1 className="text-xl">Não foi possível carregar a Home</h1><Button onClick={()=>query.refetch()}>Tentar novamente</Button></div>;
-  return <HomeEditor key={`${query.data.revision}:${query.dataUpdatedAt}`} initial={query.data.config} initialRevision={query.data.revision} />;
+  return <HomeEditor key={`${query.data.revision}:${query.dataUpdatedAt}`} initial={query.data.config} initialRevision={query.data.revision} initialTab={initialTab} />;
 }
-function HomeEditor({initial,initialRevision}:{initial:HomeConfig;initialRevision:number}) {
+function HomeEditor({initial,initialRevision,initialTab}:{initial:HomeConfig;initialRevision:number;initialTab:"sections"|"banners"}) {
   const [config,setConfig]=useState(initial); const [revision,setRevision]=useState(initialRevision);const [saved,setSaved]=useState(JSON.stringify(initial));
   const [busy,setBusy]=useState(false);const [editSection,setEditSection]=useState<HomeSection|null>(null); const [editBanner,setEditBanner]=useState<HomeBanner|null>(null);
   const [remove,setRemove]=useState<{type:"section"|"banner";id:string}|null>(null); const [confirmPublish,setConfirmPublish]=useState(false);
@@ -39,7 +39,7 @@ function HomeEditor({initial,initialRevision}:{initial:HomeConfig;initialRevisio
     <header className="space-y-4"><div className="flex items-center gap-3"><LayoutTemplate className="size-7 text-primary" /><div className="min-w-0"><h1 className="text-2xl font-semibold">Home do site</h1><p className="mt-1 text-sm text-muted-foreground">{dirty?"Alterações não salvas":"Rascunho salvo"} · Revisão {revision}</p></div></div>
       <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={busy||!dirty} onClick={()=>action("save")}><Save className="size-4" /> Salvar rascunho</Button><Button variant="outline" disabled={busy} onClick={()=>action("preview")}><Eye className="size-4" /> Visualizar Home</Button><Button disabled={busy} onClick={()=>setConfirmPublish(true)}><Send className="size-4" /> Publicar alterações</Button></div>
     </header>
-    <Tabs defaultValue="sections"><TabsList><TabsTrigger value="sections">Seções ({config.sections.length})</TabsTrigger><TabsTrigger value="banners">Banners ({config.banners.length})</TabsTrigger></TabsList>
+    <Tabs defaultValue={initialTab}><TabsList><TabsTrigger value="sections">Seções ({config.sections.length})</TabsTrigger><TabsTrigger value="banners">Banners ({config.banners.length})</TabsTrigger></TabsList>
       <TabsContent value="sections" className="mt-5 space-y-4"><div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">Estrutura da Home</h2><Button size="sm" disabled={config.sections.length>=60} onClick={()=>setEditSection(newSection())}><Plus className="size-4" /> Nova seção</Button></div>
         <SortableList items={config.sections} getId={s=>s.id} onChange={sections=>patch({sections})} render={(s,index)=><div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><div className="min-w-0"><p className="truncate font-medium">{index+1}. {s.title}</p><p className="truncate text-xs text-muted-foreground">{sectionTypes[s.type]} · {s.mode==="manual"?"Manual":"Automático"} · {s.type!=="hero"?`${s.limit} conteúdos · `:""}{s.active?"Ativo":"Inativo"}</p></div><div className="flex shrink-0 items-center gap-1"><Switch aria-label={`Ativar ${s.title}`} checked={s.active} onCheckedChange={active=>patch({sections:config.sections.map(v=>v.id===s.id?{...v,active}:v)})} /><Button size="icon" variant="ghost" aria-label={`Editar ${s.title}`} onClick={()=>setEditSection(s)}><Pencil className="size-4" /></Button><Button size="icon" variant="ghost" aria-label={`Excluir ${s.title}`} onClick={()=>setRemove({type:"section",id:s.id})}><Trash2 className="size-4" /></Button></div></div>} />
         {!config.sections.length && <p className="py-8 text-center text-muted-foreground">Nenhuma seção no rascunho.</p>}
