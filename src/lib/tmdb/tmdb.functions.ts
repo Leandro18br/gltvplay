@@ -44,7 +44,7 @@ async function tmdbGet(path: string, params: Record<string, string | number | un
   const url = new URL(BASE + path);
   clean.forEach(([k, v]) => url.searchParams.set(k, String(v)));
   const headers: Record<string, string> = { accept: "application/json" };
-  if (key.startsWith("eyJ")) headers.Authorization = `Bearer ${key}`;
+  if (key.startsWith("eyJ")) headers["Authorization"] = `Bearer ${key}`;
   else url.searchParams.set("api_key", key);
   let res: Response;
   try {
