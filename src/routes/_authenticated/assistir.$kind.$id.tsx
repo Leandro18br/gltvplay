@@ -71,7 +71,8 @@ function PlayerPage() {
   const info = usePlaybackInfo(kind, id);
   const router = useRouter();
   const [server, setServer] = useState(0);
-  useEffect(() => setServer(0), [kind, id]);
+  const [started, setStarted] = useState(false);
+  useEffect(() => { setServer(0); setStarted(false); }, [kind, id]);
 
   if (info.isPending) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="size-10 animate-spin text-primary" /></div>;
   if (info.isError || !info.data?.url) {
@@ -92,7 +93,29 @@ function PlayerPage() {
       {all.map((s, n) => <Button key={s.id} size="sm" variant={s.id === source?.id ? "default" : "secondary"} className="rounded-full" aria-pressed={s.id === source?.id} onClick={() => setServer(n)}>Servidor {n + 1}{s.label && !/^Servidor \d+$/i.test(s.label) ? ` · ${s.label}` : ""}</Button>)}
     </div>
   ) : null;
+  if (!started) return <PlayGate data={data} onPlay={() => setStarted(true)} />;
   return <Player key={`${kind}-${id}-${source?.id}-${data.url}-${source?.type}`} kind={kind} id={id} data={data} servers={servers} />;
+}
+
+/** Cover + centered Play; nothing external loads until the viewer clicks. */
+function PlayGate({ data, onPlay }: { data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]>; onPlay: () => void }) {
+  return (
+    <div className="min-h-svh bg-background px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] md:px-8">
+      <header className="mx-auto flex max-w-6xl items-center gap-3 py-5">
+        <Link to={(data.back.slug ? data.back.to : "/") as "/filme/$slug"} params={{ slug: data.back.slug ?? "" }} aria-label="Voltar" className="shrink-0 rounded-full p-2 hover:bg-foreground/10"><ArrowLeft /></Link>
+        <div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div>
+      </header>
+      <main className="mx-auto max-w-6xl">
+        <button type="button" onClick={onPlay} aria-label={`Reproduzir ${data.title}`} className="group relative block aspect-[19/12] w-full max-w-[380px] cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border">
+          {data.poster && <img src={data.poster} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
+          <span className="absolute inset-0 bg-background/55 transition group-hover:bg-background/40" />
+          <span className="absolute left-1/2 top-1/2 flex size-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-glow transition duration-300 group-hover:scale-110 group-active:scale-95">
+            <Play className="ml-1 size-9 fill-current" />
+          </span>
+        </button>
+      </main>
+    </div>
+  );
 }
 
 function Player({ kind, id, data, servers }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]>; servers: React.ReactNode }) {
@@ -220,7 +243,7 @@ function Player({ kind, id, data, servers }: { kind: PKind; id: string; data: No
       <div className="min-h-svh bg-background px-2 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] md:px-8">
         <header className="mx-auto flex max-w-6xl items-center gap-3 py-5">{backLink}<div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div></header>
         <main className="mx-auto max-w-6xl space-y-5">
-          <EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} />
+          <div className="w-full max-w-[380px]"><EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} /></div>
           {servers}
           {data.episodes.length>0 && <div className="flex flex-wrap items-center gap-3"><label htmlFor="embed-episode" className="text-sm">Episódio</label><select id="embed-episode" className="max-w-full rounded-md border border-border bg-background p-2 text-sm" value={id} onChange={e=>navigate({to:"/assistir/$kind/$id",params:{kind:"episode",id:e.target.value},replace:true})}>{data.episodes.map(e=><option key={e.id} value={e.id}>T{e.season_number}:E{e.episode_number} · {e.title}</option>)}</select>{next && <Button variant="secondary" onClick={goNext}><SkipForward /> Próximo episódio</Button>}</div>}
         </main>
