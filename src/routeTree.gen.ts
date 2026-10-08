@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BuscarRouteImport } from './routes/buscar'
 import { Route as CanaisRouteImport } from './routes/canais'
+import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as FilmesRouteImport } from './routes/filmes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SeriesRouteImport } from './routes/series'
@@ -32,6 +34,10 @@ import { Route as AdminSeriesRouteImport } from './routes/admin.series'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
+import { Route as CanalSlugRouteImport } from './routes/canal.$slug'
+import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
+import { Route as FilmeSlugRouteImport } from './routes/filme.$slug'
+import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -48,9 +54,19 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BuscarRoute = BuscarRouteImport.update({
+  id: '/buscar',
+  path: '/buscar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CanaisRoute = CanaisRouteImport.update({
   id: '/canais',
   path: '/canais',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriasRoute = CategoriasRouteImport.update({
+  id: '/categorias',
+  path: '/categorias',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilmesRoute = FilmesRouteImport.update({
@@ -148,12 +164,34 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CanalSlugRoute = CanalSlugRouteImport.update({
+  id: '/canal/$slug',
+  path: '/canal/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriaSlugRoute = CategoriaSlugRouteImport.update({
+  id: '/categoria/$slug',
+  path: '/categoria/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilmeSlugRoute = FilmeSlugRouteImport.update({
+  id: '/filme/$slug',
+  path: '/filme/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SerieSlugRoute = SerieSlugRouteImport.update({
+  id: '/serie/$slug',
+  path: '/serie/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/buscar': typeof BuscarRoute
   '/canais': typeof CanaisRoute
+  '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
@@ -172,12 +210,18 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/login': typeof AdminLoginRoute
+  '/canal/$slug': typeof CanalSlugRoute
+  '/categoria/$slug': typeof CategoriaSlugRoute
+  '/filme/$slug': typeof FilmeSlugRoute
+  '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/buscar': typeof BuscarRoute
   '/canais': typeof CanaisRoute
+  '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
@@ -196,6 +240,10 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/login': typeof AdminLoginRoute
+  '/canal/$slug': typeof CanalSlugRoute
+  '/categoria/$slug': typeof CategoriaSlugRoute
+  '/filme/$slug': typeof FilmeSlugRoute
+  '/serie/$slug': typeof SerieSlugRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
@@ -203,7 +251,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/buscar': typeof BuscarRoute
   '/canais': typeof CanaisRoute
+  '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
@@ -222,6 +272,10 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin_/login': typeof AdminLoginRoute
+  '/canal/$slug': typeof CanalSlugRoute
+  '/categoria/$slug': typeof CategoriaSlugRoute
+  '/filme/$slug': typeof FilmeSlugRoute
+  '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -230,7 +284,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/buscar'
     | '/canais'
+    | '/categorias'
     | '/filmes'
     | '/reset-password'
     | '/series'
@@ -249,12 +305,18 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/admin/login'
+    | '/canal/$slug'
+    | '/categoria/$slug'
+    | '/filme/$slug'
+    | '/serie/$slug'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/buscar'
     | '/canais'
+    | '/categorias'
     | '/filmes'
     | '/reset-password'
     | '/series'
@@ -273,13 +335,19 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/admin/login'
+    | '/canal/$slug'
+    | '/categoria/$slug'
+    | '/filme/$slug'
+    | '/serie/$slug'
     | '/admin'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/auth'
+    | '/buscar'
     | '/canais'
+    | '/categorias'
     | '/filmes'
     | '/reset-password'
     | '/series'
@@ -298,6 +366,10 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/admin_/login'
+    | '/canal/$slug'
+    | '/categoria/$slug'
+    | '/filme/$slug'
+    | '/serie/$slug'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -305,11 +377,17 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  BuscarRoute: typeof BuscarRoute
   CanaisRoute: typeof CanaisRoute
+  CategoriasRoute: typeof CategoriasRoute
   FilmesRoute: typeof FilmesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SeriesRoute: typeof SeriesRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  CanalSlugRoute: typeof CanalSlugRoute
+  CategoriaSlugRoute: typeof CategoriaSlugRoute
+  FilmeSlugRoute: typeof FilmeSlugRoute
+  SerieSlugRoute: typeof SerieSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -335,11 +413,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/buscar': {
+      id: '/buscar'
+      path: '/buscar'
+      fullPath: '/buscar'
+      preLoaderRoute: typeof BuscarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/canais': {
       id: '/canais'
       path: '/canais'
       fullPath: '/canais'
       preLoaderRoute: typeof CanaisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/categorias': {
+      id: '/categorias'
+      path: '/categorias'
+      fullPath: '/categorias'
+      preLoaderRoute: typeof CategoriasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/filmes': {
@@ -475,6 +567,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/canal/$slug': {
+      id: '/canal/$slug'
+      path: '/canal/$slug'
+      fullPath: '/canal/$slug'
+      preLoaderRoute: typeof CanalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/categoria/$slug': {
+      id: '/categoria/$slug'
+      path: '/categoria/$slug'
+      fullPath: '/categoria/$slug'
+      preLoaderRoute: typeof CategoriaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/filme/$slug': {
+      id: '/filme/$slug'
+      path: '/filme/$slug'
+      fullPath: '/filme/$slug'
+      preLoaderRoute: typeof FilmeSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/serie/$slug': {
+      id: '/serie/$slug'
+      path: '/serie/$slug'
+      fullPath: '/serie/$slug'
+      preLoaderRoute: typeof SerieSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -520,11 +640,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  BuscarRoute: BuscarRoute,
   CanaisRoute: CanaisRoute,
+  CategoriasRoute: CategoriasRoute,
   FilmesRoute: FilmesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SeriesRoute: SeriesRoute,
   AdminLoginRoute: AdminLoginRoute,
+  CanalSlugRoute: CanalSlugRoute,
+  CategoriaSlugRoute: CategoriaSlugRoute,
+  FilmeSlugRoute: FilmeSlugRoute,
+  SerieSlugRoute: SerieSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
