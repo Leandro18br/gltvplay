@@ -40,9 +40,11 @@ function SeriesPage() {
   const { slug } = Route.useParams();
   const { data } = useSuspenseQuery(seriesDetailQuery(slug));
   const [seasonId, setSeasonId] = useState(data?.seasons[0]?.id ?? "");
+  const [episodeId, setEpisodeId] = useState<string | null>(null);
   if (!data) return null;
   const season = data.seasons.find((s) => s.id === seasonId) ?? data.seasons[0];
   const first = data.seasons.flatMap((s) => s.episodes)[0];
+  const current = data.seasons.flatMap((s) => s.episodes).find((e) => e.id === episodeId) ?? first;
 
   return (
     <SiteShell padTop={false}>
@@ -50,8 +52,8 @@ function SeriesPage() {
         <DetailHero
           item={data.item}
           extraMeta={<span>· {data.seasons.length} temporada{data.seasons.length === 1 ? "" : "s"}</span>}
-          watch={first ? (
-            <Button asChild size="lg" className="rounded-full px-7"><Link to="/assistir/$kind/$id" params={{ kind: "episode", id: first.id }}><Play className="fill-current" /> Assistir</Link></Button>
+          player={current ? (
+            <InlinePlayer kind="episode" id={current.id} title={`${data.item.title} — ${current.title}`} poster={current.thumbnail_url || data.item.backdrop_url || data.item.poster_url} />
           ) : undefined}
         />
         <section id="episodios" aria-label="Episódios" className="mx-auto max-w-[1600px] scroll-mt-20 px-4 py-10 md:px-10">
