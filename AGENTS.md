@@ -16,3 +16,6 @@
 - History/watchlist/playback reference content polymorphically via `content_kind` + `content_id`. Why: one structure for movies, series, episodes and channels.
 - Catalog writes are audited by the `audit_trigger` into `audit_logs`. Why: traceable admin actions.
 - Media uploads go to the private `media` storage bucket (public buckets blocked by workspace). Why: workspace policy.
+- Admin CRUD screens are config-driven via `ResourceManager` + `src/lib/admin/configs.tsx`; add new admin entities as configs, not bespoke pages. Why: consistency and less code.
+- Admin area lives under `/admin` (own ssr:false gate checking `is_staff`); login at `/admin/login` (`admin_.login.tsx`, un-nested). Why: separate admin entry from public auth.
+- Catalog import providers live in `src/lib/import/import.functions.ts` (licensed APIs only, keys via server secrets); imports dedupe on (external_source, external_id). Why: pluggable future integrations.
