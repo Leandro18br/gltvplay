@@ -6,6 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
 
+/** Rejects slow backend calls so pages can show a retry state instead of hanging. */
+export function withTimeout<T>(p: PromiseLike<T>, ms = 15_000): Promise<T> {
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout: o servidor demorou para responder")), ms)),
+  ]);
+}
+
 export type Kind = "movie" | "series" | "channel";
 export type Genre = { id: string; name: string; slug: string };
 export type Item = {
@@ -97,7 +105,7 @@ const releaseSort = (a: Item, b: Item) =>
 export const homeCatalogQuery = queryOptions({
   queryKey: ["catalog", "home"],
   queryFn: async () => {
-    const [movies, series, channels, banners, genres, popM, popS] = await Promise.all([
+    const [movies, series, channels, banners, genres, popM, popS] = await withTimeout(Promise.all([
       sb.from("movies").select(MOVIE_SEL).eq("status", "published").order("featured", { ascending: false }).order("sort_order").order("created_at", { ascending: false }).limit(80),
       sb.from("series").select(SERIES_SEL).eq("status", "published").order("featured", { ascending: false }).order("sort_order").order("created_at", { ascending: false }).limit(80),
       sb.from("channels").select(CHANNEL_SEL).eq("status", "published").order("featured", { ascending: false }).order("sort_order").limit(30),
@@ -105,7 +113,7 @@ export const homeCatalogQuery = queryOptions({
       sb.from("genres").select("id,name,slug").order("name"),
       sb.rpc("popular_content", { _kind: "movie", _limit: 20 }),
       sb.rpc("popular_series", { _limit: 20 }),
-    ]);
+    ]));
     for (const r of [movies, series, channels, banners, genres]) if (r.error) throw r.error;
     const m: Item[] = movies.data.map(toMovie);
     const s: Item[] = series.data.map(toSeries);
