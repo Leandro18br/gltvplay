@@ -61,12 +61,14 @@ export async function testList(opts: { listId?: string | undefined; url?: string
   return { ok: true as const, type: p.isPlus ? "M3U Plus" : "M3U", total: count, approximate: truncated, movies: s.c.movies, series: s.c.series.size, episodes: s.c.episodes, channels: s.c.channels };
 }
 
+/** Accent-free search key; keeps non-Latin titles searchable (norm() would empty them). */
+const searchKey = (s: string) => (norm(s) || s.toLowerCase().replace(/\s+/g, " ").trim()).slice(0, 300);
 const cut = (s: string | null | undefined, n: number) => (s ? s.slice(0, n) : null);
 function itemRow(listId: string, gen: number, e: M3uEntry) {
   const ep = e.kind === "episode";
   return {
     list_id: listId, ext_key: itemKey(e).slice(0, 500), kind: e.kind, title: e.title.slice(0, 300),
-    title_norm: norm(ep ? `${e.series} ${e.title}` : e.title).slice(0, 300), series_key: ep ? seriesKey(e).slice(0, 400) : null,
+    title_norm: searchKey(ep ? `${e.series} ${e.title}` : e.title), series_key: ep ? seriesKey(e).slice(0, 400) : null,
     season: e.season, episode: e.episode, year: e.year, group_title: cut(e.group, 200), logo: cut(e.logo, 1000),
     url: e.url, stream_type: e.streamType, tvg_id: cut(e.tvgId, 200), tmdb_id: e.tmdbId, seen_gen: gen, missing: false,
   };
@@ -74,7 +76,7 @@ function itemRow(listId: string, gen: number, e: M3uEntry) {
 function seriesRow(listId: string, gen: number, e: M3uEntry) {
   const name = e.series ?? e.title;
   return {
-    list_id: listId, ext_key: seriesItemKey(e).slice(0, 500), kind: "series", title: name.slice(0, 300), title_norm: norm(name).slice(0, 300),
+    list_id: listId, ext_key: seriesItemKey(e).slice(0, 500), kind: "series", title: name.slice(0, 300), title_norm: searchKey(name),
     series_key: seriesKey(e).slice(0, 400), season: null, episode: null, year: null, group_title: cut(e.group, 200), logo: cut(e.logo, 1000),
     url: null, stream_type: null, tvg_id: null, tmdb_id: null, seen_gen: gen, missing: false,
   };
@@ -187,8 +189,8 @@ function filtered(q: any, f: ExploreFilter) {
   else if (f.status === "error") q = q.not("import_error", "is", null);
   else if (f.status === "missing") q = q.eq("missing", true);
   if (f.group) q = q.eq("group_title", f.group);
-  const term = norm(f.q ?? "");
-  if (term) q = q.ilike("title_norm", `%${term}%`);
+  const term = f.q?.trim() ? searchKey(f.q) : "";
+  if (term) q = q.ilike("title_norm", `%${term.replace(/[%_\\]/g, "\\$&")}%`);
   return q;
 }
 
