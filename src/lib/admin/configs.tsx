@@ -111,7 +111,7 @@ export const seasonsConfig: ResourceConfig = {
 const seasonLabel = (r: Row) => `${r.series?.title ?? "?"} — T${r.season_number}`;
 
 export const episodesConfig: ResourceConfig = {
-  table: "episodes", title: "Episódios", singular: "Episódio", searchCol: "title",
+  table: "episodes", title: "Episódios", singular: "Episódio", searchCol: "title", addLabel: "Adicionar episódio", stayOpenAfterCreate: true,
   select: "*, seasons(season_number, series(title))", hasStatus: true, reorderCol: "episode_number",
   sortOptions: [{ value: "episode_number:asc", label: "Número do episódio" }, { value: "created_at:desc", label: "Mais recentes" }, { value: "title:asc", label: "Título A–Z" }],
   scope: { col: "season_id", table: "seasons", select: "id, season_number, series(title)", label: "Temporada", labelOf: seasonLabel },
@@ -131,7 +131,7 @@ export const episodesConfig: ResourceConfig = {
     { name: "release_date", label: "Data de lançamento", type: "text", placeholder: "AAAA-MM-DD" },
     status,
     { name: "thumbnail_url", label: "Thumbnail", type: "image", folder: "thumbnails" },
-    { name: "playback", label: "Fonte de reprodução", type: "playback", kind: "episode", full:true },
+    { name: "sources", label: "Fontes / Players", type: "sources", kind: "episode", full: true },
   ],
 };
 

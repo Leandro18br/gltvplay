@@ -25,7 +25,7 @@ type Opt = { value: string; label: string };
 export type Field = {
   name: string;
   label: string;
-  type: "text" | "textarea" | "number" | "url" | "select" | "boolean" | "image" | "relation" | "genres" | "playback" | "content";
+  type: "text" | "textarea" | "number" | "url" | "select" | "boolean" | "image" | "relation" | "genres" | "playback" | "content" | "sources";
   required?: boolean;
   placeholder?: string;
   options?: Opt[];
@@ -61,6 +61,9 @@ export type ResourceConfig = {
   scope?: { col: string; table: string; select?: string; label: string; labelOf: (r: Row) => string; order?: string };
   reorderCol?: string;
   rowActions?: (r: Row) => ReactNode;
+  addLabel?: string;
+  /** After creating, keep the form open so related items (e.g. players) can be added. */
+  stayOpenAfterCreate?: boolean;
 };
 
 const PAGE = 12;
@@ -193,7 +196,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
       }
       const payload: Row = {};
       for (const f of config.fields) {
-        if (f.type === "genres" || f.type === "playback") continue;
+        if (f.type === "genres" || f.type === "playback" || f.type === "sources") continue;
         let v = values[f.name];
         if (f.type === "number") v = v === "" || v == null ? null : Number(v);
         if (typeof v === "string" && v.trim() === "") v = null;
@@ -228,7 +231,8 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
         }
       }
       toast.success(isNew ? `${config.singular} criado(a)` : "Alterações salvas");
-      setEditing(null);
+      if (isNew && config.stayOpenAfterCreate) { setEditing({ ...payload, id }); toast.info("Agora adicione as fontes / players abaixo."); }
+      else setEditing(null);
       refresh();
       qc.invalidateQueries({queryKey:["player"]});
     } catch (err) {
@@ -282,7 +286,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
           <h1 className="text-2xl font-bold md:text-3xl">{title ?? config.title}</h1>
           <p className="text-sm text-muted-foreground">{list.data?.count ?? 0} registro(s)</p>
         </div>
-        <Button onClick={() => openEdit(null)} className="rounded-full"><Plus /> Novo(a) {config.singular.toLowerCase()}</Button>
+        <Button onClick={() => openEdit(null)} className="rounded-full"><Plus /> {config.addLabel ?? `Novo(a) ${config.singular.toLowerCase()}`}</Button>
       </div>
 
       <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 md:flex-row">
@@ -387,7 +391,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
           <DialogHeader><DialogTitle>{editing?.id ? `Editar ${config.singular.toLowerCase()}` : `Novo(a) ${config.singular.toLowerCase()}`}</DialogTitle></DialogHeader>
           <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
             {config.fields.filter((f) => !(lockScope && f.name === config.scope?.col) && !(f.editOnly && !editing?.id)).map((f) => (
-              <div key={f.name} className={`space-y-1.5 ${f.full || ["textarea", "image", "genres", "playback"].includes(f.type) ? "md:col-span-2" : ""}`}>
+              <div key={f.name} className={`space-y-1.5 ${f.full || ["textarea", "image", "genres", "playback", "sources"].includes(f.type) ? "md:col-span-2" : ""}`}>
                 {f.type !== "boolean" && <Label>{f.label}{f.required && " *"}</Label>}
                 {["text", "url", "number"].includes(f.type) && (
                   <Input type={f.type === "number" ? "number" : f.type === "url" ? "url" : "text"} required={f.required} placeholder={f.placeholder} value={values[f.name] ?? ""} onChange={(e) => set(f.name, e.target.value)} />
@@ -414,6 +418,11 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
                 {f.type === "genres" && <GenresPicker value={values[f.name] ?? []} onChange={(v) => set(f.name, v)} />}
                 {f.type === "playback" && (
                   <PlaybackField value={values[f.name] as PlaybackValue | undefined} onChange={v=>set(f.name,v)} />
+                )}
+                {f.type === "sources" && (f.kind === "movie" || f.kind === "episode") && (
+                  editing?.id
+                    ? <SourcesManager kind={f.kind} contentId={editing.id as string} />
+                    : <p className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">Clique em Salvar para criar o episódio; o formulário continua aberto para você adicionar as fontes / players.</p>
                 )}
                 {f.type === "playback" && (f.kind === "movie" || f.kind === "episode") && (
                   editing?.id
