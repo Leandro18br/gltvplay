@@ -62,7 +62,6 @@ export function Hero({ slides, tagline }: { slides: HeroSlide[]; tagline?: strin
       <div key={s.key} className="relative mx-auto flex h-full max-w-[1600px] items-end px-4 pb-16 md:px-10 md:pb-24">
         <div className="flex min-w-0 max-w-2xl animate-rise flex-col gap-4">
           <span className="w-fit text-xs font-semibold uppercase tracking-[0.2em] text-primary">{tagline || "Em destaque"}</span>
-          {false && <span className="w-fit rounded-full border border-primary/40 bg-accent/60 px-3 py-1 text-xs font-medium text-accent-foreground backdrop-blur">{tagline || "Em destaque"}</span>
           {s.logo ? <img src={s.logo} alt={s.title} className="max-h-24 w-auto max-w-[80%] object-contain object-left drop-shadow-lg md:max-h-36" /> : <h1 className="break-words text-4xl font-bold leading-tight drop-shadow-lg md:text-6xl">{s.title}</h1>}
           {meta.length > 0 && (
             <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
