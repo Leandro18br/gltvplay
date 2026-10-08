@@ -44,7 +44,7 @@ export function Hero({ slides, tagline }: { slides: HeroSlide[]; tagline?: strin
   const s = slides[current] ?? slides[0];
   if (!s) return <div className="h-24" />;
   const it = s.item;
-  const meta = it ? [it.release_year, it.age_rating, it.kind === "movie" ? formatDuration(it.duration_minutes) : it.kind === "series" ? "Série" : null, it.quality].filter(Boolean) : [];
+  const meta = it ? [it.release_year, it.age_rating, it.kind === "movie" ? formatDuration(it.duration_minutes) : it.kind === "series" ? "Série" : null, it.language?.toUpperCase(), it.quality].filter(Boolean) : [];
 
   return (
     <section aria-label="Destaque" aria-roledescription="carrossel" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocusCapture={() => setPaused(true)} onBlurCapture={() => setPaused(false)} onTouchStart={e => setTouchStart(e.touches[0]?.clientX ?? null)} onTouchEnd={e => { const end = e.changedTouches[0]?.clientX; if(touchStart !== null && end !== undefined && Math.abs(end-touchStart)>50) change(end<touchStart ? 1 : -1); setTouchStart(null); }} className="relative h-[78svh] min-h-[480px] max-h-[900px] w-full overflow-hidden bg-background md:h-[85vh]">
