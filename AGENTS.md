@@ -23,3 +23,5 @@
 - Permission levels: super_admin > admin > editor > user, enforced by RLS (`is_staff` = create/edit, `is_admin` = delete/settings/logs/users) and `admin_set_role`; UI hiding is cosmetic only. Why: backend is the security boundary.
 - Viewer history/watchlist rows carry `viewer_profile_id`; active profile is per-device (`useActiveProfile`). Why: multiple profiles per account.
 - Public site cache is invalidated by Realtime events on catalog tables (`CatalogSync` in __root) plus periodic refresh. Why: admin changes reflect without reloads.
+- Home uses separate draft/published layout snapshots, revision-checked staff RPC writes and public server-side resolution; the bespoke HomeManager composes reusable editors instead of ResourceManager. Why: ordered page composition needs atomic publication and private drafts, unlike ordinary catalog CRUD.
+- Home section renderers and validators live in the Home module; preview reuses the public renderer in a staff-only un-nested route and device-sized iframe. Why: previews match the actual page without exposing drafts or duplicating presentation.
