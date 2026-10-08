@@ -14,7 +14,7 @@ export function ImageField({
   value: string | null | undefined;
   onChange: (v: string | null) => void;
   folder: string;
-  aspect?: string;
+  aspect?: string | undefined;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);

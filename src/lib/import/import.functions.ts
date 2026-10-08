@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -38,7 +39,7 @@ const PROVIDERS: Provider[] = [
       const path = kind === "movie" ? "movie" : "tv";
       const res = await fetch(`https://api.themoviedb.org/3/search/${path}?query=${encodeURIComponent(q)}&language=pt-BR&api_key=${key}`);
       if (!res.ok) throw new Error(`TMDB [${res.status}]: ${await res.text()}`);
-      const json = (await res.json()) as { results: Record<string, unknown>[] };
+      const json = (await res.json()) as { results: any[] };
       return json.results.slice(0, 20).map((r) => {
         const date = String(r.release_date ?? r.first_air_date ?? "");
         return {

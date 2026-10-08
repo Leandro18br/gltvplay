@@ -22,7 +22,7 @@ function SettingsSync() {
   useEffect(() => {
     if (!data) return;
     const root = document.documentElement.style;
-    const c = (data.colors ?? {}) as Record<string, string>;
+    const c = (data.colors ?? {}) as { primary?: string; background?: string };
     if (c.primary) { root.setProperty("--primary", c.primary); root.setProperty("--ring", c.primary); } else { root.removeProperty("--primary"); root.removeProperty("--ring"); }
     if (c.background) root.setProperty("--background", c.background); else root.removeProperty("--background");
     if (data.favicon_url) {

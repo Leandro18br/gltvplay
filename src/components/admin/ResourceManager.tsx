@@ -102,7 +102,7 @@ function GenresPicker({ value, onChange }: { value: string[]; onChange: (v: stri
   );
 }
 
-export function ResourceManager({ config, initialScope }: { config: ResourceConfig; initialScope?: string }) {
+export function ResourceManager({ config, initialScope }: { config: ResourceConfig; initialScope?: string | undefined }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -248,7 +248,7 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
   }
 
   const canReorder = !!config.reorderCol && config.scope && scope !== "all" && sort.startsWith(config.reorderCol);
-  const set = (k: string, v: unknown) => setValues((s) => ({ ...s, [k]: v }));
+  const set = (k: string, v: unknown) => setValues((s: Row) => ({ ...s, [k]: v }));
 
   const filterOptions = useMemo(() => {
     if (config.hasStatus) return STATUS_OPTIONS;
