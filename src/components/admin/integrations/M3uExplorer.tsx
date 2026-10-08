@@ -90,56 +90,57 @@ export function M3uExplorer({ list, onClose }: { list: { id: string; name: strin
 
   return (
     <Dialog open onOpenChange={o => !o && !running && onClose()}>
-      <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden p-0">
-        <div className="flex max-h-[92vh] flex-col">
-          <DialogHeader className="border-b border-border p-4"><DialogTitle>Explorar conteúdo da M3U — {list.name}</DialogTitle></DialogHeader>
-          <div className="space-y-2 border-b border-border p-4">
+      <DialogContent className="m3u-explorer box-border max-h-[calc(100dvh-24px)] w-[calc(100vw-24px)] min-w-0 max-w-[calc(100vw-24px)] overflow-hidden rounded-lg p-0 [overflow-wrap:anywhere] sm:max-h-[calc(100dvh-32px)] sm:w-[calc(100vw-32px)] sm:max-w-5xl">
+        <div className="flex max-h-[calc(100dvh-24px)] min-w-0 flex-col sm:max-h-[calc(100dvh-32px)]">
+          <DialogHeader className="shrink-0 border-b border-border p-4 pr-12 text-left"><DialogTitle className="min-w-0 leading-snug">Explorar conteúdo da M3U — {list.name}</DialogTitle></DialogHeader>
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="min-w-0 space-y-3 border-b border-border p-3 sm:p-4">
             <div className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Pesquisar conteúdo" value={text} onChange={e => setText(e.target.value)} aria-label="Pesquisar conteúdo" /></div>
-            <div className="flex flex-wrap gap-1">{KINDS.map(([k, l]) => <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} className="rounded-full" onClick={() => { reset(setKind)(k); setGroup(""); }}>{l}</Button>)}</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select aria-label="Status" className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={status} onChange={e => reset(setStatus)(e.target.value as Status)}>
+              <Input className="min-w-0 max-w-full pl-9" placeholder="Pesquisar conteúdo" value={text} onChange={e => setText(e.target.value)} aria-label="Pesquisar conteúdo" /></div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{KINDS.map(([k, l]) => <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} className="h-9 min-w-0 rounded-full" onClick={() => { reset(setKind)(k); setGroup(""); }}>{l}</Button>)}</div>
+            <div className="grid min-w-0 grid-cols-1 items-center gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
+              <select aria-label="Status" className="h-9 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-sm lg:w-auto" value={status} onChange={e => reset(setStatus)(e.target.value as Status)}>
                 {STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-              <select aria-label="Grupo" className="h-9 max-w-[16rem] rounded-md border border-input bg-background px-2 text-sm" value={group} onChange={e => reset(setGroup)(e.target.value)}>
+              <select aria-label="Grupo" className="h-9 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-sm lg:w-auto lg:max-w-[16rem]" value={group} onChange={e => reset(setGroup)(e.target.value)}>
                 <option value="">Todos os grupos</option>
                 {(groups.data ?? []).map(g => <option key={g.group_title} value={g.group_title}>{g.group_title} ({n(Number(g.n))})</option>)}</select>
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                <select aria-label="Tamanho do lote" className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={lot} onChange={e => setLot(Number(e.target.value) as typeof lot)} disabled={running}>
+              <div className="grid min-w-0 grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-2 lg:ml-auto lg:flex lg:flex-wrap [&>button]:h-9 [&>button]:min-w-0 [&>button]:max-w-full [&>button]:whitespace-normal [&>button]:leading-tight">
+                <select aria-label="Tamanho do lote" className="sm:col-span-2 h-9 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-sm lg:w-auto" value={lot} onChange={e => setLot(Number(e.target.value) as typeof lot)} disabled={running}>
                   {[50, 100, 250, 500].map(x => <option key={x} value={x}>{x} por operação</option>)}</select>
                 <Button size="sm" variant="outline" disabled={running} onClick={importLot}><Download /> Importar por lote</Button>
                 <Button size="sm" disabled={running || !sel.size} onClick={() => runImport([...sel])}><Download /> Importar selecionados ({sel.size})</Button>
               </div>
             </div>
             {prog && (
-              <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  {prog.running && <Loader2 className="size-4 animate-spin text-primary" />}
-                  <b>{prog.running ? "Importando…" : "Importação finalizada"}</b>
-                  <span>{n(prog.done + prog.skipped)} / {n(prog.total)}</span>
-                  {prog.running && <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { stop.current = true; }}><Square /> Parar</Button>}
+              <div className="min-w-0 rounded-xl border border-primary/40 bg-primary/5 p-3 text-sm">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">{prog.running && <Loader2 className="size-4 animate-spin text-primary" />}
+                  <b className="min-w-0">{prog.running ? "Importando…" : "Importação finalizada"}</b></div>
+                  <span className="col-start-1 min-w-0">{n(prog.done + prog.skipped)} / {n(prog.total)}</span>
+                  {prog.running && <Button size="sm" variant="ghost" className="col-start-2 row-span-2 row-start-1" onClick={() => { stop.current = true; }}><Square /> Parar</Button>}
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${prog.total ? ((prog.done + prog.skipped) / prog.total) * 100 : 0}%` }} /></div>
                 <p className="mt-1 text-xs text-muted-foreground">Concluídos: {prog.done} · Ignorados: {prog.skipped} · Erros: {prog.errors}{prog.note ? ` · ${prog.note}` : ""}</p>
               </div>
             )}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground">
-              <input type="checkbox" className="size-4 accent-primary" aria-label="Selecionar página" checked={allOnPage} onChange={() => setSel(s => { const x = new Set(s); rows.forEach(r => allOnPage ? x.delete(r.id) : x.add(r.id)); return x; })} />
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground">
+              <input type="checkbox" className="size-4 shrink-0 accent-primary" aria-label="Selecionar página" checked={allOnPage} onChange={() => setSel(s => { const x = new Set(s); rows.forEach(r => allOnPage ? x.delete(r.id) : x.add(r.id)); return x; })} />
               <span>{total ? `${n(from)}–${n(to)} de ${n(total)}` : items.isFetching ? "Carregando…" : "Nenhum conteúdo encontrado"}</span>
               {items.isFetching && <Loader2 className="size-3 animate-spin" />}
             </div>
             {items.isError && <p className="p-4 text-sm text-destructive">{errMsg(items.error)}</p>}
             {rows.map(r => (
-              <div key={r.id} className="flex items-center gap-3 border-b border-border/60 px-4 py-2">
-                <input type="checkbox" className="size-4 accent-primary" aria-label={`Selecionar ${r.title}`} checked={sel.has(r.id)} onChange={() => toggle(r.id)} />
+              <div key={r.id} className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 border-b border-border/60 px-3 py-3 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:gap-3 sm:px-4">
+                <input type="checkbox" className="size-4 shrink-0 accent-primary" aria-label={`Selecionar ${r.title}`} checked={sel.has(r.id)} onChange={() => toggle(r.id)} />
                 <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-muted">{r.logo && <img src={r.logo} alt="" loading="lazy" referrerPolicy="no-referrer" className="size-full object-cover" onError={e => { e.currentTarget.style.display = "none"; }} />}</div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{r.title}</p>
+                  <p className="font-medium leading-snug sm:truncate">{r.title}</p>
                   <p className="truncate text-xs text-muted-foreground">{KIND_LABEL[r.kind] ?? r.kind}{r.year ? ` · Ano: ${r.year}` : ""}{r.kind === "series" && r.episode_count ? ` · ${n(r.episode_count)} episódios` : ""}{r.group_title ? ` · ${r.group_title}` : ""} · Fonte: {list.name}</p>
                   {r.import_error && <p className="truncate text-xs text-destructive">Erro: {r.import_error}</p>}
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                <div className="col-span-2 col-start-2 flex min-w-0 flex-wrap items-center gap-2 sm:col-span-1 sm:col-start-4 sm:max-w-[17rem] sm:justify-end [&>span]:max-w-full [&>span]:whitespace-normal [&>button]:h-9 [&>button]:min-w-0 [&>button]:max-w-full [&>button]:whitespace-normal">
                   {r.missing && <Badge variant="outline">Indisponível na última sincronização</Badge>}
                   {r.content_id ? <Badge>✓ Importado</Badge> : r.import_error ? <Badge variant="destructive">Erro</Badge> : <Badge variant="secondary">Não importado</Badge>}
                   <Button size="sm" variant={r.content_id ? "ghost" : "outline"} disabled={running} onClick={() => runImport([r.id])}>
@@ -149,9 +150,10 @@ export function M3uExplorer({ list, onClose }: { list: { id: string; name: strin
               </div>
             ))}
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-1 border-t border-border p-3">
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-center gap-1 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Anterior</Button>
-            {nums.map((x, i) => <span key={x} className="flex items-center gap-1">{i > 0 && x - nums[i - 1]! > 1 && <span className="px-1 text-muted-foreground">…</span>}
+            {nums.map((x, i) => <span key={x} className="flex items-center gap-1">{i > 0 && x - (nums[i - 1] ?? x) > 1 && <span className="px-1 text-muted-foreground">…</span>}
               <Button size="sm" variant={x === page ? "default" : "ghost"} onClick={() => setPage(x)}>{x}</Button></span>)}
             <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>Próxima</Button>
           </div>
