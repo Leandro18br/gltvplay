@@ -14,3 +14,7 @@
 - [x] Resumable chunked indexing into an M3U catalog; chunked finalize.
 - [x] Explore with server-side search/filters/pagination; single, selected and per-lot import without duplicates.
 - [x] Verified with the real list (391k entries) and a no-duplicate import test.
+
+# M3U responsive interface
+- [ ] Fit M3U list cards, forms, explorer, progress and actions within the available width without changing import logic.
+- [ ] Verify authenticated M3U interface at 320, 360, 375, 390, 412, 768, 1024 and desktop widths.
