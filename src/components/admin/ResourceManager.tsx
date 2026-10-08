@@ -188,10 +188,13 @@ export function ResourceManager({ config, initialScope }: { config: ResourceConf
         if (typeof v === "string" && v.trim() === "") v = null;
         payload[f.name] = v;
       }
-      if (config.slugFrom && !payload.slug && payload[config.slugFrom]) {
-        payload.slug = `${slugify(String(payload[config.slugFrom]))}-${Math.random().toString(36).slice(2, 6)}`;
-      }
       const isNew = !editing?.id;
+      // Keep existing public links stable: only create a slug for new rows or rows that never had one.
+      if (config.slugFrom && !payload.slug && payload[config.slugFrom] && (isNew || !editing?.slug)) {
+        payload.slug = `${slugify(String(payload[config.slugFrom]))}-${Math.random().toString(36).slice(2, 6)}`;
+      } else if (!isNew && !payload.slug) {
+        delete payload.slug;
+      }
       const res = isNew
         ? await db.from(config.table).insert(payload).select("id").single()
         : await db.from(config.table).update(payload).eq("id", editing!.id).select("id").single();
