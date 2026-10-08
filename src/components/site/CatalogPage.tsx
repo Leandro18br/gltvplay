@@ -1,9 +1,9 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useSuspenseInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { Loader2, Film } from "lucide-react";
 import { catalogListQuery, genresQuery, type Kind, type SortKey } from "@/lib/catalog";
-import { CardGrid, GridSkeleton } from "./ContentCard";
+import { CardGrid } from "./ContentCard";
 import { EmptyState, PageTitle } from "./SiteShell";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +13,7 @@ export type CatalogSearch = { genero?: string | undefined; ordem?: SortKey | und
 export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; title: string; subtitle: string; search: CatalogSearch }) {
   const navigate = useNavigate();
   const sort = search.ordem ?? "recent";
-  const q = useInfiniteQuery(catalogListQuery(kind, search.genero, sort));
+  const q = useSuspenseInfiniteQuery(catalogListQuery(kind, search.genero, sort));
   const { data: genres = [] } = useQuery({ ...genresQuery, enabled: kind !== "channel" });
   const sentinel = useRef<HTMLDivElement>(null);
 
@@ -54,7 +54,7 @@ export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; tit
           </Select>
         </div>
       </PageTitle>
-      {q.isPending ? <GridSkeleton /> : q.isError ? (
+      {q.isError ? (
         <EmptyState title="Não foi possível carregar" text="Verifique sua conexão e tente novamente." />
       ) : items.length === 0 ? (
         <EmptyState icon={<Film />} title="Nada por aqui ainda" text="Assim que novos conteúdos forem publicados eles aparecerão aqui." />

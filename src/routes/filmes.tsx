@@ -6,7 +6,7 @@ import { CatalogPage, validateCatalogSearch } from "@/components/site/CatalogPag
 export const Route = createFileRoute("/filmes")({
   validateSearch: validateCatalogSearch,
   loaderDeps: ({ search }) => ({ genero: search.genero, ordem: search.ordem }),
-  loader: ({ context, deps }) => context.queryClient.prefetchInfiniteQuery(catalogListQuery("movie", deps.genero, deps.ordem ?? "recent")),
+  loader: ({ context, deps }) => context.queryClient.ensureInfiniteQueryData(catalogListQuery("movie", deps.genero, deps.ordem ?? "recent")),
   head: () => ({
     meta: [
       { title: "Filmes — Streaming" },
