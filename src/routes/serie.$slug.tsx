@@ -1,11 +1,11 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Play } from "lucide-react";
 import { formatDuration, seriesDetailQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
-import { Button } from "@/components/ui/button";
+import { InlinePlayer } from "@/components/site/InlinePlayer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/serie/$slug")({
@@ -40,9 +40,11 @@ function SeriesPage() {
   const { slug } = Route.useParams();
   const { data } = useSuspenseQuery(seriesDetailQuery(slug));
   const [seasonId, setSeasonId] = useState(data?.seasons[0]?.id ?? "");
+  const [episodeId, setEpisodeId] = useState<string | null>(null);
   if (!data) return null;
   const season = data.seasons.find((s) => s.id === seasonId) ?? data.seasons[0];
   const first = data.seasons.flatMap((s) => s.episodes)[0];
+  const current = data.seasons.flatMap((s) => s.episodes).find((e) => e.id === episodeId) ?? first;
 
   return (
     <SiteShell padTop={false}>
@@ -50,8 +52,8 @@ function SeriesPage() {
         <DetailHero
           item={data.item}
           extraMeta={<span>· {data.seasons.length} temporada{data.seasons.length === 1 ? "" : "s"}</span>}
-          watch={first ? (
-            <Button asChild size="lg" className="rounded-full px-7"><Link to="/assistir/$kind/$id" params={{ kind: "episode", id: first.id }}><Play className="fill-current" /> Assistir</Link></Button>
+          player={current ? (
+            <InlinePlayer kind="episode" id={current.id} title={`${data.item.title} — ${current.title}`} poster={current.thumbnail_url || data.item.backdrop_url || data.item.poster_url} />
           ) : undefined}
         />
         <section id="episodios" aria-label="Episódios" className="mx-auto max-w-[1600px] scroll-mt-20 px-4 py-10 md:px-10">
@@ -72,8 +74,9 @@ function SeriesPage() {
             <ol className="grid gap-3">
               {season.episodes.map((e) => (
                 <li key={e.id}>
-                  <Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }}
-                    className="group grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-4 rounded-xl p-2 transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto]">
+                  <button type="button" onClick={() => { setEpisodeId(e.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    aria-current={e.id === current?.id}
+                    className={`group grid w-full grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-4 rounded-xl p-2 text-left transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] ${e.id === current?.id ? "bg-card ring-1 ring-primary/40" : ""}`}>
                     <span className="hidden text-center font-display text-2xl text-muted-foreground md:block">{e.episode_number}</span>
                     <div className="relative aspect-video overflow-hidden rounded-lg bg-card">
                       {e.thumbnail_url ? <img src={e.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" /> : <div className="h-full bg-accent" />}
@@ -84,7 +87,7 @@ function SeriesPage() {
                       {e.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{e.description}</p>}
                     </div>
                     <span className="hidden text-sm text-muted-foreground md:block">{formatDuration(e.duration_minutes)}</span>
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ol>

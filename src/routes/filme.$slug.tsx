@@ -3,6 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { movieDetailQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
+import { InlinePlayer } from "@/components/site/InlinePlayer";
 import { Row } from "@/components/site/ContentCard";
 
 export const Route = createFileRoute("/filme/$slug")({
@@ -40,7 +41,7 @@ function MoviePage() {
   return (
     <SiteShell padTop={false}>
       <article>
-        <DetailHero item={data.item} />
+        <DetailHero item={data.item} player={<InlinePlayer kind="movie" id={data.item.id} title={data.item.title} poster={data.item.backdrop_url || data.item.poster_url} />} />
         <div className="py-8"><Row title="Títulos semelhantes" items={data.related} /></div>
       </article>
     </SiteShell>
