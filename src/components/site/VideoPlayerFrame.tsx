@@ -57,7 +57,8 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     clearTimeout(idle.current);
     idle.current = setTimeout(() => {
       const video = media.current;
-      if (video && !video.paused && !video.ended && !menuOpen.current && !wrap.current?.contains(document.activeElement)) setVisible(false);
+      const focused = document.activeElement;
+      if (video && !video.paused && !video.ended && !menuOpen.current && !(focused && wrap.current?.contains(focused) && focused.matches(':focus-visible'))) setVisible(false);
     }, CONTROLS_IDLE_MS);
   }, []);
   const flash = (value: string) => {
@@ -70,7 +71,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     const video = media.current;
     if (!video) return;
     if (video.paused) {
-      video.play().then(() => flash("play")).catch(() => { setNotice("Touchez Lecture pour démarrer."); });
+      video.play().then(() => flash("play")).catch(() => { setNotice("Toque em Reproduzir para iniciar."); });
     } else { video.pause(); flash("pause"); }
   };
   const skip = (delta: number) => {
@@ -196,7 +197,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
                   {PLAYBACK_RATES.map(value => <DropdownMenuRadioItem key={value} value={String(value)} className="min-h-9">{value}x</DropdownMenuRadioItem>)}
                 </DropdownMenuRadioGroup>
                 {qualities.length > 1 && onQualityChange && <><DropdownMenuSeparator /><DropdownMenuLabel>Qualidade</DropdownMenuLabel><DropdownMenuRadioGroup value={String(quality)} onValueChange={value => onQualityChange(Number(value))}><DropdownMenuRadioItem value="-1">Auto</DropdownMenuRadioItem>{qualities.map(item => <DropdownMenuRadioItem key={item.i} value={String(item.i)}>{item.label}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></>}
-                {servers.length > 1 && onServerChange && <><DropdownMenuSeparator /><DropdownMenuLabel>Servidores</DropdownMenuLabel><DropdownMenuRadioGroup value={selectedServer} onValueChange={value => { const index = servers.findIndex(server => server.id === value); if (index >= 0) onServerChange(index); }}>{servers.map((server, index) => <DropdownMenuRadioItem key={server.id} value={server.id} className="min-h-10 break-words">Servidor {index + 1}{server.label && !/^Servidor \d+$/i.test(server.label) ? ` · ${server.label}` : ""}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></>}
+                {servers.length > 1 && onServerChange && <><DropdownMenuSeparator /><DropdownMenuLabel>Servidores</DropdownMenuLabel><DropdownMenuRadioGroup value={selectedServer ?? ""} onValueChange={value => { const index = servers.findIndex(server => server.id === value); if (index >= 0) onServerChange(index); }}>{servers.map((server, index) => <DropdownMenuRadioItem key={server.id} value={server.id} className="min-h-10 break-words">Servidor {index + 1}{server.label && !/^Servidor \d+$/i.test(server.label) ? ` · ${server.label}` : ""}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></>}
                 {actions && <div className="flex flex-wrap gap-1 p-1 sm:hidden">{actions}</div>}
               </Menu.Content>
             </Menu.Portal>
