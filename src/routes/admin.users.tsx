@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { isAdminRole as isAdminRoleGuard } from "@/lib/admin/db";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,7 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export const Route = createFileRoute("/admin/users")({ component: UsersPage });
+export const Route = createFileRoute("/admin/users")({
+  beforeLoad: ({ context }) => { if (!isAdminRoleGuard(context.role)) throw redirect({ to: "/admin" }); },
+  component: UsersPage,
+});
 
 const PAGE = 15;
 
@@ -47,7 +51,7 @@ function UsersPage() {
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold md:text-3xl">Usuários</h1><p className="text-sm text-muted-foreground">{list.data?.count ?? 0} conta(s). Apenas administradores alteram permissões.</p></div>
+      <div><h1 className="text-2xl font-bold md:text-3xl">Usuários</h1><p className="text-sm text-muted-foreground">{list.data?.count ?? 0} conta(s). Super admin: acesso total e gerencia administradores. Administrador: conteúdo e editores. Editor: cria e edita conteúdo.</p></div>
       <div className="relative rounded-2xl border border-border bg-card p-3">
         <Search className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input className="pl-9" placeholder="Buscar por nome ou e-mail…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -58,7 +62,7 @@ function UsersPage() {
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b border-border text-left text-xs uppercase text-muted-foreground">
-              <tr><th className="px-4 py-3">Usuário</th><th className="px-4 py-3">Criado</th><th className="px-4 py-3">Último acesso</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Admin</th><th className="px-4 py-3">Editor</th></tr>
+              <tr><th className="px-4 py-3">Usuário</th><th className="px-4 py-3">Criado</th><th className="px-4 py-3">Último acesso</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Super admin</th><th className="px-4 py-3">Admin</th><th className="px-4 py-3">Editor</th></tr>
             </thead>
             <tbody>
               {list.data.rows.map((u) => (
@@ -72,6 +76,7 @@ function UsersPage() {
                       <SelectContent><SelectItem value="active">Ativo</SelectItem><SelectItem value="suspended">Suspenso</SelectItem><SelectItem value="banned">Banido</SelectItem></SelectContent>
                     </Select>
                   </td>
+                  <td className="px-4 py-3"><Switch checked={!!has(u.id, "super_admin")} onCheckedChange={(v) => setRole(u.id, "super_admin", v)} /></td>
                   <td className="px-4 py-3"><Switch checked={!!has(u.id, "admin")} onCheckedChange={(v) => setRole(u.id, "admin", v)} /></td>
                   <td className="px-4 py-3"><Switch checked={!!has(u.id, "editor")} onCheckedChange={(v) => setRole(u.id, "editor", v)} /></td>
                 </tr>

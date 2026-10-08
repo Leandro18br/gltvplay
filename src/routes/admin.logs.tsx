@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { isAdminRole as isAdminRoleGuard } from "@/lib/admin/db";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -8,7 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export const Route = createFileRoute("/admin/logs")({ component: Logs });
+export const Route = createFileRoute("/admin/logs")({
+  beforeLoad: ({ context }) => { if (!isAdminRoleGuard(context.role)) throw redirect({ to: "/admin" }); },
+  component: Logs,
+});
 
 const PAGE = 20;
 const ENTITIES = ["movies", "series", "seasons", "episodes", "channels", "categories", "genres", "banners", "playback_sources", "site_settings", "user_roles", "profiles"];
@@ -47,7 +51,7 @@ function Logs() {
           <p className="p-12 text-center text-muted-foreground">Nenhum registro.</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-border text-left text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Quem</th><th className="px-4 py-3">Ação</th><th className="px-4 py-3">Área</th><th className="px-4 py-3">Item</th></tr></thead>
+            <thead className="border-b border-border text-left text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Quem</th><th className="px-4 py-3">Ação</th><th className="px-4 py-3">Área</th><th className="px-4 py-3">Descrição</th></tr></thead>
             <tbody>
               {list.data.rows.map((r) => {
                 const item = r.changes?.new ?? r.changes?.old ?? {};
@@ -57,7 +61,7 @@ function Logs() {
                     <td className="px-4 py-3">{list.data.map[r.actor_id] ?? "Sistema"}</td>
                     <td className="px-4 py-3"><Badge variant={r.action === "delete" ? "destructive" : r.action === "insert" ? "default" : "secondary"}>{ACTION[r.action] ?? r.action}</Badge></td>
                     <td className="px-4 py-3">{r.entity}</td>
-                    <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">{item.title ?? item.name ?? item.platform_name ?? r.entity_id}</td>
+                    <td className="max-w-md px-4 py-3 text-muted-foreground">{r.summary ?? item.title ?? item.name ?? item.platform_name ?? r.entity_id}</td>
                   </tr>
                 );
               })}
