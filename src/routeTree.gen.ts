@@ -43,8 +43,10 @@ import { Route as CanalSlugRouteImport } from './routes/canal.$slug'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as FilmeSlugRouteImport } from './routes/filme.$slug'
 import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
+import { Route as AdminSeriesIdRouteImport } from './routes/admin.series_.$id'
 import { Route as HomeSecoesIdRouteImport } from './routes/home.secoes.$id'
 import { Route as AuthenticatedAssistirKindIdRouteImport } from './routes/_authenticated/assistir.$kind.$id'
+import { Route as AdminSeriesIdTemporadaSeasonIdRouteImport } from './routes/admin.series_.$id.temporada.$seasonId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -215,6 +217,11 @@ const SerieSlugRoute = SerieSlugRouteImport.update({
   path: '/serie/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSeriesIdRoute = AdminSeriesIdRouteImport.update({
+  id: '/series_/$id',
+  path: '/series/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 const HomeSecoesIdRoute = HomeSecoesIdRouteImport.update({
   id: '/home/secoes/$id',
   path: '/home/secoes/$id',
@@ -225,6 +232,12 @@ const AuthenticatedAssistirKindIdRoute =
     id: '/assistir/$kind/$id',
     path: '/assistir/$kind/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AdminSeriesIdTemporadaSeasonIdRoute =
+  AdminSeriesIdTemporadaSeasonIdRouteImport.update({
+    id: '/temporada/$seasonId',
+    path: '/temporada/$seasonId',
+    getParentRoute: () => AdminSeriesIdRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -261,8 +274,10 @@ export interface FileRoutesByFullPath {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/series/$id': typeof AdminSeriesIdRouteWithChildren
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
+  '/admin/series/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -297,8 +312,10 @@ export interface FileRoutesByTo {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/series/$id': typeof AdminSeriesIdRouteWithChildren
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
+  '/admin/series/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -336,8 +353,10 @@ export interface FileRoutesById {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/series_/$id': typeof AdminSeriesIdRouteWithChildren
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/_authenticated/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
+  '/admin/series_/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -375,8 +394,10 @@ export interface FileRouteTypes {
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin/'
+    | '/admin/series/$id'
     | '/home/secoes/$id'
     | '/assistir/$kind/$id'
+    | '/admin/series/$id/temporada/$seasonId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -411,8 +432,10 @@ export interface FileRouteTypes {
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin'
+    | '/admin/series/$id'
     | '/home/secoes/$id'
     | '/assistir/$kind/$id'
+    | '/admin/series/$id/temporada/$seasonId'
   id:
     | '__root__'
     | '/'
@@ -449,8 +472,10 @@ export interface FileRouteTypes {
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin/'
+    | '/admin/series_/$id'
     | '/home/secoes/$id'
     | '/_authenticated/assistir/$kind/$id'
+    | '/admin/series_/$id/temporada/$seasonId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -714,6 +739,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SerieSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/series_/$id': {
+      id: '/admin/series_/$id'
+      path: '/series/$id'
+      fullPath: '/admin/series/$id'
+      preLoaderRoute: typeof AdminSeriesIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/home/secoes/$id': {
       id: '/home/secoes/$id'
       path: '/home/secoes/$id'
@@ -727,6 +759,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/assistir/$kind/$id'
       preLoaderRoute: typeof AuthenticatedAssistirKindIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/admin/series_/$id/temporada/$seasonId': {
+      id: '/admin/series_/$id/temporada/$seasonId'
+      path: '/temporada/$seasonId'
+      fullPath: '/admin/series/$id/temporada/$seasonId'
+      preLoaderRoute: typeof AdminSeriesIdTemporadaSeasonIdRouteImport
+      parentRoute: typeof AdminSeriesIdRoute
     }
   }
 }
@@ -746,6 +785,18 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AdminSeriesIdRouteChildren {
+  AdminSeriesIdTemporadaSeasonIdRoute: typeof AdminSeriesIdTemporadaSeasonIdRoute
+}
+
+const AdminSeriesIdRouteChildren: AdminSeriesIdRouteChildren = {
+  AdminSeriesIdTemporadaSeasonIdRoute: AdminSeriesIdTemporadaSeasonIdRoute,
+}
+
+const AdminSeriesIdRouteWithChildren = AdminSeriesIdRoute._addFileChildren(
+  AdminSeriesIdRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminBannersRoute: typeof AdminBannersRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
@@ -762,6 +813,7 @@ interface AdminRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminSeriesIdRoute: typeof AdminSeriesIdRouteWithChildren
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -780,6 +832,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminSeriesIdRoute: AdminSeriesIdRouteWithChildren,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

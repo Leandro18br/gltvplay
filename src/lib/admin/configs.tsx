@@ -4,6 +4,17 @@ import type { ResourceConfig, Field } from "@/components/admin/ResourceManager";
 import { Thumb } from "@/components/admin/ResourceManager";
 import { KIND_OPTIONS, STATUS_OPTIONS, type Row } from "./db";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { db } from "./db";
+
+function SourcesCount({ id }: { id: string }) {
+  const q = useQuery({ queryKey: ["admin", "playback_sources", "count", id], queryFn: async () => {
+    const { count } = await db.from("playback_sources").select("id", { count: "exact", head: true }).eq("content_kind", "episode").eq("content_id", id).eq("is_active", true);
+    return count ?? 0;
+  } });
+  if (q.data == null) return <span className="text-muted-foreground">…</span>;
+  return q.data ? <span className="rounded-full border border-primary/40 bg-accent px-2 py-0.5 text-xs text-accent-foreground">{q.data} player(s)</span> : <span className="text-xs text-muted-foreground">Sem player</span>;
+}
 
 const status: Field = { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS, defaultValue: "draft" };
 const featured: Field = { name: "featured", label: "Marcar como destaque", type: "boolean" };
@@ -111,6 +122,7 @@ export const episodesConfig: ResourceConfig = {
     { key: "episode_number", label: "Nº" },
     { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{r.seasons ? seasonLabel(r.seasons) : ""}</p></div> },
     { key: "duration_minutes", label: "Duração", render: (r) => (r.duration_minutes ? `${r.duration_minutes} min` : "—") },
+    { key: "sources", label: "Fonte/Player", render: (r) => <SourcesCount id={r.id} /> },
   ],
   fields: [
     { name: "season_id", label: "Temporada", type: "relation", table: "seasons", select: "id, season_number, series(title)", labelOf: seasonLabel, required: true },
