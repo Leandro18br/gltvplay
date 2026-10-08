@@ -3,7 +3,8 @@ import { Loader2, RotateCcw, Maximize, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Renders an authorized embed directly in an isolated iframe.
+ * Renders an authorized embed directly in a cross-origin iframe (no sandbox: providers
+ * may need features it blocks; isolation comes from the browser same-origin policy).
  * Cross-origin iframes expose no reliable status, so the player never declares
  * the content unavailable on its own: no fetch/HEAD checks, no onError or timeout
  * verdicts. Only a URL that is structurally unsafe is refused before rendering.
@@ -27,9 +28,9 @@ export function EmbedPlayer({url,title,onFailure,onLoaded,preview=false}:{url:st
   const retry=()=>{setReported(false);setAttempt(v=>v+1);};
   return <div className="w-full space-y-3">
     <div ref={wrap} className="relative aspect-video w-full overflow-hidden rounded-xl bg-background ring-1 ring-border">
-      {safe && <iframe key={`${url}:${attempt}`} src={url} title={title} sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" className="absolute inset-0 h-full w-full border-0" onLoad={()=>{setLoading(false);callbacks.current.onLoaded?.();}} />}
+      {safe && <iframe key={`${url}:${attempt}`} src={url} title={title} width="100%" height="100%" frameBorder="0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" className="absolute inset-0 h-full w-full border-0" onLoad={()=>{setLoading(false);callbacks.current.onLoaded?.();}} />}
       {safe && loading && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><Loader2 className="size-10 animate-spin text-primary" /></div>}
-      {safe===false && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center"><AlertTriangle className="size-7 text-muted-foreground" /><p className="text-sm md:text-base">Não foi possível carregar este conteúdo no momento.</p></div>}
+      {safe===false && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center"><AlertTriangle className="size-7 text-muted-foreground" /><p className="text-sm md:text-base">Não foi possível carregar o player. Tente novamente.</p></div>}
     </div>
     <div className="flex flex-wrap items-center justify-end gap-2">
       <p role="status" className="mr-auto text-xs text-muted-foreground">{preview?"Pré-visualização carregada. A disponibilidade do conteúdo depende do servidor de origem.":"Se o conteúdo não carregar, tente novamente."}</p>
