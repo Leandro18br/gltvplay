@@ -141,7 +141,7 @@ export const importCatalog = createServerFn({ method: "POST" }).middleware([requ
         for (const e of eps) {
           let eid = map.get(e.episode_number!);
           if (!eid) {
-            const ins = await sb.from("episodes").insert({ season_id: season.id, episode_number: e.episode_number, title: e.title || `Episódio ${e.episode_number}`, description: e.description, thumbnail_url: https(e.thumbnail_url), duration_minutes: e.duration_minutes ? Math.round(e.duration_minutes) : null, status: "published" }).select("id").single();
+            const ins = await sb.from("episodes").insert({ season_id: season.id, episode_number: e.episode_number!, title: e.title || `Episódio ${e.episode_number}`, description: e.description, thumbnail_url: https(e.thumbnail_url), duration_minutes: e.duration_minutes ? Math.round(e.duration_minutes) : null, status: "published" }).select("id").single();
             if (ins.error) continue; eid = ins.data.id as string; report.episodes++;
           }
           if (data.autoPlayer && budget-- > 0) await autoPlayer("episode", eid);

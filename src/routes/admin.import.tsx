@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Check, DownloadCloud, Loader2, Search } from "lucide-react";
+import { ApiImport } from "@/components/admin/integrations/ApiImport";
 import { listImportProviders, searchImport, type ImportItem } from "@/lib/import/import.functions";
 import { db, errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
