@@ -45,7 +45,6 @@ export const moviesConfig: ResourceConfig = {
     { name: "release_year", label: "Ano", type: "number" },
     { name: "duration_minutes", label: "Duração (min)", type: "number" },
     { name: "age_rating", label: "Classificação indicativa", type: "select", options: ["L", "10", "12", "14", "16", "18"].map((v) => ({ value: v, label: v })) },
-    { name: "quality", label: "Qualidade", type: "select", options: ["SD", "HD", "Full HD", "4K"].map((v) => ({ value: v, label: v })) },
     { name: "language", label: "Idioma", type: "text", placeholder: "Português" },
     { name: "country", label: "País", type: "text" },
     category, status, sortOrder, featured,

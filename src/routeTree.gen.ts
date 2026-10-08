@@ -23,19 +23,14 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedMinhaListaRouteImport } from './routes/_authenticated/minha-lista'
 import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as AdminBannersRouteImport } from './routes/admin.banners'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
 import { Route as AdminGenresRouteImport } from './routes/admin.genres'
-import { Route as AdminHighlightsRouteImport } from './routes/admin.highlights'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
-import { Route as AdminImportRouteImport } from './routes/admin.import'
 import { Route as AdminIntegrationsRouteImport } from './routes/admin.integrations'
-import { Route as AdminLogsRouteImport } from './routes/admin.logs'
 import { Route as AdminMoviesRouteImport } from './routes/admin.movies'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
 import { Route as AdminSeriesRouteImport } from './routes/admin.series'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminHomePreviewRouteImport } from './routes/admin_.home-preview'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
@@ -117,11 +112,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminBannersRoute = AdminBannersRouteImport.update({
-  id: '/banners',
-  path: '/banners',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
@@ -137,29 +127,14 @@ const AdminGenresRoute = AdminGenresRouteImport.update({
   path: '/genres',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminHighlightsRoute = AdminHighlightsRouteImport.update({
-  id: '/highlights',
-  path: '/highlights',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminHomeRoute = AdminHomeRouteImport.update({
   id: '/home',
   path: '/home',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminImportRoute = AdminImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminIntegrationsRoute = AdminIntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminLogsRoute = AdminLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminMoviesRoute = AdminMoviesRouteImport.update({
@@ -175,11 +150,6 @@ const AdminProfileRoute = AdminProfileRouteImport.update({
 const AdminSeriesRoute = AdminSeriesRouteImport.update({
   id: '/series',
   path: '/series',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -253,19 +223,14 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/perfil': typeof AuthenticatedPerfilRoute
-  '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/genres': typeof AdminGenresRoute
-  '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
-  '/admin/import': typeof AdminImportRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
-  '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/series': typeof AdminSeriesRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
   '/admin/login': typeof AdminLoginRoute
@@ -291,19 +256,14 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/perfil': typeof AuthenticatedPerfilRoute
-  '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/genres': typeof AdminGenresRoute
-  '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
-  '/admin/import': typeof AdminImportRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
-  '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/series': typeof AdminSeriesRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
   '/admin/login': typeof AdminLoginRoute
@@ -332,19 +292,14 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
-  '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/genres': typeof AdminGenresRoute
-  '/admin/highlights': typeof AdminHighlightsRoute
   '/admin/home': typeof AdminHomeRoute
-  '/admin/import': typeof AdminImportRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
-  '/admin/logs': typeof AdminLogsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/series': typeof AdminSeriesRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin_/home-preview': typeof AdminHomePreviewRoute
   '/admin_/login': typeof AdminLoginRoute
@@ -373,19 +328,14 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/minha-lista'
     | '/perfil'
-    | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
     | '/admin/genres'
-    | '/admin/highlights'
     | '/admin/home'
-    | '/admin/import'
     | '/admin/integrations'
-    | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
     | '/admin/series'
-    | '/admin/settings'
     | '/admin/users'
     | '/admin/home-preview'
     | '/admin/login'
@@ -411,19 +361,14 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/minha-lista'
     | '/perfil'
-    | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
     | '/admin/genres'
-    | '/admin/highlights'
     | '/admin/home'
-    | '/admin/import'
     | '/admin/integrations'
-    | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
     | '/admin/series'
-    | '/admin/settings'
     | '/admin/users'
     | '/admin/home-preview'
     | '/admin/login'
@@ -451,19 +396,14 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_authenticated/minha-lista'
     | '/_authenticated/perfil'
-    | '/admin/banners'
     | '/admin/categories'
     | '/admin/channels'
     | '/admin/genres'
-    | '/admin/highlights'
     | '/admin/home'
-    | '/admin/import'
     | '/admin/integrations'
-    | '/admin/logs'
     | '/admin/movies'
     | '/admin/profile'
     | '/admin/series'
-    | '/admin/settings'
     | '/admin/users'
     | '/admin_/home-preview'
     | '/admin_/login'
@@ -599,13 +539,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/banners': {
-      id: '/admin/banners'
-      path: '/banners'
-      fullPath: '/admin/banners'
-      preLoaderRoute: typeof AdminBannersRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/categories': {
       id: '/admin/categories'
       path: '/categories'
@@ -627,13 +560,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminGenresRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/highlights': {
-      id: '/admin/highlights'
-      path: '/highlights'
-      fullPath: '/admin/highlights'
-      preLoaderRoute: typeof AdminHighlightsRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/home': {
       id: '/admin/home'
       path: '/home'
@@ -641,25 +567,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHomeRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/import': {
-      id: '/admin/import'
-      path: '/import'
-      fullPath: '/admin/import'
-      preLoaderRoute: typeof AdminImportRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/integrations': {
       id: '/admin/integrations'
       path: '/integrations'
       fullPath: '/admin/integrations'
       preLoaderRoute: typeof AdminIntegrationsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/logs': {
-      id: '/admin/logs'
-      path: '/logs'
-      fullPath: '/admin/logs'
-      preLoaderRoute: typeof AdminLogsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/movies': {
@@ -681,13 +593,6 @@ declare module '@tanstack/react-router' {
       path: '/series'
       fullPath: '/admin/series'
       preLoaderRoute: typeof AdminSeriesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -798,38 +703,28 @@ const AdminSeriesIdRouteWithChildren = AdminSeriesIdRoute._addFileChildren(
 )
 
 interface AdminRouteChildren {
-  AdminBannersRoute: typeof AdminBannersRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminChannelsRoute: typeof AdminChannelsRoute
   AdminGenresRoute: typeof AdminGenresRoute
-  AdminHighlightsRoute: typeof AdminHighlightsRoute
   AdminHomeRoute: typeof AdminHomeRoute
-  AdminImportRoute: typeof AdminImportRoute
   AdminIntegrationsRoute: typeof AdminIntegrationsRoute
-  AdminLogsRoute: typeof AdminLogsRoute
   AdminMoviesRoute: typeof AdminMoviesRoute
   AdminProfileRoute: typeof AdminProfileRoute
   AdminSeriesRoute: typeof AdminSeriesRoute
-  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminSeriesIdRoute: typeof AdminSeriesIdRouteWithChildren
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
-  AdminBannersRoute: AdminBannersRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminChannelsRoute: AdminChannelsRoute,
   AdminGenresRoute: AdminGenresRoute,
-  AdminHighlightsRoute: AdminHighlightsRoute,
   AdminHomeRoute: AdminHomeRoute,
-  AdminImportRoute: AdminImportRoute,
   AdminIntegrationsRoute: AdminIntegrationsRoute,
-  AdminLogsRoute: AdminLogsRoute,
   AdminMoviesRoute: AdminMoviesRoute,
   AdminProfileRoute: AdminProfileRoute,
   AdminSeriesRoute: AdminSeriesRoute,
-  AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminSeriesIdRoute: AdminSeriesIdRouteWithChildren,
