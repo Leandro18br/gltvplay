@@ -71,6 +71,13 @@
       "when": 1791432150280,
       "tag": "0009_api_integrations_hub",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791433285084,
+      "tag": "0010_season_details",
+      "breakpoints": true
     }
   ]
 }

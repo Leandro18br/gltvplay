@@ -1,0 +1,1 @@
+ALTER TABLE public.seasons ADD COLUMN IF NOT EXISTS description text, ADD COLUMN IF NOT EXISTS status public.content_status NOT NULL DEFAULT 'published', ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0;

@@ -808,28 +808,37 @@ export type Database = {
       seasons: {
         Row: {
           created_at: string
+          description: string | null
           id: string
           poster_url: string | null
           season_number: number
           series_id: string
+          sort_order: number
+          status: Database["public"]["Enums"]["content_status"]
           title: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
           poster_url?: string | null
           season_number: number
           series_id: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["content_status"]
           title?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
           poster_url?: string | null
           season_number?: number
           series_id?: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["content_status"]
           title?: string | null
           updated_at?: string
         }
