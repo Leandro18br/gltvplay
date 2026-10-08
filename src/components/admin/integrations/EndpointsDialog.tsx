@@ -30,7 +30,7 @@ export function EndpointsDialog({ integration, onOpenChange }: { integration: In
     if (!edit) { setF(null); return; }
     const e = edit === "new" ? null : edit; const m = (e?.mapping ?? {}) as Record<string, unknown>;
     const defKind = integration?.kind === "movie_player" ? "movie_player" : integration?.kind === "episode_player" ? "episode_player" : "search_movies";
-    setF({ name: e?.name ?? "", description: e?.description ?? "", kind: e?.kind ?? defKind, method: e?.method ?? integration?.default_method ?? "GET", path: e?.path ?? "", headers: kvToText(e?.headers), query: kvToText(e?.query), body: e?.body ?? "", is_active: e?.is_active ?? true, player_path: String(m.player_path ?? ""), player_type: String(m.player_type ?? "auto"), results_path: String(m.results_path ?? ""), image_base: String(m.image_base ?? ""), fields: (m.fields as Record<string, string>) ?? {} });
+    setF({ name: e?.name ?? "", description: e?.description ?? "", kind: e?.kind ?? defKind, method: e?.method ?? integration?.default_method ?? "GET", path: e?.path ?? "", headers: kvToText(e?.headers), query: kvToText(e?.query), body: e?.body ?? "", is_active: e?.is_active ?? true, player_path: String(m['player_path'] ?? ""), player_type: String(m['player_type'] ?? "auto"), results_path: String(m['results_path'] ?? ""), image_base: String(m['image_base'] ?? ""), fields: (m['fields'] as Record<string, string>) ?? {} });
   }, [edit, integration]);
 
   async function save(ev: React.FormEvent) {

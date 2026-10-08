@@ -31,7 +31,7 @@ export function TesterDialog({ integration, onOpenChange, onDone }: { integratio
   async function exec(e: React.FormEvent) {
     e.preventDefault(); if (!integration) return; setBusy(true); setErr(null); setRes(null); setPreview(false);
     try {
-      const clean = Object.fromEntries(Object.entries({ ...vars, query: vars.title, series_tmdb_id: vars.tmdb_id }).filter(([, v]) => v?.trim()));
+      const clean = Object.fromEntries(Object.entries({ ...vars, query: vars['title'], series_tmdb_id: vars['tmdb_id'] }).filter(([, v]) => v?.trim()));
       setRes(await run({ data: { integrationId: integration.id, ...(endpoint !== "base" ? { endpointId: endpoint } : {}), vars: clean, noCache } }));
       onDone();
     } catch (x) { setErr(errMsg(x)); } finally { setBusy(false); }

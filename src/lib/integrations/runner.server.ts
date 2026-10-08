@@ -81,7 +81,7 @@ export async function runEndpoint(integ: Integration, ep: Endpoint | null, vars:
 
     let res: Response;
     try {
-      res = await fetch(url.href, { method, headers, body, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+      res = await fetch(url.href, { method, headers, body: body ?? null, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch (e) {
       const name = e instanceof Error ? e.name : "";
       return await fail(name === "TimeoutError" || name === "AbortError" ? "Tempo esgotado (timeout)" : "Falha de conexão com a API");

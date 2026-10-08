@@ -94,7 +94,7 @@ export function mapCatalog(body: unknown, mapping: Mapping): CatalogItem[] {
       poster_url: img(getPath(r, f.poster), mapping.image_base), backdrop_url: img(getPath(r, f.backdrop), mapping.image_base),
       release_year: year && year > 1800 && year < 2200 ? year : null,
       duration_minutes: num(getPath(r, f.duration)), rating: num(getPath(r, f.rating)),
-      genres: Array.isArray(g) ? g.map(x => (typeof x === "object" && x ? str((x as Record<string, unknown>).name) : str(x))).filter((x): x is string => !!x).slice(0, 10) : [],
+      genres: Array.isArray(g) ? g.map(x => (typeof x === "object" && x ? str((x as Record<string, unknown>)['name']) : str(x))).filter((x): x is string => !!x).slice(0, 10) : [],
       season_number: num(getPath(r, f.season_number)), episode_number: num(getPath(r, f.episode_number)),
       thumbnail_url: img(getPath(r, f.thumbnail), mapping.image_base),
     }];
