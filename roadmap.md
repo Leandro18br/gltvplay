@@ -3,3 +3,9 @@
 - [x] Build section/banner editor, drag ordering, filters, manual selection and device previews.
 - [x] Render only published configuration, synchronize updates and improve mobile carousel/navigation.
 - [x] Test configuration rules and verify authenticated editing, preview and publication.
+
+# Authorized embeds
+- [ ] Add validated playback types, principal sources, domain policy and diagnostic storage.
+- [ ] Integrate movie/episode source editing and admin embed preview/settings.
+- [ ] Render sandboxed embeds with loading/retry and episode selection; preserve existing video playback.
+- [ ] Run security tests and verify the authenticated admin-to-player flow.
