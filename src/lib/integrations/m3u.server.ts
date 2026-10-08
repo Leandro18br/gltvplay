@@ -98,6 +98,10 @@ export async function indexStep(listId: string, restart: boolean) {
   } else {
     await db.from("m3u_lists").update({ sync_state: "indexing", last_error: null }).eq("id", listId);
   }
+  if (flags.phase === "finalize") {
+    try { return await finalizeStep(listId, gen, flags, entries); }
+    catch (e) { await db.from("m3u_lists").update({ sync_state: "error", last_error: msg(e).slice(0, 500) }).eq("id", listId); throw e; }
+  }
   const started = Date.now();
   const batchSize: number = list.index_batch_size ?? 500;
   try {
@@ -132,21 +136,44 @@ export async function indexStep(listId: string, restart: boolean) {
         if (Date.now() - processStart > STEP_MS || Date.now() - started > STEP_WALL_MS || stepEntries >= STEP_MAX_ENTRIES) { finished = false; break; }
       }
     }
-    if (!finished) return { done: false as const, entries, offset: safe, total: total ?? list.index_total_bytes ?? null };
+    if (!finished) return { done: false as const, phase: "read" as const, entries, offset: safe, total: total ?? list.index_total_bytes ?? null };
     await flush();
     if (!ext || (!parser.isM3u && entries === 0)) throw new Error(INVALID);
-    const fin = await db.rpc("m3u_finalize_index", { _list: listId, _gen: gen });
-    if (fin.error) throw new Error(`Falha ao concluir a indexação: ${fin.error.message}`);
-    await db.from("m3u_lists").update({
-      sync_state: "indexed", last_synced_at: new Date().toISOString(), last_error: null, index_offset: 0, index_entries: entries,
-      index_flags: { m3u: parser.isM3u, plus: parser.isPlus }, detected_type: parser.isPlus ? "m3u_plus" : "m3u",
-    }).eq("id", listId);
-    return { done: true as const, entries, counts: fin.data as Record<string, number>, total: total ?? null };
+    flags = { running: true, phase: "finalize", cursor: 0, checked: 0, counts: { movie: 0, series: 0, episode: 0, channel: 0, missing: 0 }, m3u: parser.isM3u, plus: parser.isPlus };
+    await db.from("m3u_lists").update({ index_offset: safe, index_entries: entries, index_flags: flags, detected_type: parser.isPlus ? "m3u_plus" : "m3u" }).eq("id", listId);
+    return await finalizeStep(listId, gen, flags, entries);
   } catch (e) {
     // Checkpoint is kept: the next call resumes from the last saved batch.
     await db.from("m3u_lists").update({ sync_state: "error", last_error: msg(e).slice(0, 500) }).eq("id", listId);
     throw e;
   }
+}
+
+const FINAL_CHUNK = 20_000;
+const FINAL_MS = 20_000;
+/** Closing phase, also chunked: flags vanished entries, recounts, refreshes sources of imported content. */
+async function finalizeStep(listId: string, gen: number, flags: any, entries: number) {
+  const started = Date.now();
+  while (Date.now() - started < FINAL_MS) {
+    const r = await db.rpc("m3u_finalize_chunk", { _list: listId, _gen: gen, _from: flags.cursor, _limit: FINAL_CHUNK });
+    if (r.error) throw new Error(`Falha ao concluir a indexação: ${r.error.message}`);
+    const c = r.data as Record<string, number>;
+    for (const k of ["movie", "series", "episode", "channel", "missing"]) flags.counts[k] += Number(c[k] ?? 0);
+    flags.cursor = Number(c["next"]); flags.checked += Number(c["rows"]);
+    await db.from("m3u_lists").update({ index_flags: flags }).eq("id", listId);
+    if (Number(c["rows"]) < FINAL_CHUNK) {
+      const s = await db.rpc("m3u_finalize_sources", { _list: listId, _gen: gen });
+      if (s.error) throw new Error(`Falha ao atualizar as fontes importadas: ${s.error.message}`);
+      const k = flags.counts;
+      await db.from("m3u_lists").update({
+        sync_state: "indexed", last_synced_at: new Date().toISOString(), last_error: null, index_offset: 0, index_entries: entries,
+        index_flags: { m3u: flags.m3u, plus: flags.plus }, movies_count: k.movie, series_count: k.series, episodes_count: k.episode,
+        channels_count: k.channel, total_items: k.movie + k.episode + k.channel,
+      }).eq("id", listId);
+      return { done: true as const, phase: "done" as const, entries, counts: k as Record<string, number>, offset: 0, total: null };
+    }
+  }
+  return { done: false as const, phase: "finalize" as const, entries, checked: flags.checked as number, offset: 0, total: null };
 }
 
 /* ------------------------------ explore ------------------------------ */
