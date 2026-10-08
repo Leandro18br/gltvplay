@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ResourceManager } from "@/components/admin/ResourceManager";
 import { categoriesConfig } from "@/lib/admin/configs";
+import { adminHead } from "@/lib/admin/head";
 
-export const Route = createFileRoute("/admin/categories")({ component: () => <ResourceManager config={categoriesConfig} /> });
+export const Route = createFileRoute("/admin/categories")({ head:()=>adminHead("Categorias","Gerencie as categorias do catálogo."), component: () => <ResourceManager config={categoriesConfig} /> });

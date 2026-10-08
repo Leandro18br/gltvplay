@@ -12,7 +12,7 @@
 ## Architecture rules
 - All catalog/config data lives in Lovable Cloud tables; public site reads published rows via RLS, never hardcoded content. Why: admin changes must reflect without code changes.
 - Roles live in `user_roles` and are checked with `has_role`/`is_staff` SQL functions; first signup becomes admin. Why: prevent privilege escalation.
-- Playback URLs live only in `playback_sources` (staff-only) and are resolved through `get_playback_url` RPC for signed-in active users. Why: keep stream URLs private.
+- Playback sources live only in staff-only `playback_sources` and are resolved through `get_playback_source` for signed-in active users; the legacy URL RPC excludes embeds. Why: preserve private playback authorization across source types.
 - History/watchlist/playback reference content polymorphically via `content_kind` + `content_id`. Why: one structure for movies, series, episodes and channels.
 - Catalog writes are audited by the `audit_trigger` into `audit_logs`. Why: traceable admin actions.
 - Media uploads go to the private `media` storage bucket (public buckets blocked by workspace). Why: workspace policy.
@@ -25,3 +25,6 @@
 - Public site cache is invalidated by Realtime events on catalog tables (`CatalogSync` in __root) plus periodic refresh. Why: admin changes reflect without reloads.
 - Home uses separate draft/published layout snapshots, revision-checked staff RPC writes and public server-side resolution; the bespoke HomeManager composes reusable editors instead of ResourceManager. Why: ordered page composition needs atomic publication and private drafts, unlike ordinary catalog CRUD.
 - Home section renderers and validators live in the Home module; preview reuses the public renderer in a staff-only un-nested route and device-sized iframe. Why: previews match the actual page without exposing drafts or duplicating presentation.
+- Embed input is parsed to a single URL with shared schemas, checked against exact admin-authorized HTTPS domains server-side and in database triggers, and rendered only in the shared sandboxed EmbedPlayer. Why: never execute admin-provided HTML in the main document.
+- Primary playback designation uses a staff-only serialized RPC; sources retain type, active state and ordering for future alternatives. Why: multiple sources share one authorization model.
+- Cross-origin embed loading is not proof of playback; generic embeds record history without fabricated playback progress, and failures use rate-limited diagnostic reports. Why: provider APIs are required for accurate time and reliable playback signals.

@@ -14,6 +14,10 @@ export const Route = createFileRoute("/reset-password")({
     meta: [
       { title: "Redefinir senha — Streaming" },
       { name: "description", content: "Defina uma nova senha para sua conta." },
+      { property: "og:title", content: "Redefinir senha — Streaming" },
+      { property: "og:description", content: "Defina uma nova senha para sua conta." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
     ],
   }),

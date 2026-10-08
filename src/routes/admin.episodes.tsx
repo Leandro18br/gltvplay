@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ResourceManager } from "@/components/admin/ResourceManager";
 import { episodesConfig } from "@/lib/admin/configs";
+import { adminHead } from "@/lib/admin/head";
 
 export const Route = createFileRoute("/admin/episodes")({
+  head:()=>adminHead("Episódios", "Gerencie episódios e suas fontes autorizadas de reprodução."),
   validateSearch: z.object({ season: z.string().optional() }),
   component: Page,
 });

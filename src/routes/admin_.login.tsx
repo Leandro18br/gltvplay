@@ -7,17 +7,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { adminHead } from "@/lib/admin/head";
 
 export const Route = createFileRoute("/admin_/login")({
   ssr: false,
   validateSearch: z.object({ denied: z.coerce.number().optional() }),
-  head: () => ({
-    meta: [
-      { title: "Login administrativo" },
-      { name: "description", content: "Acesso restrito à administração da plataforma." },
-      { name: "robots", content: "noindex" },
-    ],
-  }),
+  head: () => adminHead("Login administrativo", "Acesso restrito à administração da plataforma."),
   component: AdminLogin,
 });
 

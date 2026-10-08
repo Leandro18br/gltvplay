@@ -10,13 +10,14 @@ import { Slider } from "@/components/ui/slider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { EmbedPlayer } from "@/components/site/EmbedPlayer";
 
 type PKind = "movie" | "episode" | "channel";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
 
 export const Route = createFileRoute("/_authenticated/assistir/$kind/$id")({
-  head: () => ({ meta: [{ title: "Assistindo — Streaming" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Reprodução — GLTV Plus" }, {name:"description",content:"Reprodução autorizada de filmes, episódios e canais."}, {property:"og:title",content:"Reprodução — GLTV Plus"}, {property:"og:description",content:"Assista ao conteúdo autorizado da plataforma."}, {property:"og:type",content:"website"}, {name:"twitter:card",content:"summary"}, { name: "robots", content: "noindex" }] }),
   component: PlayerPage,
 });
 
@@ -27,8 +28,9 @@ function usePlaybackInfo(kind: PKind, id: string) {
     queryKey: ["player", kind, id],
     staleTime: 0,
     gcTime: 0,
+    refetchInterval: 15000,
     queryFn: async () => {
-      const urlRes = await sb.rpc("get_playback_url", { _kind: kind, _content_id: id });
+      const urlRes = await sb.rpc("get_playback_source", { _kind: kind, _content_id: id });
       if (urlRes.error) throw new Error(urlRes.error.message.includes("inactive") ? "Sua conta está inativa." : "Não foi possível autorizar a reprodução.");
       let title = "", subtitle: string | null = null, back: { to: string; slug?: string } = { to: "/" }, episodes: Ep[] = [], poster: string | null = null;
       if (kind === "movie") {
@@ -49,7 +51,8 @@ function usePlaybackInfo(kind: PKind, id: string) {
         episodes = (all.data ?? []).flatMap((se: { season_number: number; episodes: (Ep & { status: string })[] }) =>
           se.episodes.filter((e) => e.status === "published").sort((a, b) => a.episode_number - b.episode_number).map((e) => ({ ...e, season_number: se.season_number })));
       }
-      return { url: urlRes.data as string | null, title, subtitle, back, episodes, poster };
+      const source=urlRes.data as {id:string;url:string;type:"url"|"embed"|"hls"}|null;
+      return { url: source?.url ?? null, source, title, subtitle, back, episodes, poster };
     },
   });
 }
@@ -59,7 +62,6 @@ const fmt = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = Math.floor(s % 60);
   return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${m}:${String(x).padStart(2, "0")}`;
 };
-const isEmbed = (u: string) => /youtube\.com|youtu\.be|vimeo\.com/.test(u);
 
 function PlayerPage() {
   const { kind: rawKind, id } = Route.useParams();
@@ -72,12 +74,13 @@ function PlayerPage() {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center">
         <h1 className="text-2xl font-semibold">Reprodução indisponível</h1>
-        <p className="max-w-md text-muted-foreground">{info.error instanceof Error ? info.error.message : "Este conteúdo ainda não possui uma fonte de reprodução autorizada."}</p>
+        <p className="max-w-md text-muted-foreground">Não foi possível carregar este conteúdo no momento.</p>
+        <Button variant="outline" onClick={()=>info.refetch()}>Tentar novamente</Button>
         <Button variant="secondary" onClick={() => router.history.back()}><ArrowLeft /> Voltar</Button>
       </div>
     );
   }
-  return <Player key={`${kind}-${id}`} kind={kind} id={id} data={info.data} />;
+  return <Player key={`${kind}-${id}-${info.data.source?.id}-${info.data.url}-${info.data.source?.type}`} kind={kind} id={id} data={info.data} />;
 }
 
 function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]> }) {
@@ -102,16 +105,17 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
   const [error, setError] = useState<string | null>(null);
   const [resumed, setResumed] = useState<number | null>(null);
   const live = kind === "channel";
-  const url = data.url!;
+   const url = data.url ?? "";
+   const embed = data.source?.type === "embed";
   const idx = data.episodes.findIndex((e) => e.id === id);
   const next = idx >= 0 ? data.episodes[idx + 1] : undefined;
 
   // Load source (HLS via hls.js when not natively supported)
   useEffect(() => {
     const v = video.current;
-    if (!v || isEmbed(url)) return;
+    if (!v || embed) return;
     let cancelled = false;
-    const isHls = /\.m3u8(\?|$)/i.test(url);
+    const isHls = data.source?.type === "hls" || /\.m3u8(\?|$)/i.test(url);
     if (isHls && !v.canPlayType("application/vnd.apple.mpegurl")) {
       import("hls.js").then(({ default: Hls }) => {
         if (cancelled) return;
@@ -129,15 +133,15 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
       v.src = url;
     }
     return () => { cancelled = true; hlsRef.current?.destroy(); hlsRef.current = null; };
-  }, [url, live]);
+  }, [url, live, embed, data.source?.type]);
 
   // Resume from history
   useEffect(() => {
-    if (!user || live || profileLoading) return;
+    if (!user || live || embed || profileLoading) return;
     getProgress(user.id, profileId, kind, id).then((p) => {
       if (p && p.position_seconds > 5 && p.progress_percent < 95) setResumed(p.position_seconds);
     });
-  }, [user, profileId, profileLoading, kind, id, live]);
+  }, [user, profileId, profileLoading, kind, id, live, embed]);
   useEffect(() => {
     const v = video.current;
     if (!v || resumed == null) return;
@@ -199,13 +203,14 @@ function Player({ kind, id, data }: { kind: PKind; id: string; data: NonNullable
     ? <Link to={data.back.to as "/filme/$slug"} params={{ slug: data.back.slug }} aria-label="Voltar" className="rounded-full p-2 hover:bg-foreground/10"><ArrowLeft /></Link>
     : <Link to="/" aria-label="Voltar" className="rounded-full p-2 hover:bg-foreground/10"><ArrowLeft /></Link>;
 
-  if (isEmbed(url)) {
-    const yt = url.match(/(?:v=|youtu\.be\/|embed\/)([\w-]{6,})/);
-    const src = yt ? `https://www.youtube-nocookie.com/embed/${yt[1]}?autoplay=1` : url.replace("vimeo.com/", "player.vimeo.com/video/");
+  if (embed) {
     return (
-      <div className="fixed inset-0 bg-background">
-        <div className="absolute left-4 top-4 z-10 flex items-center gap-3">{backLink}<p className="font-semibold">{data.title}</p></div>
-        <iframe src={src} title={data.title} allow="autoplay; encrypted-media; fullscreen" allowFullScreen className="h-full w-full" />
+      <div className="min-h-svh bg-background px-2 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] md:px-8">
+        <header className="mx-auto flex max-w-6xl items-center gap-3 py-5">{backLink}<div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div></header>
+        <main className="mx-auto max-w-6xl space-y-5">
+          <EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} />
+          {data.episodes.length>0 && <div className="flex flex-wrap items-center gap-3"><label htmlFor="embed-episode" className="text-sm">Episódio</label><select id="embed-episode" className="max-w-full rounded-md border border-border bg-background p-2 text-sm" value={id} onChange={e=>navigate({to:"/assistir/$kind/$id",params:{kind:"episode",id:e.target.value},replace:true})}>{data.episodes.map(e=><option key={e.id} value={e.id}>T{e.season_number}:E{e.episode_number} · {e.title}</option>)}</select>{next && <Button variant="secondary" onClick={goNext}><SkipForward /> Próximo episódio</Button>}</div>}
+        </main>
       </div>
     );
   }

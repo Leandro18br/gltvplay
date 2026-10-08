@@ -181,6 +181,24 @@ export type Database = {
           },
         ]
       }
+      embed_domains: {
+        Row: {
+          created_at: string
+          hostname: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          hostname: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          hostname?: string
+          id?: string
+        }
+        Relationships: []
+      }
       episodes: {
         Row: {
           created_at: string
@@ -389,6 +407,45 @@ export type Database = {
           },
         ]
       }
+      playback_diagnostics: {
+        Row: {
+          actor_id: string
+          created_at: string
+          event: string
+          id: string
+          source_id: string | null
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          event: string
+          id?: string
+          source_id?: string | null
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          event?: string
+          id?: string
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playback_diagnostics_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playback_diagnostics_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "playback_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playback_sources: {
         Row: {
           content_id: string
@@ -397,8 +454,11 @@ export type Database = {
           drm: Json
           id: string
           is_active: boolean
+          is_primary: boolean
           provider: string | null
           quality: string | null
+          sort_order: number
+          source_type: string
           updated_at: string
           url: string
         }
@@ -409,8 +469,11 @@ export type Database = {
           drm?: Json
           id?: string
           is_active?: boolean
+          is_primary?: boolean
           provider?: string | null
           quality?: string | null
+          sort_order?: number
+          source_type?: string
           updated_at?: string
           url: string
         }
@@ -421,8 +484,11 @@ export type Database = {
           drm?: Json
           id?: string
           is_active?: boolean
+          is_primary?: boolean
           provider?: string | null
           quality?: string | null
+          sort_order?: number
+          source_type?: string
           updated_at?: string
           url?: string
         }
@@ -604,6 +670,7 @@ export type Database = {
         Row: {
           banner: Json
           colors: Json
+          embed_allow_iframe: boolean
           favicon_url: string | null
           general: Json
           id: number
@@ -616,6 +683,7 @@ export type Database = {
         Insert: {
           banner?: Json
           colors?: Json
+          embed_allow_iframe?: boolean
           favicon_url?: string | null
           general?: Json
           id?: number
@@ -628,6 +696,7 @@ export type Database = {
         Update: {
           banner?: Json
           colors?: Json
+          embed_allow_iframe?: boolean
           favicon_url?: string | null
           general?: Json
           id?: number
@@ -805,6 +874,14 @@ export type Database = {
         Returns: undefined
       }
       admin_stats: { Args: never; Returns: Json }
+      embed_url_allowed: { Args: { u: string }; Returns: boolean }
+      get_playback_source: {
+        Args: {
+          _content_id: string
+          _kind: Database["public"]["Enums"]["content_kind"]
+        }
+        Returns: Json
+      }
       get_playback_url: {
         Args: {
           _content_id: string
@@ -843,10 +920,15 @@ export type Database = {
         Args: { expected_revision: number }
         Returns: number
       }
+      report_playback_error: {
+        Args: { _event: string; _source_id: string }
+        Returns: undefined
+      }
       save_home_draft: {
         Args: { c: Json; expected_revision: number }
         Returns: number
       }
+      set_primary_playback: { Args: { _source_id: string }; Returns: undefined }
       validate_home_config: { Args: { c: Json }; Returns: undefined }
     }
     Enums: {

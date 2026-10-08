@@ -7,12 +7,13 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ROLE_LABEL, isAdminRole, type StaffRole } from "@/lib/admin/db";
+import { adminHead } from "@/lib/admin/head";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Painel ADM" }, { name: "robots", content: "noindex" }] }),
+  head: () => adminHead("Painel", "Administração do catálogo e das fontes de reprodução autorizadas."),
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/admin/login" });
