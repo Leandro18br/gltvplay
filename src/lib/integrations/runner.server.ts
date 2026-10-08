@@ -120,3 +120,36 @@ export async function contentVars(kind: "movie" | "episode", id: string): Promis
 const clean = (o: Record<string, unknown>): Vars => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== "").map(([k, v]) => [k, String(v)]));
 
 export type { Mapping };
+
+import { extractPlayer, type DetectedPlayer } from "./engine";
+
+export type Attempt = { integration: string; status: number | null; ok: boolean; error: string | null; cached: boolean };
+/** Tries every active player API in priority order until one returns a player (fallback chain). */
+export async function resolvePlayer(kind: "movie" | "episode", id: string, actorId: string, onlyIntegration?: string) {
+  const { vars, label } = await contentVars(kind, id);
+  const list = (await integrationsFor(kind === "movie" ? "movie_player" : "episode_player")).filter(i => !onlyIntegration || i.id === onlyIntegration);
+  const attempts: Attempt[] = [];
+  if (!list.length) throw new Error(kind === "movie" ? "Nenhuma API de Player ativa" : "Nenhuma API de Player de Série ativa");
+  for (const integ of list) {
+    const ep = pickEndpoint(integ, kind === "movie" ? "movie_player" : "episode_player");
+    if (!ep) { attempts.push({ integration: integ.name, status: null, ok: false, error: "Sem endpoint de player", cached: false }); continue; }
+    let r: RunResult;
+    try { r = await runEndpoint(integ, ep, vars, { actorId, label }); }
+    catch (e) { attempts.push({ integration: integ.name, status: null, ok: false, error: e instanceof Error ? e.message : "Erro", cached: false }); continue; }
+    const player: DetectedPlayer | null = r.ok ? extractPlayer(r.body, ep.mapping ?? {}) : null;
+    attempts.push({ integration: integ.name, status: r.status, ok: !!player, error: r.ok && !player ? "Player não encontrado na resposta" : r.error, cached: r.cached });
+    if (player) return { player, integrationId: integ.id, integrationName: integ.name, attempts, vars };
+  }
+  return { player: null, integrationId: null, integrationName: null, attempts, vars };
+}
+
+/** Adds a player to one movie/episode (never to a whole series), skipping duplicates. */
+export async function attachSource(kind: "movie" | "episode", id: string, p: DetectedPlayer, label: string | null, integrationId: string | null) {
+  const { data: existing } = await db.from("playback_sources").select("id,url,is_primary,sort_order").eq("content_kind", kind).eq("content_id", id);
+  const dup = (existing ?? []).find((s: any) => s.url === p.url);
+  if (dup) return { id: dup.id as string, duplicate: true };
+  const n = (existing ?? []).length;
+  const { data, error } = await db.from("playback_sources").insert({ content_kind: kind, content_id: id, url: p.url, source_type: p.type, is_active: true, is_primary: n === 0, sort_order: n, label: label ?? `Servidor ${n + 1}`, api_integration_id: integrationId }).select("id").single();
+  if (error) throw new Error(/não autorizado|embed/i.test(error.message) ? `Domínio do player não autorizado para Embed: ${new URL(p.url).hostname}` : "Não foi possível salvar o player");
+  return { id: data.id as string, duplicate: false };
+}
