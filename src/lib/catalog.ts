@@ -17,7 +17,7 @@ export const siteSettingsQuery = queryOptions({
 export const homeCatalogQuery = queryOptions({
   queryKey: ["catalog", "home"],
   queryFn: async () => {
-    const [movies, series, channels] = await Promise.all([
+    const [movies, series, channels, banners] = await Promise.all([
       supabase
         .from("movies")
         .select("id,title,description,poster_url,backdrop_url,release_year,age_rating,quality,featured,duration_minutes")
@@ -41,11 +41,18 @@ export const homeCatalogQuery = queryOptions({
         .order("featured", { ascending: false })
         .order("sort_order")
         .limit(30),
+      supabase
+        .from("banners")
+        .select("id,title,subtitle,image_url,button_label,button_url,content_kind,content_id")
+        .eq("is_active", true)
+        .order("sort_order")
+        .limit(10),
     ]);
     if (movies.error) throw movies.error;
     if (series.error) throw series.error;
     if (channels.error) throw channels.error;
-    return { movies: movies.data, series: series.data, channels: channels.data };
+    if (banners.error) throw banners.error;
+    return { movies: movies.data, series: series.data, channels: channels.data, banners: banners.data };
   },
   staleTime: 30_000,
 });

@@ -44,6 +44,51 @@ export type Database = {
         }
         Relationships: []
       }
+      banners: {
+        Row: {
+          button_label: string | null
+          button_url: string | null
+          content_id: string | null
+          content_kind: Database["public"]["Enums"]["content_kind"] | null
+          created_at: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          sort_order: number
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          button_label?: string | null
+          button_url?: string | null
+          content_id?: string | null
+          content_kind?: Database["public"]["Enums"]["content_kind"] | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          sort_order?: number
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          button_label?: string | null
+          button_url?: string | null
+          content_id?: string | null
+          content_kind?: Database["public"]["Enums"]["content_kind"] | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          sort_order?: number
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -721,6 +766,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_role: {
+        Args: {
+          _enabled: boolean
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
+      admin_stats: { Args: never; Returns: Json }
       get_playback_url: {
         Args: {
           _content_id: string

@@ -10,17 +10,34 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminBannersRouteImport } from './routes/admin.banners'
+import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
+import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
+import { Route as AdminEpisodesRouteImport } from './routes/admin.episodes'
+import { Route as AdminGenresRouteImport } from './routes/admin.genres'
+import { Route as AdminHighlightsRouteImport } from './routes/admin.highlights'
+import { Route as AdminImportRouteImport } from './routes/admin.import'
+import { Route as AdminLogsRouteImport } from './routes/admin.logs'
+import { Route as AdminMoviesRouteImport } from './routes/admin.movies'
+import { Route as AdminProfileRouteImport } from './routes/admin.profile'
+import { Route as AdminSeasonsRouteImport } from './routes/admin.seasons'
+import { Route as AdminSeriesRouteImport } from './routes/admin.series'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminLoginRouteImport } from './routes/admin_.login'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -28,41 +45,232 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRouteRoute,
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBannersRoute = AdminBannersRouteImport.update({
+  id: '/banners',
+  path: '/banners',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminChannelsRoute = AdminChannelsRouteImport.update({
+  id: '/channels',
+  path: '/channels',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEpisodesRoute = AdminEpisodesRouteImport.update({
+  id: '/episodes',
+  path: '/episodes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminGenresRoute = AdminGenresRouteImport.update({
+  id: '/genres',
+  path: '/genres',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHighlightsRoute = AdminHighlightsRouteImport.update({
+  id: '/highlights',
+  path: '/highlights',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminImportRoute = AdminImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLogsRoute = AdminLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMoviesRoute = AdminMoviesRouteImport.update({
+  id: '/movies',
+  path: '/movies',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProfileRoute = AdminProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSeasonsRoute = AdminSeasonsRouteImport.update({
+  id: '/seasons',
+  path: '/seasons',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSeriesRoute = AdminSeriesRouteImport.update({
+  id: '/series',
+  path: '/series',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin_/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin/banners': typeof AdminBannersRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/channels': typeof AdminChannelsRoute
+  '/admin/episodes': typeof AdminEpisodesRoute
+  '/admin/genres': typeof AdminGenresRoute
+  '/admin/highlights': typeof AdminHighlightsRoute
+  '/admin/import': typeof AdminImportRoute
+  '/admin/logs': typeof AdminLogsRoute
+  '/admin/movies': typeof AdminMoviesRoute
+  '/admin/profile': typeof AdminProfileRoute
+  '/admin/seasons': typeof AdminSeasonsRoute
+  '/admin/series': typeof AdminSeriesRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin/banners': typeof AdminBannersRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/channels': typeof AdminChannelsRoute
+  '/admin/episodes': typeof AdminEpisodesRoute
+  '/admin/genres': typeof AdminGenresRoute
+  '/admin/highlights': typeof AdminHighlightsRoute
+  '/admin/import': typeof AdminImportRoute
+  '/admin/logs': typeof AdminLogsRoute
+  '/admin/movies': typeof AdminMoviesRoute
+  '/admin/profile': typeof AdminProfileRoute
+  '/admin/seasons': typeof AdminSeasonsRoute
+  '/admin/series': typeof AdminSeriesRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin/banners': typeof AdminBannersRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/channels': typeof AdminChannelsRoute
+  '/admin/episodes': typeof AdminEpisodesRoute
+  '/admin/genres': typeof AdminGenresRoute
+  '/admin/highlights': typeof AdminHighlightsRoute
+  '/admin/import': typeof AdminImportRoute
+  '/admin/logs': typeof AdminLogsRoute
+  '/admin/movies': typeof AdminMoviesRoute
+  '/admin/profile': typeof AdminProfileRoute
+  '/admin/seasons': typeof AdminSeasonsRoute
+  '/admin/series': typeof AdminSeriesRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin_/login': typeof AdminLoginRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/admin'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/reset-password'
+    | '/admin/banners'
+    | '/admin/categories'
+    | '/admin/channels'
+    | '/admin/episodes'
+    | '/admin/genres'
+    | '/admin/highlights'
+    | '/admin/import'
+    | '/admin/logs'
+    | '/admin/movies'
+    | '/admin/profile'
+    | '/admin/seasons'
+    | '/admin/series'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/admin/login'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/admin'
-  id: '__root__' | '/' | '/_authenticated' | '/auth' | '/_authenticated/admin'
+  to:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/admin/banners'
+    | '/admin/categories'
+    | '/admin/channels'
+    | '/admin/episodes'
+    | '/admin/genres'
+    | '/admin/highlights'
+    | '/admin/import'
+    | '/admin/logs'
+    | '/admin/movies'
+    | '/admin/profile'
+    | '/admin/seasons'
+    | '/admin/series'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/admin/login'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/reset-password'
+    | '/admin/banners'
+    | '/admin/categories'
+    | '/admin/channels'
+    | '/admin/episodes'
+    | '/admin/genres'
+    | '/admin/highlights'
+    | '/admin/import'
+    | '/admin/logs'
+    | '/admin/movies'
+    | '/admin/profile'
+    | '/admin/seasons'
+    | '/admin/series'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/admin_/login'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  AdminLoginRoute: typeof AdminLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -74,11 +282,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -88,31 +296,172 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/banners': {
+      id: '/admin/banners'
+      path: '/banners'
+      fullPath: '/admin/banners'
+      preLoaderRoute: typeof AdminBannersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/categories': {
+      id: '/admin/categories'
+      path: '/categories'
+      fullPath: '/admin/categories'
+      preLoaderRoute: typeof AdminCategoriesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/channels': {
+      id: '/admin/channels'
+      path: '/channels'
+      fullPath: '/admin/channels'
+      preLoaderRoute: typeof AdminChannelsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/episodes': {
+      id: '/admin/episodes'
+      path: '/episodes'
+      fullPath: '/admin/episodes'
+      preLoaderRoute: typeof AdminEpisodesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/genres': {
+      id: '/admin/genres'
+      path: '/genres'
+      fullPath: '/admin/genres'
+      preLoaderRoute: typeof AdminGenresRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/highlights': {
+      id: '/admin/highlights'
+      path: '/highlights'
+      fullPath: '/admin/highlights'
+      preLoaderRoute: typeof AdminHighlightsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/import': {
+      id: '/admin/import'
+      path: '/import'
+      fullPath: '/admin/import'
+      preLoaderRoute: typeof AdminImportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/logs': {
+      id: '/admin/logs'
+      path: '/logs'
+      fullPath: '/admin/logs'
+      preLoaderRoute: typeof AdminLogsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/movies': {
+      id: '/admin/movies'
+      path: '/movies'
+      fullPath: '/admin/movies'
+      preLoaderRoute: typeof AdminMoviesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/profile': {
+      id: '/admin/profile'
+      path: '/profile'
+      fullPath: '/admin/profile'
+      preLoaderRoute: typeof AdminProfileRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/seasons': {
+      id: '/admin/seasons'
+      path: '/seasons'
+      fullPath: '/admin/seasons'
+      preLoaderRoute: typeof AdminSeasonsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/series': {
+      id: '/admin/series'
+      path: '/series'
+      fullPath: '/admin/series'
+      preLoaderRoute: typeof AdminSeriesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin_/login': {
+      id: '/admin_/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+interface AdminRouteChildren {
+  AdminBannersRoute: typeof AdminBannersRoute
+  AdminCategoriesRoute: typeof AdminCategoriesRoute
+  AdminChannelsRoute: typeof AdminChannelsRoute
+  AdminEpisodesRoute: typeof AdminEpisodesRoute
+  AdminGenresRoute: typeof AdminGenresRoute
+  AdminHighlightsRoute: typeof AdminHighlightsRoute
+  AdminImportRoute: typeof AdminImportRoute
+  AdminLogsRoute: typeof AdminLogsRoute
+  AdminMoviesRoute: typeof AdminMoviesRoute
+  AdminProfileRoute: typeof AdminProfileRoute
+  AdminSeasonsRoute: typeof AdminSeasonsRoute
+  AdminSeriesRoute: typeof AdminSeriesRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
 }
 
-const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminBannersRoute: AdminBannersRoute,
+  AdminCategoriesRoute: AdminCategoriesRoute,
+  AdminChannelsRoute: AdminChannelsRoute,
+  AdminEpisodesRoute: AdminEpisodesRoute,
+  AdminGenresRoute: AdminGenresRoute,
+  AdminHighlightsRoute: AdminHighlightsRoute,
+  AdminImportRoute: AdminImportRoute,
+  AdminLogsRoute: AdminLogsRoute,
+  AdminMoviesRoute: AdminMoviesRoute,
+  AdminProfileRoute: AdminProfileRoute,
+  AdminSeasonsRoute: AdminSeasonsRoute,
+  AdminSeriesRoute: AdminSeriesRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
 }
 
-const AuthenticatedRouteRouteWithChildren =
-  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  AdminLoginRoute: AdminLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

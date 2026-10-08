@@ -14,6 +14,25 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { useQuery } from "@tanstack/react-query";
+import { siteSettingsQuery } from "@/lib/catalog";
+
+function SettingsSync() {
+  const { data } = useQuery(siteSettingsQuery);
+  useEffect(() => {
+    if (!data) return;
+    const root = document.documentElement.style;
+    const c = (data.colors ?? {}) as { primary?: string; background?: string };
+    if (c.primary) { root.setProperty("--primary", c.primary); root.setProperty("--ring", c.primary); } else { root.removeProperty("--primary"); root.removeProperty("--ring"); }
+    if (c.background) root.setProperty("--background", c.background); else root.removeProperty("--background");
+    if (data.favicon_url) {
+      let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+      if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+      link.href = data.favicon_url;
+    }
+  }, [data]);
+  return null;
+}
 
 function NotFoundComponent() {
   return (
@@ -131,6 +150,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <SettingsSync />
       <Outlet />
       <Toaster />
     </QueryClientProvider>

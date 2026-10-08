@@ -8,6 +8,13 @@
       "when": 1791425840542,
       "tag": "0000_streaming_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791426071823,
+      "tag": "0001_admin_panel",
+      "breakpoints": true
     }
   ]
 }
