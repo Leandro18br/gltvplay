@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Play } from "lucide-react";
 import { formatDuration, seriesDetailQuery } from "@/lib/catalog";
-import { SiteShell, EmptyState } from "@/components/site/SiteShell";
+import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/serie/$slug")({
       scripts: [{ type: "application/ld+json", children: JSON.stringify({ "@context": "https://schema.org", "@type": "TVSeries", name: loaderData.title, description: loaderData.description, image: img ?? undefined, numberOfSeasons: loaderData.seasons }) }],
     };
   },
-  errorComponent: () => <SiteShell><EmptyState title="Não foi possível carregar esta série" /></SiteShell>,
+  errorComponent: () => <RetryState title="Não foi possível carregar esta série" />,
   notFoundComponent: () => <SiteShell><EmptyState title="Série não encontrada" text="Ela pode ter sido removida ou ainda não foi publicada." /></SiteShell>,
   component: SeriesPage,
 });

@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Home, Search, Film, Tv, ListVideo, User } from "lucide-react";
@@ -89,5 +89,19 @@ export function EmptyState({ title, text, icon }: { title: string; text?: string
       <h2 className="text-xl font-semibold">{title}</h2>
       {text && <p className="mt-2 text-muted-foreground">{text}</p>}
     </div>
+  );
+}
+
+/** Error state for route loaders: explains timeouts/offline and lets the user retry. */
+export function RetryState({ title }: { title: string }) {
+  const router = useRouter();
+  return (
+    <SiteShell>
+      <div className="mx-auto my-20 max-w-md px-5 text-center">
+        <h2 className="text-xl font-semibold">{title}</h2>
+        <p className="mt-2 text-muted-foreground">O servidor demorou ou está indisponível no momento. Verifique sua conexão e tente novamente.</p>
+        <button onClick={() => router.invalidate()} className="mt-5 rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">Tentar novamente</button>
+      </div>
+    </SiteShell>
   );
 }
