@@ -13,6 +13,7 @@ function SectionAction({ data }: { data: ResolvedSection }) {
   const { data: categories = [] } = useQuery(categoriesQuery);
   if (!section.showAll) return null;
   const cls = "shrink-0 text-xs text-primary hover:underline md:text-sm";
+  if (section.mode === "manual") return <Link to="/home/secoes/$id" params={{id:section.id}} className={cls}>Ver todos ›</Link>;
   const category = categories.find(c => c.id === section.filters.category);
   if (category) return <Link to="/categoria/$slug" params={{slug:category.slug}} className={cls}>Ver todos ›</Link>;
   const genre = genres.find(g => g.id === section.filters.genre);

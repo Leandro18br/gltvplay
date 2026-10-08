@@ -33,5 +33,5 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { data } = useSuspenseQuery(publishedHomeQuery);
-  return <SiteShell padTop={false}><HomeContent data={data} /></SiteShell>;
+  return <SiteShell padTop={!(data.sections[0]?.section.type === "hero" && data.slides.length > 0)}><HomeContent data={data} /></SiteShell>;
 }

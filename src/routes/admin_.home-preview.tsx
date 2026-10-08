@@ -15,4 +15,4 @@ export const Route=createFileRoute("/admin_/home-preview")({
   notFoundComponent:()=> <EmptyState title="Prévia indisponível" />,
   component:Preview,
 });
-function Preview(){const {data}=useSuspenseQuery(previewQuery);return <SiteShell padTop={false}><HomeContent data={data} /></SiteShell>;}
+function Preview(){const {data}=useSuspenseQuery(previewQuery);return <SiteShell padTop={!(data.sections[0]?.section.type === "hero" && data.slides.length > 0)}><HomeContent data={data} /></SiteShell>;}
