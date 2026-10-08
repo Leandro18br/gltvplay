@@ -7,7 +7,7 @@ export const db = supabase as unknown as {
   rpc: (fn: string, args?: Record<string, unknown>) => any;
 };
 
-export type Row = Record<string, any>;
+export type Row = any;
 
 export const STATUS_OPTIONS = [
   { value: "published", label: "Publicado" },

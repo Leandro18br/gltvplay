@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Layers, PlaySquare } from "lucide-react";
 import type { ResourceConfig, Field } from "@/components/admin/ResourceManager";
 import { Thumb } from "@/components/admin/ResourceManager";
-import { KIND_OPTIONS, STATUS_OPTIONS } from "./db";
+import { KIND_OPTIONS, STATUS_OPTIONS, type Row } from "./db";
 import { Button } from "@/components/ui/button";
 
 const status: Field = { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS, defaultValue: "draft" };
@@ -96,7 +96,7 @@ export const seasonsConfig: ResourceConfig = {
   ],
 };
 
-const seasonLabel = (r: { season_number: number; series?: { title: string } | null }) => `${r.series?.title ?? "?"} — T${r.season_number}`;
+const seasonLabel = (r: Row) => `${r.series?.title ?? "?"} — T${r.season_number}`;
 
 export const episodesConfig: ResourceConfig = {
   table: "episodes", title: "Episódios", singular: "Episódio", searchCol: "title",
