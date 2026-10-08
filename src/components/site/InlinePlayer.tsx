@@ -52,17 +52,17 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
   const isHls = source?.type === "hls" || /\.m3u8(\?|$)/i.test(source?.url ?? "");
 
   return (
-    <div className="w-full max-w-[380px] space-y-3">
-      <div className="relative aspect-[19/12] w-full overflow-hidden rounded-xl bg-card ring-1 ring-border">
+    <div className="w-full min-w-0 space-y-3">
+      <div className={`relative w-full ${started && source?.type === "embed" ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
         {!started ? (
-          <button type="button" onClick={start} disabled={loading} aria-label={`Reproduzir ${title}`} className="group relative block h-full w-full cursor-pointer">
+          <Button type="button" variant="ghost" onClick={start} disabled={loading} aria-label={`Reproduzir ${title}`} className="group relative block h-full w-full rounded-none p-0 [&_svg]:size-9">
             {poster && <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
             <span className="absolute inset-0 bg-background/55 transition group-hover:bg-background/40" />
             <span className="absolute left-1/2 top-1/2 flex size-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-foreground shadow-glow transition duration-300 group-hover:scale-110 group-active:scale-95">
               {loading ? <Loader2 className="size-9 animate-spin" /> : <Play className="ml-1 size-9 fill-current" />}
             </span>
             {error && <span className="absolute inset-x-3 bottom-3 rounded-lg bg-background/85 px-3 py-2 text-center text-xs text-muted-foreground">{error}</span>}
-          </button>
+          </Button>
         ) : !source ? (
           <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">Não foi possível carregar o player. Tente novamente.</div>
         ) : source.type === "embed" ? (
