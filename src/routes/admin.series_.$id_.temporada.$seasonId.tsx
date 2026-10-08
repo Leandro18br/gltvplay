@@ -7,7 +7,7 @@ import { episodesConfig } from "@/lib/admin/configs";
 import { adminHead } from "@/lib/admin/head";
 import { db, type Row } from "@/lib/admin/db";
 
-export const Route = createFileRoute("/admin/series_/$id/temporada/$seasonId")({
+export const Route = createFileRoute("/admin/series_/$id_/temporada/$seasonId")({
   head: () => adminHead("Episódios da temporada", "Episódios e players de uma temporada."),
   component: SeasonManage,
 });

@@ -41,7 +41,7 @@ import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
 import { Route as AdminSeriesIdRouteImport } from './routes/admin.series_.$id'
 import { Route as HomeSecoesIdRouteImport } from './routes/home.secoes.$id'
 import { Route as AuthenticatedAssistirKindIdRouteImport } from './routes/_authenticated/assistir.$kind.$id'
-import { Route as AdminSeriesIdTemporadaSeasonIdRouteImport } from './routes/admin.series_.$id.temporada.$seasonId'
+import { Route as AdminSeriesIdTemporadaSeasonIdRouteImport } from './routes/admin.series_.$id_.temporada.$seasonId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -205,9 +205,9 @@ const AuthenticatedAssistirKindIdRoute =
   } as any)
 const AdminSeriesIdTemporadaSeasonIdRoute =
   AdminSeriesIdTemporadaSeasonIdRouteImport.update({
-    id: '/temporada/$seasonId',
-    path: '/temporada/$seasonId',
-    getParentRoute: () => AdminSeriesIdRoute,
+    id: '/series_/$id_/temporada/$seasonId',
+    path: '/series/$id/temporada/$seasonId',
+    getParentRoute: () => AdminRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -239,7 +239,7 @@ export interface FileRoutesByFullPath {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
-  '/admin/series/$id': typeof AdminSeriesIdRouteWithChildren
+  '/admin/series/$id': typeof AdminSeriesIdRoute
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
   '/admin/series/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
@@ -272,7 +272,7 @@ export interface FileRoutesByTo {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin': typeof AdminIndexRoute
-  '/admin/series/$id': typeof AdminSeriesIdRouteWithChildren
+  '/admin/series/$id': typeof AdminSeriesIdRoute
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
   '/admin/series/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
@@ -308,10 +308,10 @@ export interface FileRoutesById {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
-  '/admin/series_/$id': typeof AdminSeriesIdRouteWithChildren
+  '/admin/series_/$id': typeof AdminSeriesIdRoute
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/_authenticated/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
-  '/admin/series_/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
+  '/admin/series_/$id_/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -415,7 +415,7 @@ export interface FileRouteTypes {
     | '/admin/series_/$id'
     | '/home/secoes/$id'
     | '/_authenticated/assistir/$kind/$id'
-    | '/admin/series_/$id/temporada/$seasonId'
+    | '/admin/series_/$id_/temporada/$seasonId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -665,12 +665,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssistirKindIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/admin/series_/$id/temporada/$seasonId': {
-      id: '/admin/series_/$id/temporada/$seasonId'
-      path: '/temporada/$seasonId'
+    '/admin/series_/$id_/temporada/$seasonId': {
+      id: '/admin/series_/$id_/temporada/$seasonId'
+      path: '/series/$id/temporada/$seasonId'
       fullPath: '/admin/series/$id/temporada/$seasonId'
       preLoaderRoute: typeof AdminSeriesIdTemporadaSeasonIdRouteImport
-      parentRoute: typeof AdminSeriesIdRoute
+      parentRoute: typeof AdminRoute
     }
   }
 }
@@ -690,18 +690,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
-interface AdminSeriesIdRouteChildren {
-  AdminSeriesIdTemporadaSeasonIdRoute: typeof AdminSeriesIdTemporadaSeasonIdRoute
-}
-
-const AdminSeriesIdRouteChildren: AdminSeriesIdRouteChildren = {
-  AdminSeriesIdTemporadaSeasonIdRoute: AdminSeriesIdTemporadaSeasonIdRoute,
-}
-
-const AdminSeriesIdRouteWithChildren = AdminSeriesIdRoute._addFileChildren(
-  AdminSeriesIdRouteChildren,
-)
-
 interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminChannelsRoute: typeof AdminChannelsRoute
@@ -713,7 +701,8 @@ interface AdminRouteChildren {
   AdminSeriesRoute: typeof AdminSeriesRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
-  AdminSeriesIdRoute: typeof AdminSeriesIdRouteWithChildren
+  AdminSeriesIdRoute: typeof AdminSeriesIdRoute
+  AdminSeriesIdTemporadaSeasonIdRoute: typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -727,7 +716,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSeriesRoute: AdminSeriesRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
-  AdminSeriesIdRoute: AdminSeriesIdRouteWithChildren,
+  AdminSeriesIdRoute: AdminSeriesIdRoute,
+  AdminSeriesIdTemporadaSeasonIdRoute: AdminSeriesIdTemporadaSeasonIdRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
