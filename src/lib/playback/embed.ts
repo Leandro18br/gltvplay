@@ -28,6 +28,7 @@ export function normalizeEmbed(input: string, policy: EmbedPolicy): string {
     if (frame.childNodes.some(n => n.nodeName !== "#text" || ("value" in n && n.value.trim() !== ""))) throw new Error("Conteúdo interno do iframe não permitido");
     // Only src is kept; every other attribute (width, allow, frameborder, handlers…) is discarded and the
     // player regenerates its own iframe, so nothing admin-provided runs in the main document.
+    if (frame.attrs.some(a => /^on/i.test(a.name) || a.name === "srcdoc")) throw new Error("Atributos não permitidos no iframe");
     value = frame.attrs.find(a => a.name === "src")?.value ?? "";
   }
   const url = new URL(z.string().max(2048).parse(value));
