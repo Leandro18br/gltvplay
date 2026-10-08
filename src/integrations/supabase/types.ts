@@ -576,6 +576,168 @@ export type Database = {
         }
         Relationships: []
       }
+      m3u_entities: {
+        Row: {
+          content_id: string
+          ext_key: string
+          kind: string
+          last_seen_at: string
+          list_id: string
+        }
+        Insert: {
+          content_id: string
+          ext_key: string
+          kind: string
+          last_seen_at?: string
+          list_id: string
+        }
+        Update: {
+          content_id?: string
+          ext_key?: string
+          kind?: string
+          last_seen_at?: string
+          list_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_entities_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_list_secrets: {
+        Row: {
+          list_id: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          list_id: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          list_id?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_list_secrets_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: true
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_lists: {
+        Row: {
+          channels_count: number
+          created_at: string
+          detected_type: string | null
+          enrich_tmdb: boolean
+          episodes_count: number
+          id: string
+          is_active: boolean
+          last_error: string | null
+          last_report: Json
+          last_synced_at: string | null
+          list_type: string
+          movies_count: number
+          name: string
+          processed_items: number
+          series_count: number
+          sync_started_at: string | null
+          sync_state: string
+          total_items: number
+          updated_at: string
+          url_hint: string | null
+        }
+        Insert: {
+          channels_count?: number
+          created_at?: string
+          detected_type?: string | null
+          enrich_tmdb?: boolean
+          episodes_count?: number
+          id?: string
+          is_active?: boolean
+          last_error?: string | null
+          last_report?: Json
+          last_synced_at?: string | null
+          list_type?: string
+          movies_count?: number
+          name: string
+          processed_items?: number
+          series_count?: number
+          sync_started_at?: string | null
+          sync_state?: string
+          total_items?: number
+          updated_at?: string
+          url_hint?: string | null
+        }
+        Update: {
+          channels_count?: number
+          created_at?: string
+          detected_type?: string | null
+          enrich_tmdb?: boolean
+          episodes_count?: number
+          id?: string
+          is_active?: boolean
+          last_error?: string | null
+          last_report?: Json
+          last_synced_at?: string | null
+          list_type?: string
+          movies_count?: number
+          name?: string
+          processed_items?: number
+          series_count?: number
+          sync_started_at?: string | null
+          sync_state?: string
+          total_items?: number
+          updated_at?: string
+          url_hint?: string | null
+        }
+        Relationships: []
+      }
+      m3u_staging: {
+        Row: {
+          data: Json
+          done: boolean
+          id: number
+          kind: string
+          list_id: string
+          sort_key: string
+        }
+        Insert: {
+          data: Json
+          done?: boolean
+          id?: number
+          kind: string
+          list_id: string
+          sort_key?: string
+        }
+        Update: {
+          data?: Json
+          done?: boolean
+          id?: number
+          kind?: string
+          list_id?: string
+          sort_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_staging_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movie_genres: {
         Row: {
           genre_id: string
@@ -773,10 +935,13 @@ export type Database = {
           is_active: boolean
           is_primary: boolean
           label: string | null
+          last_seen_at: string | null
+          m3u_list_id: string | null
           provider: string | null
           quality: string | null
           sort_order: number
           source_type: string
+          unavailable_since: string | null
           updated_at: string
           url: string
         }
@@ -791,10 +956,13 @@ export type Database = {
           is_active?: boolean
           is_primary?: boolean
           label?: string | null
+          last_seen_at?: string | null
+          m3u_list_id?: string | null
           provider?: string | null
           quality?: string | null
           sort_order?: number
           source_type?: string
+          unavailable_since?: string | null
           updated_at?: string
           url: string
         }
@@ -809,10 +977,13 @@ export type Database = {
           is_active?: boolean
           is_primary?: boolean
           label?: string | null
+          last_seen_at?: string | null
+          m3u_list_id?: string | null
           provider?: string | null
           quality?: string | null
           sort_order?: number
           source_type?: string
+          unavailable_since?: string | null
           updated_at?: string
           url?: string
         }
@@ -822,6 +993,13 @@ export type Database = {
             columns: ["api_integration_id"]
             isOneToOne: false
             referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playback_sources_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
             referencedColumns: ["id"]
           },
         ]

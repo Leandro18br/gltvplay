@@ -31,7 +31,7 @@ function errorFor(status: number, notFound: string) {
   return "Não foi possível conectar ao TMDB.";
 }
 
-async function tmdbGet(path: string, params: Record<string, string | number | undefined>, opts: { ttl: number; fresh?: boolean; notFound?: string }) {
+export async function tmdbGet(path: string, params: Record<string, string | number | undefined>, opts: { ttl: number; fresh?: boolean; notFound?: string }) {
   const key = process.env["TMDB_API_KEY"];
   if (!key) throw new TmdbError("API Key do TMDB inválida ou não configurada.");
   const clean = Object.entries(params).filter(([, v]) => v !== undefined && v !== "").sort(([a], [b]) => a.localeCompare(b));
@@ -80,7 +80,7 @@ function wrap<T>(fn: () => Promise<T>) {
 }
 
 // Maps TMDB genre ids onto the fixed system genres only; never creates new genres.
-async function linkGenres(ctx: Ctx, kind: "movie" | "series", contentId: string, genres: { id?: number; name: string }[]) {
+export async function linkGenres(ctx: Ctx, kind: "movie" | "series", contentId: string, genres: { id?: number; name: string }[]) {
   const joinTable = kind === "movie" ? "movie_genres" : "series_genres";
   const fk = kind === "movie" ? "movie_id" : "series_id";
   const ids = (genres ?? []).map((g) => g.id).filter((n): n is number => typeof n === "number");
@@ -91,7 +91,7 @@ async function linkGenres(ctx: Ctx, kind: "movie" | "series", contentId: string,
   }
 }
 
-async function uniqueSlug(ctx: Ctx, table: string, title: string, y: number | null) {
+export async function uniqueSlug(ctx: Ctx, table: string, title: string, y: number | null) {
   const base = slugify(title) || "conteudo";
   for (const s of [base, y ? `${base}-${y}` : null, `${base}-${Date.now().toString(36)}`]) {
     if (!s) continue;
@@ -102,7 +102,7 @@ async function uniqueSlug(ctx: Ctx, table: string, title: string, y: number | nu
 }
 
 /* ---------- metadata mappers (only TMDB-owned columns) ---------- */
-async function movieMeta(tmdbId: number, fresh: boolean) {
+export async function movieMeta(tmdbId: number, fresh: boolean) {
   const [m, i] = await Promise.all([tmdbGet(`/movie/${tmdbId}`, { language: LANG, append_to_response: "external_ids" }, { ttl: DAY, fresh, notFound: "Filme não encontrado." }), imageConfig()]);
   const fields = {
     tmdb_id: m.id, imdb_id: m.imdb_id ?? m.external_ids?.imdb_id ?? null,
@@ -118,7 +118,7 @@ async function movieMeta(tmdbId: number, fresh: boolean) {
   return { fields, genres: m.genres ?? [] };
 }
 
-async function seriesMeta(tmdbId: number, fresh: boolean) {
+export async function seriesMeta(tmdbId: number, fresh: boolean) {
   const [s, i] = await Promise.all([tmdbGet(`/tv/${tmdbId}`, { language: LANG, append_to_response: "external_ids" }, { ttl: DAY, fresh, notFound: "Série não encontrada." }), imageConfig()]);
   const fields = {
     tmdb_id: s.id, imdb_id: s.external_ids?.imdb_id ?? null,

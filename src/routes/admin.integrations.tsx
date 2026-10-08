@@ -15,6 +15,7 @@ import { TesterDialog } from "@/components/admin/integrations/TesterDialog";
 import { EmbedSettings } from "@/components/admin/EmbedSettings";
 import { TmdbIntegrationCard } from "@/components/admin/tmdb/TmdbTools";
 import { MegaEmbedCard } from "@/components/admin/integrations/MegaEmbedCard";
+import { M3uListsCard } from "@/components/admin/integrations/M3uListsCard";
 import { StatusBadge, fmtDate, type Integration } from "@/components/admin/integrations/shared";
 
 export const Route = createFileRoute("/admin/integrations")({
@@ -54,6 +55,7 @@ function IntegrationsPage() {
         <TabsContent value="apis" className="space-y-3">
           <TmdbIntegrationCard />
           <MegaEmbedCard />
+          <M3uListsCard />
           {list.isPending && <Loader2 className="animate-spin text-primary" />}
           {list.data?.length === 0 && <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhuma API cadastrada. Clique em "Adicionar API".</div>}
           {all.map(i => (
