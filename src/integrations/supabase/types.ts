@@ -529,20 +529,26 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_fixed: boolean
           name: string
           slug: string
+          tmdb_genre_ids: number[]
         }
         Insert: {
           created_at?: string
           id?: string
+          is_fixed?: boolean
           name: string
           slug: string
+          tmdb_genre_ids?: number[]
         }
         Update: {
           created_at?: string
           id?: string
+          is_fixed?: boolean
           name?: string
           slug?: string
+          tmdb_genre_ids?: number[]
         }
         Relationships: []
       }
@@ -1282,6 +1288,7 @@ export type Database = {
       }
       admin_stats: { Args: never; Returns: Json }
       embed_url_allowed: { Args: { u: string }; Returns: boolean }
+      ensure_fixed_genres: { Args: never; Returns: undefined }
       get_playback_source: {
         Args: {
           _content_id: string
@@ -1313,6 +1320,7 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       my_role: { Args: never; Returns: string }
+      norm_genre: { Args: { t: string }; Returns: string }
       popular_content: {
         Args: {
           _kind: Database["public"]["Enums"]["content_kind"]

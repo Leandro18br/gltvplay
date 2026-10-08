@@ -85,6 +85,13 @@
       "when": 1791460047517,
       "tag": "0011_tmdb_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791462937055,
+      "tag": "0012_fixed_genres",
+      "breakpoints": true
     }
   ]
 }
