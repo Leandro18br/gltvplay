@@ -10,7 +10,8 @@ import { tmdbGet, movieMeta, seriesMeta, linkGenres, uniqueSlug } from "@/lib/tm
  */
 const db = supabaseAdmin as any;
 const TEST_BYTES = 8 * 1024 * 1024;
-const STEP_MS = 15_000;          // wall budget per indexing request
+const STEP_MS = 15_000;          // budget for parsing NEW data per indexing request
+const STEP_WALL_MS = 90_000;     // absolute wall cap (servers without Range support re-send the skipped prefix)
 const STEP_MAX_ENTRIES = 20_000; // hard cap of entries per indexing request
 const IMPORT_MS = 18_000;        // wall budget per import request
 const INVALID = "O conteúdo não é uma lista M3U válida.";
@@ -103,7 +104,7 @@ export async function indexStep(listId: string, restart: boolean) {
     const { res, ranged, total } = await openList(url, offset, 120_000);
     const parser = createParser({ m3u: flags.m3u, plus: flags.plus });
     const batch = new Map<string, any>();
-    let safe = offset, stepEntries = 0, ext = offset > 0, finished = true;
+    let safe = offset, stepEntries = 0, ext = offset > 0, finished = true, processStart = 0;
     const flush = async () => {
       if (!batch.size) return;
       const rows = [...batch.values()]; batch.clear();
@@ -117,6 +118,7 @@ export async function indexStep(listId: string, restart: boolean) {
     }).eq("id", listId);
 
     for await (const l of lines(res, offset, ranged ? 0 : offset)) {
+      if (!processStart) processStart = Date.now(); // skipped prefix (if any) costs network time, not parsing
       if (!ext) { if (l.text.trim().startsWith("#EXT")) ext = true; else if (l.end > 4096) throw new Error(INVALID); }
       const e = parser.line(l.text);
       if (e && e !== "skip") {
@@ -127,7 +129,7 @@ export async function indexStep(listId: string, restart: boolean) {
       if (!parser.pending) safe = l.end;
       if (batch.size >= batchSize && !parser.pending) {
         await flush(); await save(safe);
-        if (Date.now() - started > STEP_MS || stepEntries >= STEP_MAX_ENTRIES) { finished = false; break; }
+        if (Date.now() - processStart > STEP_MS || Date.now() - started > STEP_WALL_MS || stepEntries >= STEP_MAX_ENTRIES) { finished = false; break; }
       }
     }
     if (!finished) return { done: false as const, entries, offset: safe, total: total ?? list.index_total_bytes ?? null };
