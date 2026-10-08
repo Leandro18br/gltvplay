@@ -608,6 +608,143 @@ export type Database = {
           },
         ]
       }
+      m3u_import_errors: {
+        Row: {
+          attempt: number
+          batch_id: string | null
+          created_at: string
+          error: string
+          id: number
+          item_id: number | null
+          list_id: string
+        }
+        Insert: {
+          attempt?: number
+          batch_id?: string | null
+          created_at?: string
+          error: string
+          id?: number
+          item_id?: number | null
+          list_id: string
+        }
+        Update: {
+          attempt?: number
+          batch_id?: string | null
+          created_at?: string
+          error?: string
+          id?: number
+          item_id?: number | null
+          list_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_import_errors_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "m3u_import_errors_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_items: {
+        Row: {
+          content_id: string | null
+          created_at: string
+          episode: number | null
+          episode_count: number | null
+          ext_key: string
+          group_title: string | null
+          id: number
+          import_attempts: number
+          import_error: string | null
+          imported_at: string | null
+          kind: string
+          last_attempt_at: string | null
+          list_id: string
+          logo: string | null
+          missing: boolean
+          season: number | null
+          seen_gen: number
+          series_key: string | null
+          stream_type: string | null
+          title: string
+          title_norm: string
+          tmdb_id: number | null
+          tvg_id: string | null
+          url: string | null
+          year: number | null
+        }
+        Insert: {
+          content_id?: string | null
+          created_at?: string
+          episode?: number | null
+          episode_count?: number | null
+          ext_key: string
+          group_title?: string | null
+          id?: number
+          import_attempts?: number
+          import_error?: string | null
+          imported_at?: string | null
+          kind: string
+          last_attempt_at?: string | null
+          list_id: string
+          logo?: string | null
+          missing?: boolean
+          season?: number | null
+          seen_gen?: number
+          series_key?: string | null
+          stream_type?: string | null
+          title: string
+          title_norm?: string
+          tmdb_id?: number | null
+          tvg_id?: string | null
+          url?: string | null
+          year?: number | null
+        }
+        Update: {
+          content_id?: string | null
+          created_at?: string
+          episode?: number | null
+          episode_count?: number | null
+          ext_key?: string
+          group_title?: string | null
+          id?: number
+          import_attempts?: number
+          import_error?: string | null
+          imported_at?: string | null
+          kind?: string
+          last_attempt_at?: string | null
+          list_id?: string
+          logo?: string | null
+          missing?: boolean
+          season?: number | null
+          seen_gen?: number
+          series_key?: string | null
+          stream_type?: string | null
+          title?: string
+          title_norm?: string
+          tmdb_id?: number | null
+          tvg_id?: string | null
+          url?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       m3u_list_secrets: {
         Row: {
           list_id: string
@@ -642,6 +779,13 @@ export type Database = {
           enrich_tmdb: boolean
           episodes_count: number
           id: string
+          index_batch_size: number
+          index_entries: number
+          index_flags: Json
+          index_gen: number
+          index_offset: number
+          index_range: boolean | null
+          index_total_bytes: number | null
           is_active: boolean
           last_error: string | null
           last_report: Json
@@ -664,6 +808,13 @@ export type Database = {
           enrich_tmdb?: boolean
           episodes_count?: number
           id?: string
+          index_batch_size?: number
+          index_entries?: number
+          index_flags?: Json
+          index_gen?: number
+          index_offset?: number
+          index_range?: boolean | null
+          index_total_bytes?: number | null
           is_active?: boolean
           last_error?: string | null
           last_report?: Json
@@ -686,6 +837,13 @@ export type Database = {
           enrich_tmdb?: boolean
           episodes_count?: number
           id?: string
+          index_batch_size?: number
+          index_entries?: number
+          index_flags?: Json
+          index_gen?: number
+          index_offset?: number
+          index_range?: boolean | null
+          index_total_bytes?: number | null
           is_active?: boolean
           last_error?: string | null
           last_report?: Json
@@ -1518,6 +1676,17 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      m3u_finalize_index: {
+        Args: { _gen: number; _list: string }
+        Returns: Json
+      }
+      m3u_groups: {
+        Args: { _kind: string; _list: string }
+        Returns: {
+          group_title: string
+          n: number
+        }[]
+      }
       my_role: { Args: never; Returns: string }
       norm_genre: { Args: { t: string }; Returns: string }
       popular_content: {

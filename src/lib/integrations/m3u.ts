@@ -53,11 +53,13 @@ export function classify(info: string, url: string): M3uEntry | null {
   return { kind, name, title, group, logo, url, tvgId: a["tvg-id"]?.trim() || null, tmdbId, year, series, season, episode, streamType: /\.m3u8$/.test(path) ? "hls" : "url" };
 }
 
-/** Incremental line parser: feed lines, get entries. */
-export function createParser() {
-  let pending: string | null = null, header = false, plus = false;
+/** Incremental line parser: feed lines, get entries. `init` restores header flags when resuming mid-file. */
+export function createParser(init?: { m3u?: boolean; plus?: boolean }) {
+  let pending: string | null = null, header = !!init?.m3u, plus = !!init?.plus;
   return {
     get isM3u() { return header; }, get isPlus() { return plus; },
+    /** True while an #EXTINF line waits for its URL (not a safe resume point). */
+    get pending() { return pending !== null; },
     line(raw: string): M3uEntry | null | "skip" {
       const l = raw.trim();
       if (!l) return "skip";
@@ -69,6 +71,10 @@ export function createParser() {
     },
   };
 }
+
+/** Stable catalog identifier for an entry, prefixed by kind so kinds never collide. */
+export const itemKey = (e: M3uEntry) => `${e.kind}:${entityKey(e)}`;
+export const seriesItemKey = (e: M3uEntry) => `series:${seriesKey(e)}`;
 
 export function parseM3u(text: string) {
   const p = createParser(); const out: M3uEntry[] = [];
@@ -109,3 +115,30 @@ export function assertSafeListUrl(u: string) {
   if (h === "localhost" || h.endsWith(".local") || h.endsWith(".internal") || /^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h) || h === "[::1]") throw new Error("Endereço não permitido");
   return x;
 }
+
+/**
+ * Byte-level line splitter (no growing string buffers). Yields each line with the absolute byte
+ * offset right after it, so a checkpoint can resume exactly there. `skip` discards leading bytes
+ * when the server ignored the Range request.
+ */
+export async function* lines(res: Response, startAt: number, skip: number) {
+  const reader = res.body!.getReader();
+  const dec = new TextDecoder();
+  let carry: Uint8Array = new Uint8Array(0), carryStart = startAt, toSkip = skip;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      let chunk = value as Uint8Array;
+      if (toSkip > 0) { if (chunk.length <= toSkip) { toSkip -= chunk.length; continue; } chunk = chunk.subarray(toSkip); toSkip = 0; }
+      let data: Uint8Array;
+      if (carry.length) { data = new Uint8Array(carry.length + chunk.length); data.set(carry); data.set(chunk, carry.length); } else data = chunk;
+      let ls = 0, nl: number;
+      while ((nl = data.indexOf(10, ls)) >= 0) { const text = dec.decode(data.subarray(ls, nl)); ls = nl + 1; yield { text, end: carryStart + ls }; }
+      carry = data.slice(ls); carryStart += ls;
+      if (carry.length > 1_000_000) throw new Error("O conteúdo não é uma lista M3U válida.");
+    }
+    if (carry.length) yield { text: dec.decode(carry), end: carryStart + carry.length };
+  } finally { reader.cancel().catch(() => {}); }
+}
+

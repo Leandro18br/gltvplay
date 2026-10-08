@@ -14,14 +14,14 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
 
-type Src = { id: string; url: string; source_type: string; is_active: boolean; is_primary: boolean; sort_order: number; label: string | null; api_integration_id: string | null };
+type Src = { id: string; url: string; source_type: string; is_active: boolean; is_primary: boolean; sort_order: number; label: string | null; api_integration_id: string | null; m3u_list_id: string | null; unavailable_since: string | null };
 type Found = Awaited<ReturnType<typeof findPlayer>>;
 
 /** All players of one movie or one episode (never a whole series). */
 export function SourcesManager({ kind, contentId }: { kind: "movie" | "episode"; contentId: string }) {
   const qc = useQueryClient();
   const key = ["admin", "sources", kind, contentId];
-  const list = useQuery({ queryKey: key, queryFn: async () => { const r = await db.from("playback_sources").select("id,url,source_type,is_active,is_primary,sort_order,label,api_integration_id").eq("content_kind", kind).eq("content_id", contentId).order("is_primary", { ascending: false }).order("sort_order").order("created_at"); if (r.error) throw r.error; return r.data as Src[]; } });
+  const list = useQuery({ queryKey: key, queryFn: async () => { const r = await db.from("playback_sources").select("id,url,source_type,is_active,is_primary,sort_order,label,api_integration_id,m3u_list_id,unavailable_since").eq("content_kind", kind).eq("content_id", contentId).order("is_primary", { ascending: false }).order("sort_order").order("created_at"); if (r.error) throw r.error; return r.data as Src[]; } });
   const find = useServerFn(findPlayer); const add = useServerFn(addPlayerSource);
   const [busy, setBusy] = useState(false); const [found, setFound] = useState<Found | null>(null);
   const [manual, setManual] = useState(""); const [label, setLabel] = useState(""); const [ptype, setPtype] = useState<"auto" | "url" | "embed" | "hls">("auto"); const [adding, setAdding] = useState(false);
@@ -83,7 +83,7 @@ export function SourcesManager({ kind, contentId }: { kind: "movie" | "episode";
       {list.data?.length === 0 && <p className="text-xs text-muted-foreground">Nenhum player salvo.</p>}
       {list.data?.map((s, n) => <div key={s.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/30 p-2">
         <Input className="h-8 w-32" defaultValue={s.label ?? `Servidor ${n + 1}`} aria-label="Nome do player" onBlur={e => e.target.value !== (s.label ?? "") && act(db.from("playback_sources").update({ label: e.target.value.slice(0, 60) || null }).eq("id", s.id))} />
-        <Badge variant="outline">{s.source_type.toUpperCase()}</Badge>{s.is_primary && <Badge>Principal</Badge>}{s.api_integration_id && <Badge variant="secondary">API</Badge>}
+        <Badge variant="outline">{s.source_type.toUpperCase()}</Badge>{s.is_primary && <Badge>Principal</Badge>}{s.api_integration_id && <Badge variant="secondary">API</Badge>}{s.m3u_list_id && <Badge variant="secondary">M3U</Badge>}{s.unavailable_since && <Badge variant="outline" title="Este item não apareceu na última sincronização da lista">Indisponível na última sincronização</Badge>}
         <Input key={s.url} className="h-8 min-w-0 flex-1 font-mono text-xs" defaultValue={s.url} aria-label="URL do player" onBlur={e => editUrl(s, e.target.value)} />
         <Switch checked={s.is_active} aria-label="Ativo" onCheckedChange={v => act(db.from("playback_sources").update({ is_active: v }).eq("id", s.id))} />
         {!s.is_primary && <Button type="button" size="icon" variant="ghost" aria-label="Definir como principal" onClick={() => act(db.rpc("set_primary_playback", { _source_id: s.id }))}><Star /></Button>}
