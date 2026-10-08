@@ -467,12 +467,17 @@ export type Database = {
           duration_minutes: number | null
           episode_number: number
           id: string
+          original_title: string | null
           release_date: string | null
           season_id: string
           status: Database["public"]["Enums"]["content_status"]
+          still_path: string | null
           thumbnail_url: string | null
           title: string
+          tmdb_id: number | null
           updated_at: string
+          vote_average: number | null
+          vote_count: number | null
         }
         Insert: {
           created_at?: string
@@ -480,12 +485,17 @@ export type Database = {
           duration_minutes?: number | null
           episode_number: number
           id?: string
+          original_title?: string | null
           release_date?: string | null
           season_id: string
           status?: Database["public"]["Enums"]["content_status"]
+          still_path?: string | null
           thumbnail_url?: string | null
           title: string
+          tmdb_id?: number | null
           updated_at?: string
+          vote_average?: number | null
+          vote_count?: number | null
         }
         Update: {
           created_at?: string
@@ -493,12 +503,17 @@ export type Database = {
           duration_minutes?: number | null
           episode_number?: number
           id?: string
+          original_title?: string | null
           release_date?: string | null
           season_id?: string
           status?: Database["public"]["Enums"]["content_status"]
+          still_path?: string | null
           thumbnail_url?: string | null
           title?: string
+          tmdb_id?: number | null
           updated_at?: string
+          vote_average?: number | null
+          vote_count?: number | null
         }
         Relationships: [
           {
@@ -588,6 +603,7 @@ export type Database = {
       movies: {
         Row: {
           age_rating: string | null
+          backdrop_path: string | null
           backdrop_url: string | null
           category_id: string | null
           country: string | null
@@ -598,20 +614,31 @@ export type Database = {
           external_source: string | null
           featured: boolean
           id: string
+          imdb_id: string | null
           language: string | null
           original_title: string | null
+          popularity: number | null
+          poster_path: string | null
           poster_url: string | null
           quality: string | null
+          release_date: string | null
           release_year: number | null
           slug: string | null
           sort_order: number
           status: Database["public"]["Enums"]["content_status"]
+          tagline: string | null
           title: string
+          tmdb_id: number | null
+          tmdb_status: string | null
+          tmdb_synced_at: string | null
           trailer_url: string | null
           updated_at: string
+          vote_average: number | null
+          vote_count: number | null
         }
         Insert: {
           age_rating?: string | null
+          backdrop_path?: string | null
           backdrop_url?: string | null
           category_id?: string | null
           country?: string | null
@@ -622,20 +649,31 @@ export type Database = {
           external_source?: string | null
           featured?: boolean
           id?: string
+          imdb_id?: string | null
           language?: string | null
           original_title?: string | null
+          popularity?: number | null
+          poster_path?: string | null
           poster_url?: string | null
           quality?: string | null
+          release_date?: string | null
           release_year?: number | null
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          tagline?: string | null
           title: string
+          tmdb_id?: number | null
+          tmdb_status?: string | null
+          tmdb_synced_at?: string | null
           trailer_url?: string | null
           updated_at?: string
+          vote_average?: number | null
+          vote_count?: number | null
         }
         Update: {
           age_rating?: string | null
+          backdrop_path?: string | null
           backdrop_url?: string | null
           category_id?: string | null
           country?: string | null
@@ -646,17 +684,27 @@ export type Database = {
           external_source?: string | null
           featured?: boolean
           id?: string
+          imdb_id?: string | null
           language?: string | null
           original_title?: string | null
+          popularity?: number | null
+          poster_path?: string | null
           poster_url?: string | null
           quality?: string | null
+          release_date?: string | null
           release_year?: number | null
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          tagline?: string | null
           title?: string
+          tmdb_id?: number | null
+          tmdb_status?: string | null
+          tmdb_synced_at?: string | null
           trailer_url?: string | null
           updated_at?: string
+          vote_average?: number | null
+          vote_count?: number | null
         }
         Relationships: [
           {
@@ -807,6 +855,7 @@ export type Database = {
       }
       seasons: {
         Row: {
+          air_date: string | null
           created_at: string
           description: string | null
           id: string
@@ -816,9 +865,11 @@ export type Database = {
           sort_order: number
           status: Database["public"]["Enums"]["content_status"]
           title: string | null
+          tmdb_id: number | null
           updated_at: string
         }
         Insert: {
+          air_date?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -828,9 +879,11 @@ export type Database = {
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
           title?: string | null
+          tmdb_id?: number | null
           updated_at?: string
         }
         Update: {
+          air_date?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -840,6 +893,7 @@ export type Database = {
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
           title?: string | null
+          tmdb_id?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -855,63 +909,108 @@ export type Database = {
       series: {
         Row: {
           age_rating: string | null
+          backdrop_path: string | null
           backdrop_url: string | null
           category_id: string | null
+          country: string | null
           created_at: string
           description: string | null
           external_id: string | null
           external_source: string | null
           featured: boolean
+          first_air_date: string | null
           id: string
+          imdb_id: string | null
+          language: string | null
+          number_of_episodes: number | null
+          number_of_seasons: number | null
           original_title: string | null
+          popularity: number | null
+          poster_path: string | null
           poster_url: string | null
           release_year: number | null
           slug: string | null
           sort_order: number
           status: Database["public"]["Enums"]["content_status"]
+          tagline: string | null
           title: string
+          tmdb_id: number | null
+          tmdb_status: string | null
+          tmdb_synced_at: string | null
           trailer_url: string | null
           updated_at: string
+          vote_average: number | null
+          vote_count: number | null
         }
         Insert: {
           age_rating?: string | null
+          backdrop_path?: string | null
           backdrop_url?: string | null
           category_id?: string | null
+          country?: string | null
           created_at?: string
           description?: string | null
           external_id?: string | null
           external_source?: string | null
           featured?: boolean
+          first_air_date?: string | null
           id?: string
+          imdb_id?: string | null
+          language?: string | null
+          number_of_episodes?: number | null
+          number_of_seasons?: number | null
           original_title?: string | null
+          popularity?: number | null
+          poster_path?: string | null
           poster_url?: string | null
           release_year?: number | null
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          tagline?: string | null
           title: string
+          tmdb_id?: number | null
+          tmdb_status?: string | null
+          tmdb_synced_at?: string | null
           trailer_url?: string | null
           updated_at?: string
+          vote_average?: number | null
+          vote_count?: number | null
         }
         Update: {
           age_rating?: string | null
+          backdrop_path?: string | null
           backdrop_url?: string | null
           category_id?: string | null
+          country?: string | null
           created_at?: string
           description?: string | null
           external_id?: string | null
           external_source?: string | null
           featured?: boolean
+          first_air_date?: string | null
           id?: string
+          imdb_id?: string | null
+          language?: string | null
+          number_of_episodes?: number | null
+          number_of_seasons?: number | null
           original_title?: string | null
+          popularity?: number | null
+          poster_path?: string | null
           poster_url?: string | null
           release_year?: number | null
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          tagline?: string | null
           title?: string
+          tmdb_id?: number | null
+          tmdb_status?: string | null
+          tmdb_synced_at?: string | null
           trailer_url?: string | null
           updated_at?: string
+          vote_average?: number | null
+          vote_count?: number | null
         }
         Relationships: [
           {
@@ -992,6 +1091,27 @@ export type Database = {
           social_links?: Json
           texts?: Json
           updated_at?: string
+        }
+        Relationships: []
+      }
+      tmdb_cache: {
+        Row: {
+          body: Json
+          cache_key: string
+          created_at: string
+          expires_at: string
+        }
+        Insert: {
+          body: Json
+          cache_key: string
+          created_at?: string
+          expires_at: string
+        }
+        Update: {
+          body?: Json
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
         }
         Relationships: []
       }
