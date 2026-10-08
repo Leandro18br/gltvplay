@@ -19,6 +19,7 @@ import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as FilmesRouteImport } from './routes/filmes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SeriesRouteImport } from './routes/series'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedMinhaListaRouteImport } from './routes/_authenticated/minha-lista'
 import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -41,6 +42,7 @@ import { Route as CanalSlugRouteImport } from './routes/canal.$slug'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as FilmeSlugRouteImport } from './routes/filme.$slug'
 import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
+import { Route as AuthenticatedAssistirKindIdRouteImport } from './routes/_authenticated/assistir.$kind.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -89,6 +91,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const SeriesRoute = SeriesRouteImport.update({
   id: '/series',
   path: '/series',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedMinhaListaRoute = AuthenticatedMinhaListaRouteImport.update({
@@ -201,6 +208,12 @@ const SerieSlugRoute = SerieSlugRouteImport.update({
   path: '/serie/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAssistirKindIdRoute =
+  AuthenticatedAssistirKindIdRouteImport.update({
+    id: '/assistir/$kind/$id',
+    path: '/assistir/$kind/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -212,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/banners': typeof AdminBannersRoute
@@ -234,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -244,6 +259,7 @@ export interface FileRoutesByTo {
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/banners': typeof AdminBannersRoute
@@ -266,6 +282,7 @@ export interface FileRoutesByTo {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin': typeof AdminIndexRoute
+  '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -279,6 +296,7 @@ export interface FileRoutesById {
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/series': typeof SeriesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/admin/banners': typeof AdminBannersRoute
@@ -301,6 +319,7 @@ export interface FileRoutesById {
   '/filme/$slug': typeof FilmeSlugRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/_authenticated/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -314,6 +333,7 @@ export interface FileRouteTypes {
     | '/filmes'
     | '/reset-password'
     | '/series'
+    | '/sitemap.xml'
     | '/minha-lista'
     | '/perfil'
     | '/admin/banners'
@@ -336,6 +356,7 @@ export interface FileRouteTypes {
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin/'
+    | '/assistir/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -346,6 +367,7 @@ export interface FileRouteTypes {
     | '/filmes'
     | '/reset-password'
     | '/series'
+    | '/sitemap.xml'
     | '/minha-lista'
     | '/perfil'
     | '/admin/banners'
@@ -368,6 +390,7 @@ export interface FileRouteTypes {
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin'
+    | '/assistir/$kind/$id'
   id:
     | '__root__'
     | '/'
@@ -380,6 +403,7 @@ export interface FileRouteTypes {
     | '/filmes'
     | '/reset-password'
     | '/series'
+    | '/sitemap.xml'
     | '/_authenticated/minha-lista'
     | '/_authenticated/perfil'
     | '/admin/banners'
@@ -402,6 +426,7 @@ export interface FileRouteTypes {
     | '/filme/$slug'
     | '/serie/$slug'
     | '/admin/'
+    | '/_authenticated/assistir/$kind/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -415,6 +440,7 @@ export interface RootRouteChildren {
   FilmesRoute: typeof FilmesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SeriesRoute: typeof SeriesRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AdminLoginRoute: typeof AdminLoginRoute
   CanalSlugRoute: typeof CanalSlugRoute
   CategoriaSlugRoute: typeof CategoriaSlugRoute
@@ -492,6 +518,13 @@ declare module '@tanstack/react-router' {
       path: '/series'
       fullPath: '/series'
       preLoaderRoute: typeof SeriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/minha-lista': {
@@ -648,17 +681,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SerieSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/assistir/$kind/$id': {
+      id: '/_authenticated/assistir/$kind/$id'
+      path: '/assistir/$kind/$id'
+      fullPath: '/assistir/$kind/$id'
+      preLoaderRoute: typeof AuthenticatedAssistirKindIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedMinhaListaRoute: typeof AuthenticatedMinhaListaRoute
   AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
+  AuthenticatedAssistirKindIdRoute: typeof AuthenticatedAssistirKindIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMinhaListaRoute: AuthenticatedMinhaListaRoute,
   AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
+  AuthenticatedAssistirKindIdRoute: AuthenticatedAssistirKindIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -713,6 +755,7 @@ const rootRouteChildren: RootRouteChildren = {
   FilmesRoute: FilmesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SeriesRoute: SeriesRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   AdminLoginRoute: AdminLoginRoute,
   CanalSlugRoute: CanalSlugRoute,
   CategoriaSlugRoute: CategoriaSlugRoute,
