@@ -46,7 +46,7 @@ function summarize() {
   return { c, add(e: M3uEntry) { if (e.kind === "movie") c.movies++; else if (e.kind === "channel") c.channels++; else { c.episodes++; c.series.add(seriesKey(e)); } } };
 }
 
-export async function testList(opts: { listId?: string; url?: string }) {
+export async function testList(opts: { listId?: string | undefined; url?: string | undefined }) {
   const url = opts.url?.trim() || await listUrl(opts.listId!);
   const s = summarize();
   const r = await streamList(url, e => s.add(e), TEST_BYTES);

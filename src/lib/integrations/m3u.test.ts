@@ -22,8 +22,8 @@ describe("m3u", () => {
     expect(entries[3]).toMatchObject({ series: "Dark", season: 1, episode: 2 });
   });
   it("gives each episode its own key and URL", () => {
-    expect(entityKey(entries[2])).not.toBe(entityKey(entries[3]));
-    expect(entries[2].url).not.toBe(entries[3].url);
+    expect(entityKey(entries[2]!)).not.toBe(entityKey(entries[3]!));
+    expect(entries[2]!.url).not.toBe(entries[3]!.url);
   });
   it("normalizes group names", () => {
     expect(categoryName("FILMES | AÇÃO")).toBe("Ação");
