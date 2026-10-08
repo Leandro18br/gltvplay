@@ -3,7 +3,6 @@ import { Clapperboard } from "lucide-react";
 import { formatDuration, type Item } from "@/lib/catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { WatchButton } from "./Hero";
 import { WatchlistButton } from "./ContentCard";
 import type { ReactNode } from "react";
 
@@ -15,22 +14,18 @@ function trailerEmbed(url: string) {
   return null;
 }
 
-export function DetailHero({ item, extraMeta, watch }: { item: Item; extraMeta?: ReactNode; watch?: ReactNode }) {
+/** Compact details header: poster, info and the small player block (no big banner). */
+export function DetailHero({ item, extraMeta, player }: { item: Item; extraMeta?: ReactNode; player?: ReactNode }) {
   const [trailer, setTrailer] = useState(false);
   const meta = [item.release_year, item.kind === "movie" ? formatDuration(item.duration_minutes) : null, item.quality, item.language, item.country].filter(Boolean);
   const embed = item.trailer_url ? trailerEmbed(item.trailer_url) : null;
   return (
-    <section className="relative min-h-[80vh] w-full overflow-hidden">
-      {(item.backdrop_url || item.poster_url) && (
-        <img src={item.backdrop_url || item.poster_url!} alt="" fetchPriority="high" className="absolute inset-0 h-full w-full object-cover" />
-      )}
-      <div className="absolute inset-0 bg-side-fade" />
-      <div className="absolute inset-0 bg-fade" />
-      <div className="relative mx-auto flex min-h-[80vh] max-w-[1600px] flex-col justify-end gap-8 px-4 pb-14 pt-28 md:flex-row md:items-end md:px-10">
-        {item.poster_url && <img src={item.poster_url} alt={`Pôster de ${item.title}`} className="aspect-[2/3] w-40 shrink-0 animate-rise rounded-2xl object-cover shadow-glow ring-1 ring-primary/30 md:w-60" />}
-        <div className="flex min-w-0 max-w-3xl animate-rise flex-col gap-4">
+    <section className="relative w-full overflow-hidden">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-8 px-4 pb-10 pt-24 md:flex-row md:items-start md:px-10 md:pt-28">
+        {item.poster_url && <img src={item.poster_url} alt={`Pôster de ${item.title}`} className="aspect-[2/3] w-32 shrink-0 animate-rise rounded-2xl object-cover shadow-glow ring-1 ring-primary/30 md:w-44" />}
+        <div className="flex min-w-0 max-w-3xl animate-rise flex-1 flex-col gap-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">{item.kind === "movie" ? "Filme" : "Série"}</p>
-          <h1 className="text-4xl font-bold leading-tight md:text-6xl">{item.title}</h1>
+          <h1 className="text-3xl font-bold leading-tight md:text-5xl">{item.title}</h1>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {item.age_rating && <span className="rounded border border-muted-foreground/60 px-1.5 text-xs">{item.age_rating}</span>}
             {meta.map((m, i) => <span key={i}>{i > 0 || item.age_rating ? "· " : ""}{m}</span>)}
@@ -43,12 +38,12 @@ export function DetailHero({ item, extraMeta, watch }: { item: Item; extraMeta?:
           )}
           {item.description && <p className="text-muted-foreground md:text-lg">{item.description}</p>}
           <div className="flex flex-wrap items-center gap-3">
-            {watch ?? <WatchButton item={item} />}
             {item.trailer_url && (
               <Button size="lg" variant="secondary" className="rounded-full" onClick={() => setTrailer(true)}><Clapperboard /> Trailer</Button>
             )}
             <WatchlistButton item={item} className="size-11" />
           </div>
+          {player && <div className="pt-2">{player}</div>}
         </div>
       </div>
       {item.trailer_url && (
