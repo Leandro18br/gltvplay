@@ -74,8 +74,9 @@ function SeriesPage() {
             <ol className="grid gap-3">
               {season.episodes.map((e) => (
                 <li key={e.id}>
-                  <Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }}
-                    className="group grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-4 rounded-xl p-2 transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto]">
+                  <button type="button" onClick={() => { setEpisodeId(e.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    aria-current={e.id === current?.id}
+                    className={`group grid w-full grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-4 rounded-xl p-2 text-left transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] ${e.id === current?.id ? "bg-card ring-1 ring-primary/40" : ""}`}>
                     <span className="hidden text-center font-display text-2xl text-muted-foreground md:block">{e.episode_number}</span>
                     <div className="relative aspect-video overflow-hidden rounded-lg bg-card">
                       {e.thumbnail_url ? <img src={e.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" /> : <div className="h-full bg-accent" />}
@@ -86,7 +87,7 @@ function SeriesPage() {
                       {e.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{e.description}</p>}
                     </div>
                     <span className="hidden text-sm text-muted-foreground md:block">{formatDuration(e.duration_minutes)}</span>
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ol>
