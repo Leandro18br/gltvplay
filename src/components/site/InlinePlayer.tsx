@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmbedPlayer } from "./EmbedPlayer";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerFrame } from "./VideoPlayerFrame";
+import { attachMpegTs, isMpegTsUrl, resolveSecureUrl, MIXED_CONTENT_MESSAGE } from "@/lib/playback/mpegts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
@@ -139,5 +140,15 @@ function SecureSource({ url, title, servers, selectedServer, onServerChange, chi
   if (state.url) return <>{children(state.url)}</>;
   return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={state.failed ? MIXED_CONTENT_MESSAGE : null}>
     <video title={title} playsInline className="h-full w-full bg-player object-contain" />
+  </VideoPlayerFrame>;
+}
+
+/** Direct MPEG-TS stream inside the compact block (mpegts.js). */
+function InlineMpegTs({ url, title, servers, selectedServer, onServerChange }: { url: string; title: string; servers: Src[]; selectedServer: string; onServerChange: (index: number) => void }) {
+  const [el, setEl] = useState<HTMLVideoElement | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => { if (!el) return; setFailed(null); return attachMpegTs(el, url, false, setFailed); }, [el, url]);
+  return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={failed}>
+    <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player object-contain" />
   </VideoPlayerFrame>;
 }
