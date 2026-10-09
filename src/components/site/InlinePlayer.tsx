@@ -68,14 +68,18 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
           <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">Não foi possível carregar o player. Tente novamente.</div>
         ) : source.type === "embed" ? (
           <EmbedPlayer url={source.url} title={title} />
-        ) : isHls ? (
-          <InlineHls key={source.id} url={source.url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
-        ) : isMpegTsUrl(source.url) ? (
-          <InlineMpegTs key={source.id} url={source.url} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer} />
         ) : (
-          <VideoPlayerFrame key={source.id} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer}>
-            <video src={source.url} autoPlay playsInline className="h-full w-full bg-player object-contain" />
-          </VideoPlayerFrame>
+          <SecureSource key={source.id} url={source.url} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer}>
+            {(url) => isHls ? (
+              <InlineHls url={url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
+            ) : isMpegTsUrl(url) ? (
+              <InlineMpegTs url={url} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer} />
+            ) : (
+              <VideoPlayerFrame title={title} servers={sources} selectedServer={source.id} onServerChange={setServer}>
+                <video src={url} autoPlay playsInline className="h-full w-full bg-player object-contain" />
+              </VideoPlayerFrame>
+            )}
+          </SecureSource>
         )}
       </div>
       {started && source?.type === "embed" && sources.length > 1 && (
@@ -125,5 +129,15 @@ function InlineHls({ url, title, servers, selectedServer, onServerChange }: { ur
   const [engine, setEngine] = useState<{ currentLevel: number } | null>(null);
   return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={failed ? "HLS" : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
     <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player object-contain" />
+  </VideoPlayerFrame>;
+}
+
+/** Resolves HTTP sources on HTTPS pages to a verified HTTPS alternative, or shows why it can't play. */
+function SecureSource({ url, title, servers, selectedServer, onServerChange, children }: { url: string; title: string; servers: Src[]; selectedServer: string; onServerChange: (index: number) => void; children: (url: string) => React.ReactNode }) {
+  const [state, setState] = useState<{ url: string | null; failed: boolean }>({ url: null, failed: false });
+  useEffect(() => { let off = false; resolveSecureUrl(url).then(r => { if (!off) setState({ url: r, failed: !r }); }); return () => { off = true; }; }, [url]);
+  if (state.url) return <>{children(state.url)}</>;
+  return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={state.failed ? MIXED_CONTENT_MESSAGE : null}>
+    <video title={title} playsInline className="h-full w-full bg-player object-contain" />
   </VideoPlayerFrame>;
 }

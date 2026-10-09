@@ -152,6 +152,7 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
   useEffect(() => {
     let off = false;
     setSrc(null);
+    setError(null);
     if (embed || !url) return;
     resolveSecureUrl(url).then((r) => { if (off) return; if (r) setSrc(r); else setError(MIXED_CONTENT_MESSAGE); });
     return () => { off = true; };
