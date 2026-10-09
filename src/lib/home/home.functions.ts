@@ -40,8 +40,10 @@ async function resolveSection(db: any, section: HomeSection): Promise<ResolvedSe
   const lists = await Promise.all(kinds.map(async kind => {
     let sel = selectors[kind]; const join = kind === "movie" ? "movie_genres" : "series_genres";
     if (section.filters.genre && kind !== "channel") sel = sel.replace(`${join}(`, `${join}!inner(`);
+    const categoriesJoin = kind === "movie" ? "movie_categories" : "series_categories";
+    if (section.filters.category && kind !== "channel") sel += `,${categoriesJoin}!inner(category_id)`;
     let q = db.from(tables[kind]).select(sel).eq("status", "published");
-    if (section.filters.category) q = q.eq("category_id", section.filters.category);
+    if (section.filters.category) q = q.eq(kind === "channel" ? "category_id" : `${categoriesJoin}.category_id`, section.filters.category);
     if (section.filters.year && kind !== "channel") q = q.eq("release_year", section.filters.year);
     if (section.filters.genre && kind !== "channel") q = q.eq(`${join}.genre_id`, section.filters.genre);
     if (section.type === "featured" || section.filters.sort === "featured") q = q.eq("featured", true);

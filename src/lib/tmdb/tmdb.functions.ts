@@ -16,7 +16,7 @@ export class TmdbError extends Error {}
 
 type Ctx = { supabase: any; userId: string };
 
-async function assertStaff(ctx: Ctx) {
+export async function assertStaff(ctx: Ctx) {
   const { data } = await ctx.supabase.rpc("is_staff", { _user_id: ctx.userId });
   if (!data) throw new Error("Acesso negado");
 }
@@ -243,7 +243,7 @@ async function completionRow(ctx: Ctx, kind: "movie" | "series", id: string) {
   return row;
 }
 
-async function resolveCompletion(kind: "movie" | "series", row: any) {
+export async function resolveCompletion(kind: "movie" | "series", row: any) {
   if (Number.isInteger(row.tmdb_id) && row.tmdb_id > 0) {
     try {
       await tmdbGet(`/${kind === "movie" ? "movie" : "tv"}/${row.tmdb_id}`, { language: LANG, append_to_response: "external_ids" }, { ttl: DAY, notFound: unidentified });
@@ -277,7 +277,7 @@ export const tmdbResolveContent = createServerFn({ method: "POST" })
     return resolveCompletion(data.kind, await completionRow(ctx, data.kind, data.id));
   }));
 
-async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string, current: any, fields: any, genres: any[] = []) {
+export async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string, current: any, fields: any, genres: any[] = []) {
   const patch = missingMetadata(kind, current, fields);
   const { data, error } = await ctx.supabase.rpc("complete_tmdb_metadata", {
     _kind: kind, _id: id, _patch: patch, _genre_ids: genres.map((g) => g.id).filter((id): id is number => Number.isInteger(id)),
