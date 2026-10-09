@@ -1,0 +1,1 @@
+- Direct MPEG-TS (.ts) URLs play through mpegts.js via `mpegts.ts` (lazy import, destroyed on source change), URL unchanged; HLS/MP4/embeds keep their paths. Why: browsers cannot play raw MPEG-TS in <video>.
