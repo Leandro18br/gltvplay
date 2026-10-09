@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { catalogListQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
-import { CatalogPage, validateCatalogSearch } from "@/components/site/CatalogPage";
+import { CatalogPage, catalogPagedQuery, validateCatalogSearch } from "@/components/site/CatalogPage";
 
 export const Route = createFileRoute("/canais")({
   validateSearch: validateCatalogSearch,
-  loaderDeps: ({ search }) => ({ genero: search.genero, ordem: search.ordem }),
-  loader: ({ context, deps }) => context.queryClient.ensureInfiniteQueryData(catalogListQuery("channel", deps.genero, deps.ordem ?? "recent")),
+  loaderDeps: ({ search }) => ({ genero: search.genero, ordem: search.ordem, pagina: search.pagina }),
+  loader: ({ context, deps }) => context.queryClient.ensureQueryData(catalogPagedQuery("channel", deps)),
   head: () => ({
     meta: [
       { title: "Canais ao vivo — Streaming" },

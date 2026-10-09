@@ -1,11 +1,15 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Film } from "lucide-react";
 import { categoryQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
-import { GridSection, Row } from "@/components/site/ContentCard";
+import { Row } from "@/components/site/ContentCard";
+import { PagedGridSection } from "@/components/site/Pager";
+
+const pageParam = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) > 1 ? Number(v) : undefined);
 
 export const Route = createFileRoute("/categoria/$slug")({
+  validateSearch: (s: Record<string, unknown>): { pf?: number | undefined; ps?: number | undefined } => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]) }),
   loader: async ({ context, params }) => {
     const d = await context.queryClient.ensureQueryData(categoryQuery(params.slug));
     if (!d) throw notFound();
@@ -32,6 +36,9 @@ export const Route = createFileRoute("/categoria/$slug")({
 
 function Page() {
   const { slug } = Route.useParams();
+  const { pf, ps } = Route.useSearch();
+  const navigate = useNavigate({ from: "/categoria/$slug" });
+  const go = (key: "pf" | "ps") => (n: number) => navigate({ search: (prev) => ({ ...prev, [key]: n > 1 ? n : undefined }), replace: true });
   const { data } = useSuspenseQuery(categoryQuery(slug));
   if (!data) return null;
   const empty = !data.movies.length && !data.series.length && !data.channels.length;
@@ -40,8 +47,8 @@ function Page() {
       <PageTitle title={data.category.name} subtitle={data.category.description} />
       {empty ? <EmptyState icon={<Film />} title="Ainda não há conteúdos nesta categoria" /> : (
         <div className="space-y-4">
-          <GridSection title="Filmes" items={data.movies} />
-          <GridSection title="Séries" items={data.series} />
+          <PagedGridSection title="Filmes" kind="movie" filter={{ categoryId: data.category.id }} page={pf ?? 1} onChange={go("pf")} />
+          <PagedGridSection title="Séries" kind="series" filter={{ categoryId: data.category.id }} page={ps ?? 1} onChange={go("ps")} />
           <Row title="Canais" items={data.channels} />
         </div>
       )}

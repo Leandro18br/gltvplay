@@ -1,35 +1,24 @@
-import { useSuspenseInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
 import { Loader2, Film } from "lucide-react";
-import { catalogListQuery, genresQuery, type Kind, type SortKey } from "@/lib/catalog";
+import { genresQuery, pagedListQuery, type Kind, type SortKey } from "@/lib/catalog";
+import { Pager } from "./Pager";
 import { CardGrid } from "./ContentCard";
 import { EmptyState, PageTitle } from "./SiteShell";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export type CatalogSearch = { genero?: string | undefined; ordem?: SortKey | undefined };
+export type CatalogSearch = { genero?: string | undefined; ordem?: SortKey | undefined; pagina?: number | undefined };
+export const catalogPagedQuery = (kind: Kind, s: CatalogSearch) => pagedListQuery(kind, { genre: s.genero, sort: s.ordem ?? "recent" }, s.pagina ?? 1);
 
 export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; title: string; subtitle: string; search: CatalogSearch }) {
   const navigate = useNavigate();
   const sort = search.ordem ?? "recent";
-  const q = useSuspenseInfiniteQuery(catalogListQuery(kind, search.genero, sort));
+  const q = useQuery({ ...catalogPagedQuery(kind, search), placeholderData: keepPreviousData });
   const { data: genres = [] } = useQuery({ ...genresQuery, enabled: kind !== "channel" });
-  const sentinel = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = sentinel.current;
-    if (!el) return;
-    const io = new IntersectionObserver((e) => {
-      if (e[0]?.isIntersecting && q.hasNextPage && !q.isFetchingNextPage) q.fetchNextPage();
-    }, { rootMargin: "600px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [q.hasNextPage, q.isFetchingNextPage, q]);
-
-  const items = q.data?.pages.flatMap((p) => p.items) ?? [];
+  const items = q.data?.items ?? [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const set = (patch: Partial<CatalogSearch>) => navigate({ to: ".", search: (prev: any) => ({ ...prev, ...patch }), replace: true });
+  const set = (patch: Partial<CatalogSearch>) => navigate({ to: ".", search: (prev: any) => ({ ...prev, pagina: undefined, ...patch }), replace: true });
+  const goTo = (pagina: number) => { set({ pagina: pagina > 1 ? pagina : undefined }); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   return (
     <>
@@ -54,16 +43,16 @@ export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; tit
           </Select>
         </div>
       </PageTitle>
-      {q.isError ? (
+      {q.isPending ? (
+        <div className="flex justify-center py-16"><Loader2 className="animate-spin text-primary" /></div>
+      ) : q.isError ? (
         <EmptyState title="Não foi possível carregar" text="Verifique sua conexão e tente novamente." />
       ) : items.length === 0 ? (
         <EmptyState icon={<Film />} title="Nada por aqui ainda" text="Assim que novos conteúdos forem publicados eles aparecerão aqui." />
       ) : (
         <CardGrid items={items} />
       )}
-      <div ref={sentinel} className="flex justify-center py-10">
-        {q.isFetchingNextPage ? <Loader2 className="animate-spin text-primary" /> : q.hasNextPage ? <Button variant="secondary" onClick={() => q.fetchNextPage()}>Carregar mais</Button> : null}
-      </div>
+      {q.data && <Pager page={q.data.page} pages={q.data.pages} total={q.data.total} onChange={goTo} />}
     </>
   );
 }
@@ -71,4 +60,5 @@ export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; tit
 export const validateCatalogSearch = (s: Record<string, unknown>): CatalogSearch => ({
   genero: typeof s["genero"] === "string" && s["genero"] ? s["genero"] : undefined,
   ordem: s["ordem"] === "year" || s["ordem"] === "title" ? s["ordem"] : undefined,
+  pagina: Number.isInteger(Number(s["pagina"])) && Number(s["pagina"]) > 1 ? Number(s["pagina"]) : undefined,
 });
