@@ -5,9 +5,14 @@ import { Search, Loader2, X } from "lucide-react";
 import { searchQuery } from "@/lib/catalog";
 import { SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { CardGrid, GridSkeleton } from "@/components/site/ContentCard";
+import { PagedGridSection } from "@/components/site/Pager";
 
 export const Route = createFileRoute("/buscar")({
-  validateSearch: (s: Record<string, unknown>) => ({ q: typeof s["q"] === "string" ? s["q"] : "" }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    q: typeof s["q"] === "string" ? s["q"] : "",
+    pf: Number.isInteger(Number(s["pf"])) && Number(s["pf"]) > 1 ? Number(s["pf"]) : undefined,
+    ps: Number.isInteger(Number(s["ps"])) && Number(s["ps"]) > 1 ? Number(s["ps"]) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Buscar — Streaming" },
@@ -23,7 +28,7 @@ export const Route = createFileRoute("/buscar")({
 });
 
 function SearchPage() {
-  const { q } = Route.useSearch();
+  const { q, pf, ps } = Route.useSearch();
   const navigate = useNavigate({ from: "/buscar" });
   const [value, setValue] = useState(q);
   const [term, setTerm] = useState(q);
@@ -32,11 +37,13 @@ function SearchPage() {
   useEffect(() => { input.current?.focus(); }, []);
   useEffect(() => {
     const t = setTimeout(() => {
+      if (value === term) return;
       setTerm(value);
-      navigate({ search: { q: value }, replace: true });
+      navigate({ search: { q: value }, replace: true }); // new term → back to page 1
     }, 250);
     return () => clearTimeout(t);
-  }, [value, navigate]);
+  }, [value, term, navigate]);
+  const go = (key: "pf" | "ps") => (n: number) => navigate({ search: (prev) => ({ ...prev, [key]: n > 1 ? n : undefined }), replace: true });
 
   const res = useQuery({ ...searchQuery(term), placeholderData: keepPreviousData });
   const d = res.data;
@@ -63,8 +70,8 @@ function SearchPage() {
         <EmptyState title={`Nenhum resultado para “${term}”`} text="Tente outro título ou palavra-chave." />
       ) : d && (
         <div className="space-y-10">
-          {d.movies.length > 0 && <section><h2 className="mx-auto mb-4 max-w-[1600px] px-4 text-lg font-semibold md:px-10">Filmes</h2><CardGrid items={d.movies} /></section>}
-          {d.series.length > 0 && <section><h2 className="mx-auto mb-4 max-w-[1600px] px-4 text-lg font-semibold md:px-10">Séries</h2><CardGrid items={d.series} /></section>}
+          <PagedGridSection title="Filmes" kind="movie" filter={{ term, sort: "title" }} page={pf ?? 1} onChange={go("pf")} />
+          <PagedGridSection title="Séries" kind="series" filter={{ term, sort: "title" }} page={ps ?? 1} onChange={go("ps")} />
           {d.episodes.length > 0 && (
             <section className="mx-auto max-w-[1600px] px-4 md:px-10">
               <h2 className="mb-4 text-lg font-semibold">Episódios</h2>
