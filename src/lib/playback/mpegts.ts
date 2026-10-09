@@ -46,7 +46,7 @@ export function isMixedContent(url: string): boolean {
  */
 export async function resolveSecureUrl(url: string): Promise<string | null> {
   if (!isMixedContent(url)) return url;
-  const candidate = url.replace(/^http:/i, "https:");
+  const candidate = url.replace(/^http:\/\/([^/?#:]+)(?::80)?(?=[/?#]|$)/i, "https://$1");
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
