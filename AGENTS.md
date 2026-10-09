@@ -28,8 +28,8 @@
 - Embed input is parsed to a single URL with shared schemas, checked against admin-authorized HTTPS domains (exact host or subdomain) server-side and in database triggers, and rendered only by the shared EmbedPlayer as a regenerated cross-origin iframe without sandbox. Why: never execute admin-provided HTML in the main document while letting provider players work.
 - Primary playback designation uses a staff-only serialized RPC; sources retain type, active state and ordering for future alternatives. Why: multiple sources share one authorization model.
 - Cross-origin embed loading is not proof of playback; generic embeds record history without fabricated playback progress, and failures use rate-limited diagnostic reports. Why: provider APIs are required for accurate time and reliable playback signals.
-- TMDB reuses `tmdb.functions.ts` and its cache; completion locks records through staff-only `complete_tmdb_metadata`, fills missing allowlisted fields and links fixed genres; episodes update existing seasons sequentially. Imports remain separate. Why: preserve manual edits, provenance, identities and playback.
-- Genres are a fixed, seeded set (`ensure_fixed_genres`, idempotent by normalized name) mapped via `genres.tmdb_genre_ids`; TMDB imports only link to existing genres, never create them. Why: reusable categories without duplicates.
+- TMDB reuses cached metadata, staff-only allowlisted completion and locked import deduplication; year jobs persist bounded discovery/item checkpoints. Episode updates touch existing rows only. Why: preserve manual data, identities and playback.
+- Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
 
 - Player/catalog integration rules (MegaEmbed, M3U) live in `src/lib/integrations/AGENTS.md`. Why: directory-scoped detail.
 - Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: keep presentation ordering independent of source and episode logic.

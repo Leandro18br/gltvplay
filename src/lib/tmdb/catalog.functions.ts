@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, tmdbGet, movieMeta, resolveCompletion, applyCompletion } from "./tmdb.functions";
 import { CATALOG_YEAR, CATALOG_BATCH_SIZE, yearSegment, splitSegment, inCatalogYear, type DateSegment } from "./catalog-batch";
 
-function checked<T extends {error: any; data: any}>(r: T): T["data"] { if(r.error) throw new Error("Não foi possível salvar o lote do catálogo."); return r.data; }
+function checked<T extends {error: any; data: any}>(r: T): NonNullable<T["data"]> { if(r.error) throw new Error("Não foi possível salvar o lote do catálogo."); return r.data; }
 async function report(ctx: any, job: any) {
   const totals = checked(await ctx.supabase.rpc("tmdb_catalog_report",{_job:job.id}));
   const errors = checked(await ctx.supabase.from("tmdb_catalog_job_items").select("item_key,error,outcome").eq("job_id",job.id).or("state.eq.error,outcome.eq.ambiguous").limit(50));
@@ -59,7 +59,7 @@ export const tmdbCatalogStep = createServerFn({method:"POST"}).middleware([requi
         checked(await db.from("tmdb_catalog_jobs").update({segments:job.segments,segment_index:job.segment_index,page:job.page,phase:job.phase,discovered:job.discovered,total_reported:job.total_reported,last_error:null,updated_at:now}).eq("id",job.id));
       } else if(job.phase==="import") {
         const items=checked(await db.from("tmdb_catalog_job_items").select("*").eq("job_id",job.id).eq("state","pending").order("item_key").limit(CATALOG_BATCH_SIZE));
-        for(const item of items) {
+        await Promise.all(items.map(async item => {
           try {
             let tmdbId=item.tmdb_id;
             let row:any=null;
@@ -67,12 +67,13 @@ export const tmdbCatalogStep = createServerFn({method:"POST"}).middleware([requi
               row=checked(await context.supabase.from("movies").select("*").eq("id",item.content_id).single());
               tmdbId=(await resolveCompletion("movie",row)).tmdbId;
               if(!tmdbId) {
-                checked(await db.from("tmdb_catalog_job_items").update({state:"done",outcome:"ambiguous",error:"Correspondência não confiável; conteúdo preservado.",attempts:item.attempts+1}).eq("job_id",job.id).eq("item_key",item.item_key)); continue;
+                checked(await db.from("tmdb_catalog_job_items").update({state:"done",outcome:"ambiguous",error:"Correspondência não confiável; conteúdo preservado.",attempts:item.attempts+1}).eq("job_id",job.id).eq("item_key",item.item_key)); return;
               }
             }
+            if(!tmdbId) throw new Error("TMDB ID ausente; conteúdo preservado.");
             const meta=await movieMeta(tmdbId,false);
             if(!inCatalogYear(meta.fields.release_date)) {
-              checked(await db.from("tmdb_catalog_job_items").update({state:"done",outcome:"outside_year",error:"Data principal no TMDB não pertence a 2026; conteúdo preservado."}).eq("job_id",job.id).eq("item_key",item.item_key));continue;
+              checked(await db.from("tmdb_catalog_job_items").update({state:"done",outcome:"outside_year",error:"Data principal no TMDB não pertence a 2026; conteúdo preservado."}).eq("job_id",job.id).eq("item_key",item.item_key));return;
             }
             let result:any;
             if(row) { result=await applyCompletion(context,"movie",row.id,row,meta.fields,meta.genres);result={...result,id:row.id,outcome:result.filled||result.genres?"completed":"exists"}; }
@@ -81,7 +82,7 @@ export const tmdbCatalogStep = createServerFn({method:"POST"}).middleware([requi
           } catch(e) {
             checked(await db.from("tmdb_catalog_job_items").update({state:"error",error:e instanceof Error?e.message:"Erro ao atualizar metadados.",attempts:item.attempts+1}).eq("job_id",job.id).eq("item_key",item.item_key));
           }
-        }
+        }));
         if(!items.length) {job.phase="done";checked(await db.from("tmdb_catalog_jobs").update({phase:"done",updated_at:now,last_error:null}).eq("id",job.id));}
       }
       return report(context,job);

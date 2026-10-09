@@ -1,6 +1,6 @@
 # 2026 catalog and default categories
-- [ ] Inspect existing categories and import paths; preserve existing associations and playback.
-- [ ] Add reusable default categories and additive movie/series associations for existing and new imports.
+- [x] Inspect existing categories and import paths; preserve existing associations and playback.
+- [x] Add reusable default categories and additive movie/series associations for existing and new imports.
 - [ ] Discover all TMDB 2026 release pages and process metadata-only imports/completion in resumable bounded batches.
 - [ ] Execute real updates; verify database counts, idempotency, unchanged players and public/admin categories; report exact outcomes and errors.
 

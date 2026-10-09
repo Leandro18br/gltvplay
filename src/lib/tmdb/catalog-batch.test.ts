@@ -8,6 +8,7 @@ describe("2026 metadata catalog", () => {
   });
   it("splits overflowing TMDB intervals without date gaps or overlap", () => {
     const [a,b]=splitSegment(yearSegment());
+    if(!a||!b) throw new Error("Split must return two intervals");
     expect(a.from).toBe("2026-01-01"); expect(b.to).toBe("2026-12-31");
     expect(Date.parse(b.from)-Date.parse(a.to)).toBe(86400000);
   });

@@ -191,22 +191,11 @@ export const tmdbImportMovie = createServerFn({ method: "POST" })
   .handler(({ data, context }) => wrap(async () => {
     const ctx = context as Ctx;
     await assertStaff(ctx);
-    const { data: found } = await ctx.supabase.from("movies").select("id").eq("tmdb_id", data.tmdbId).maybeSingle();
-    if (found && !data.update) return { id: found.id as string, created: false, exists: true };
     const { fields, genres } = await movieMeta(data.tmdbId, data.update);
-    let id: string;
-    if (found) {
-      const r = await ctx.supabase.from("movies").update(fields).eq("id", found.id);
-      if (r.error) throw r.error;
-      id = found.id;
-    } else {
-      const slug = await uniqueSlug(ctx, "movies", fields.title, fields.release_year);
-      const r = await ctx.supabase.from("movies").insert({ ...fields, slug, status: "published" }).select("id").single();
-      if (r.error) throw r.error;
-      id = r.data.id;
-    }
-    await linkGenres(ctx, "movie", id, genres);
-    return { id, created: !found, exists: false };
+    const r = await ctx.supabase.rpc("import_tmdb_movie_metadata", { _patch: fields, _genre_ids: genres.map((g: any) => g.id) });
+    if (r.error) throw new Error("Não foi possível salvar os metadados do filme.");
+    if (r.data.outcome === "ambiguous") throw new Error("Correspondência ambígua com conteúdo existente. Confira o título e ano antes de importar.");
+    return { id: r.data.id as string, created: r.data.outcome === "created", exists: r.data.outcome !== "created" && !data.update };
   }));
 
 export const tmdbImportSeries = createServerFn({ method: "POST" })
@@ -220,8 +209,7 @@ export const tmdbImportSeries = createServerFn({ method: "POST" })
     const { fields, genres } = await seriesMeta(data.tmdbId, data.update);
     let id: string;
     if (found) {
-      const r = await ctx.supabase.from("series").update(fields).eq("id", found.id);
-      if (r.error) throw r.error;
+      await applyCompletion(ctx, "series", found.id, await completionRow(ctx, "series", found.id), fields, genres);
       id = found.id;
     } else {
       const slug = await uniqueSlug(ctx, "series", fields.title, fields.release_year);

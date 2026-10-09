@@ -32,10 +32,10 @@ const titleSorts = [
 
 export const moviesConfig: ResourceConfig = {
   table: "movies", title: "Filmes", singular: "Filme", searchCol: "title",
-  select: "*, categories(name)", hasStatus: true, hasFeatured: true, slugFrom: "title", sortOptions: titleSorts,
+   select: "*, categories(name), movie_categories(categories(name))", hasStatus: true, hasFeatured: true, slugFrom: "title", sortOptions: titleSorts,
   columns: [
     { key: "poster_url", label: "", render: (r) => <Thumb src={r.poster_url} />, className: "w-14" },
-    { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{r.categories?.name ?? "Sem categoria"}</p></div> },
+     { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{[...new Set([r.categories?.name, ...(r.movie_categories ?? []).map((c: { categories?: { name?: string } }) => c.categories?.name)].filter(Boolean))].join(" · ") || "Sem categoria"}</p></div> },
     { key: "release_year", label: "Ano" },
   ],
   fields: [
@@ -58,10 +58,10 @@ export const moviesConfig: ResourceConfig = {
 
 export const seriesConfig: ResourceConfig = {
   table: "series", title: "Séries", singular: "Série", searchCol: "title",
-  select: "*, categories(name), seasons(count)", hasStatus: true, hasFeatured: true, slugFrom: "title", sortOptions: titleSorts,
+   select: "*, categories(name), series_categories(categories(name)), seasons(count)", hasStatus: true, hasFeatured: true, slugFrom: "title", sortOptions: titleSorts,
   columns: [
     { key: "poster_url", label: "", render: (r) => <Thumb src={r.poster_url} />, className: "w-14" },
-    { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{r.categories?.name ?? "Sem categoria"}</p></div> },
+     { key: "title", label: "Título", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground">{[...new Set([r.categories?.name, ...(r.series_categories ?? []).map((c: { categories?: { name?: string } }) => c.categories?.name)].filter(Boolean))].join(" · ") || "Sem categoria"}</p></div> },
     { key: "release_year", label: "Ano" },
     { key: "seasons", label: "Temporadas", render: (r) => r.seasons?.[0]?.count ?? 0 },
   ],
