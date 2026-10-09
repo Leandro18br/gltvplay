@@ -35,3 +35,4 @@
 - Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: layout independent of source logic.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
 - Non-Home movie/series lists use CardGrid/GridSection with shared responsive tracks; Home and channel carousels retain Row. Why: wrapping without data changes.
+- Public movie/series listings page on the server (exact count + range, id tie-breaker) with Anterior/Próximo and page in the URL; Home carousels unchanged. Why: the whole catalog is reachable without loading it in the browser.
