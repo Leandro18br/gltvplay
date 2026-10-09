@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Download, Loader2, RotateCcw, Search, Square } from "lucide-react";
+const IMPORT_CONCURRENCY = 3;
 import { exploreM3u, m3uGroups, pickM3uItems, importM3uItems } from "@/lib/integrations/m3u.functions";
 import { errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
@@ -50,25 +51,27 @@ export function M3uExplorer({ list, onClose }: { list: { id: string; name: strin
     const jobStart = new Date().toISOString(), batchId = crypto.randomUUID().slice(0, 8);
     const p: Progress = { total: ids.length, done: 0, skipped: 0, errors: 0, running: true };
     setProg({ ...p });
-    let queue = [...ids];
-    while (queue.length && !stop.current) {
-      const chunk = queue.splice(0, 5);
-      try {
-        const res = await imp({ data: { listId: list.id, ids: chunk, jobStart, batchId } });
-        const back: number[] = [];
-        p.note = undefined;
-        for (const r of res) {
-          if (r.episodeErrors) p.errors += r.episodeErrors;
-          if (r.status === "partial") { back.push(r.id); p.note = `Importando episódios… faltam ${n(r.remaining ?? 0)}`; }
-          else if (r.status === "pending") back.push(r.id);
-          else if (r.status === "done") p.done++;
-          else if (r.status === "skipped") p.skipped++;
-          else p.errors++;
-        }
-        queue = [...back, ...queue];
-      } catch (e) { p.errors += chunk.length; p.note = errMsg(e); }
-      setProg({ ...p });
-    }
+    const queue = [...ids];
+    // Limited concurrency: a few requests at once, each on different items (never the same series twice).
+    const worker = async () => {
+      while (queue.length && !stop.current) {
+        const chunk = queue.splice(0, 5);
+        try {
+          const res = await imp({ data: { listId: list.id, ids: chunk, jobStart, batchId } });
+          p.note = undefined;
+          for (const r of res) {
+            if (r.episodeErrors) p.errors += r.episodeErrors;
+            if (r.status === "partial") { queue.unshift(r.id); p.note = `Importando episódios… faltam ${n(r.remaining ?? 0)}`; }
+            else if (r.status === "pending") queue.unshift(r.id);
+            else if (r.status === "done") p.done++;
+            else if (r.status === "skipped") p.skipped++;
+            else p.errors++;
+          }
+        } catch (e) { p.errors += chunk.length; p.note = errMsg(e); }
+        setProg({ ...p });
+      }
+    };
+    await Promise.all(Array.from({ length: IMPORT_CONCURRENCY }, worker));
     p.running = false; setProg({ ...p }); setSel(new Set());
     qc.invalidateQueries({ queryKey: ["admin", "m3u-explore"] });
     toast[p.errors ? "warning" : "success"](stop.current ? "Importação interrompida." : `Importação concluída: ${p.done} importados, ${p.skipped} ignorados, ${p.errors} erros.`);

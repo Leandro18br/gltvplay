@@ -1876,6 +1876,16 @@ export type Database = {
           n: number
         }[]
       }
+      m3u_import_series_chunk: {
+        Args: {
+          _job_start: string
+          _limit?: number
+          _list: string
+          _series_id: string
+          _series_key: string
+        }
+        Returns: Json
+      }
       my_role: { Args: never; Returns: string }
       norm_genre: { Args: { t: string }; Returns: string }
       popular_content: {
