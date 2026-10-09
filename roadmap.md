@@ -1,3 +1,8 @@
+# Individual TMDB metadata completion
+- [ ] Reuse TMDB lookup/cache to resolve an existing movie or series and fill only missing metadata, preserving playback and manual values.
+- [ ] Add individual admin update controls, ambiguous-match selection, result counts and separate existing-season/episode completion.
+- [ ] Test preservation/matching rules and verify authenticated movie and series update flows.
+
 # Public catalog grids
 - [x] Use responsive multi-row movie/series grids outside Home; preserve Home and channel carousels and all data behavior.
 - [x] Verify Home, movies, series, category Ação (60 cards), search and related titles (16 cards); 320/390/649/768/1024/1280 widths show no horizontal overflow. Columns adapt from 2 to 6. Movie links, genre/sort filters, live search and progressive loading (48 to 72 cards) work; routing test passed and build OK. Existing header-brand hydration warnings observed; shared header/data loading untouched by this presentation-only request.
