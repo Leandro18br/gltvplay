@@ -79,3 +79,17 @@ describe("resumable indexing", () => {
     expect(p.pending).toBe(false);
   });
 });
+
+import { vi } from "vitest";
+vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
+describe("bulk import retries", async () => {
+  const { withRetry } = await import("./m3u.server");
+  it("retries temporary failures (timeout, 429) and stops at once on permanent data errors", async () => {
+    let calls = 0;
+    const ok = await withRetry(async () => (++calls < 3 ? { error: { message: "canceling statement due to statement timeout" } } : { error: null, data: 1 }));
+    expect(ok.error).toBeNull(); expect(calls).toBe(3);
+    calls = 0;
+    const bad = await withRetry(async () => { calls++; return { error: { message: "violates check constraint" } }; });
+    expect(bad.error).toBeTruthy(); expect(calls).toBe(1);
+  });
+});
