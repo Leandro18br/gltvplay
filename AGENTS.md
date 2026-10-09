@@ -35,3 +35,4 @@
 - Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: keep presentation ordering independent of source and episode logic.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modernize presentation without changing source authorization, history, provider behavior or channel playback.
 - Non-Home movie/series lists use CardGrid/GridSection with shared responsive tracks; Home and channel carousels retain Row. Why: wrapping without data changes.
+- Direct MPEG-TS (.ts) URLs play through mpegts.js via `src/lib/playback/mpegts.ts` (lazy import, destroyed on source change), URL unchanged; HLS/MP4/embeds keep their paths. Why: browsers cannot play raw MPEG-TS in <video>.
