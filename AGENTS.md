@@ -35,3 +35,5 @@
 - Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: layout independent of source logic.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
 - Non-Home movie/series lists use CardGrid with server paging (exact count + range, id tie-breaker, page in URL, Pager); Home/channel carousels keep Row. Why: whole catalog reachable without loading it all.
+- Sync-failure AI diagnosis runs server-side in `src/lib/integrations/diagnose.functions.ts` (staff-only, URLs/credentials redacted before sending, read-only advice). Why: secrets never reach the model and AI never changes data.
+- Episode covers: "Atualizar episódios" replaces missing/HTTP/malformed/wrong-episode TMDB stills matched by series TMDB id + season + episode number, keeping custom HTTPS images; displays pass URLs through `safeImageUrl`. Why: HTTP stills are blocked on the HTTPS site.
