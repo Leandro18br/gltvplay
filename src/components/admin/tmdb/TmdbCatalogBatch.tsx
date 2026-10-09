@@ -21,6 +21,10 @@ export function TmdbCatalogBatch() {
       while(job&&job.phase!=="done"&&!stop.current) {
         job=await step({data:{id:job.id}});
         qc.setQueryData(["admin","tmdb-catalog-2026"],job);
+         if(job.phase==="discover"&&!stop.current) {
+           job=await step({data:{id:job.id,work:"import"}});
+           qc.setQueryData(["admin","tmdb-catalog-2026"],job);
+         }
         await new Promise(resolve=>setTimeout(resolve,150));
       }
       await qc.invalidateQueries({queryKey:["admin"]});await qc.invalidateQueries({queryKey:["catalog"]});
