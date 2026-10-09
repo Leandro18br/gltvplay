@@ -32,6 +32,6 @@
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
 
 - Integration (MegaEmbed, M3U) and playback-format rules live in `src/lib/integrations/AGENTS.md` and `src/lib/playback/AGENTS.md`. Why: directory-scoped detail.
-- Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: keep presentation ordering independent of source and episode logic.
-- Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modernize presentation without changing source authorization, history, provider behavior or channel playback.
+- Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: layout independent of source logic.
+- Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
 - Non-Home movie/series lists use CardGrid/GridSection with shared responsive tracks; Home and channel carousels retain Row. Why: wrapping without data changes.
