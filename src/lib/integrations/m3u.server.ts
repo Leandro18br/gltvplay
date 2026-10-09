@@ -95,79 +95,197 @@ function seriesRow(listId: string, gen: number, e: M3uEntry) {
   };
 }
 
+/* ---------------------------- snapshot ---------------------------- */
+// The list server may not support HTTP Range: resuming then re-downloads the whole prefix on every step
+// (quadratic traffic; steps near the end hit timeouts). So each sync first copies the list ONCE into a
+// private, service-role-only bucket in fixed parts; all reading then resumes with Range on that copy.
+const SNAP_BUCKET = "m3u-snapshots";
+const PART = 20 * 1024 * 1024;
+const LEASE_MS = 120_000;
+const snapPath = (listId: string, gen: number, p: number) => `${listId}/${gen}-${p}`;
+const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+
+async function setFlags(listId: string, flags: any, extra: Record<string, unknown> = {}) {
+  await withRetry(() => db.from("m3u_lists").update({ index_flags: flags, ...extra }).eq("id", listId));
+}
+
+async function removeSnapshot(listId: string) {
+  const { data } = await db.storage.from(SNAP_BUCKET).list(listId, { limit: 1000 });
+  const paths = ((data ?? []) as any[]).map((f) => `${listId}/${f.name}`);
+  if (paths.length) await db.storage.from(SNAP_BUCKET).remove(paths);
+}
+
+/** Downloads the full list once, uploading fixed-size parts and hashing them (for change detection). */
+async function snapshotStep(listId: string, url: string, gen: number, flags: any) {
+  await removeSnapshot(listId);
+  const { res } = await openList(url, 0, 120_000);
+  const reader = res.body!.getReader();
+  let buf = new Uint8Array(PART), fill = 0, parts = 0, size = 0;
+  const hashes: string[] = [];
+  const upload = async (bytes: Uint8Array) => {
+    if (parts === 0) {
+      const head = new TextDecoder().decode(bytes.subarray(0, 4096)).replace(/^\uFEFF/, "").trimStart();
+      if (!head.startsWith("#EXT")) throw new Error(INVALID);
+    }
+    hashes.push(hex(await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>)));
+    let r: any;
+    for (let i = 0; i < 3; i++) {
+      r = await db.storage.from(SNAP_BUCKET).upload(snapPath(listId, gen, parts), bytes, { upsert: true, contentType: "text/plain" });
+      if (!r.error) break;
+      await new Promise((x) => setTimeout(x, 800 * 2 ** i));
+    }
+    if (r.error) throw new Error(`Falha ao salvar a cópia da lista: ${msg(r.error)}`);
+    parts++;
+    await setFlags(listId, { ...flags, snapBytes: size, lease: flags.lease });
+  };
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      let chunk = value as Uint8Array;
+      size += chunk.length;
+      while (chunk.length) {
+        const n = Math.min(PART - fill, chunk.length);
+        buf.set(chunk.subarray(0, n), fill); fill += n; chunk = chunk.subarray(n);
+        if (fill === PART) { await upload(buf); buf = new Uint8Array(PART); fill = 0; }
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message === INVALID) throw e;
+    throw new Error(`A leitura da lista foi interrompida (${msg(e)}). Nada foi alterado; tente novamente.`);
+  } finally { reader.cancel().catch(() => {}); }
+  if (fill) await upload(buf.subarray(0, fill));
+  if (!size) throw new Error(INVALID);
+  const hash = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashes.join(""))));
+  return { parts, size, hash };
+}
+
+/** A Response streaming the snapshot from `offset` (Range inside the first part, then whole parts). */
+async function openSnapshot(listId: string, gen: number, snap: { parts: number; size: number }, offset: number) {
+  let p = Math.floor(offset / PART), within = offset % PART;
+  async function* chunks() {
+    for (; p < snap.parts; p++) {
+      const s = await db.storage.from(SNAP_BUCKET).createSignedUrl(snapPath(listId, gen, p), 600);
+      if (s.error || !s.data?.signedUrl) throw new Error(`Cópia da lista indisponível (${msg(s.error)}); clique em Sincronizar para recomeçar.`);
+      const r = await fetch(s.data.signedUrl, { headers: within ? { Range: `bytes=${within}-` } : {}, signal: AbortSignal.timeout(60_000) });
+      if (!r.ok || !r.body || (within && r.status !== 206)) throw new Error(`Falha ao ler a cópia da lista (HTTP ${r.status}).`);
+      const rd = r.body.getReader();
+      for (;;) { const { value, done } = await rd.read(); if (done) break; yield value as Uint8Array; }
+      within = 0;
+    }
+  }
+  const it = chunks();
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(c) { const { value, done } = await it.next(); if (done) c.close(); else c.enqueue(value); },
+    cancel() { void it.return(undefined); },
+  });
+  return { res: new Response(stream), ranged: true, total: snap.size };
+}
+
 /**
- * One indexing step. Reads from the saved checkpoint, upserts entries in batches of
- * `index_batch_size`, saves the checkpoint after every batch, and stops after a short budget.
- * Never touches movies/series/channels. Call repeatedly until `done`.
+ * One indexing step, in stages persisted in `index_flags.phase`:
+ * snapshot (one full download) → read (batched upserts, checkpoint per batch) → finalize (chunked RPCs).
+ * Unchanged lists (same content hash as the last completed sync) finish right after the snapshot.
+ * A lease prevents two windows from running the same list. Never touches movies/series/channels
+ * except refreshing links of already-imported content in finalize.
  */
-export async function indexStep(listId: string, restart: boolean) {
+export async function indexStep(listId: string, restart: boolean, runner = "legacy", force = false) {
   const { data: list } = await db.from("m3u_lists").select("*").eq("id", listId).maybeSingle();
   if (!list) throw new Error("Lista não encontrada");
   if (!list.is_active) throw new Error("Ative a lista antes de sincronizar");
   const url = await listUrl(listId);
   let gen: number = list.index_gen, offset: number = Number(list.index_offset), entries: number = list.index_entries;
   let flags: any = list.index_flags ?? {};
+  const now = Date.now();
+  if (flags.running && flags.lease && flags.lease.id !== runner && flags.lease.until > now)
+    throw new Error("Esta sincronização já está em andamento em outra janela. Aguarde ou tente em 2 minutos.");
+  const lease = { id: runner, until: now + LEASE_MS };
+  const prevHash: string | undefined = list.sync_state === "indexed" ? list.index_flags?.hash : undefined;
   if (restart || !flags.running) {
-    gen += 1; offset = 0; entries = 0; flags = { running: true };
+    gen += 1; offset = 0; entries = 0; flags = { running: true, phase: "snapshot", prevHash, force, lease };
     await db.from("m3u_lists").update({ sync_state: "indexing", sync_started_at: new Date().toISOString(), last_error: null, index_gen: gen, index_offset: 0, index_entries: 0, index_flags: flags }).eq("id", listId);
   } else {
-    await db.from("m3u_lists").update({ sync_state: "indexing", last_error: null }).eq("id", listId);
+    flags.lease = lease;
+    await db.from("m3u_lists").update({ sync_state: "indexing", last_error: null, index_flags: flags }).eq("id", listId);
   }
-  if (flags.phase === "finalize") {
-    try { return await finalizeStep(listId, gen, flags, entries); }
-    catch (e) { await db.from("m3u_lists").update({ sync_state: "error", last_error: msg(e).slice(0, 500) }).eq("id", listId); throw e; }
-  }
+  const fail = async (e: unknown) => {
+    console.error("[m3u] step failed:", flags.phase, msg(e));
+    // Checkpoint is kept: the next call resumes from the last confirmed stage/batch.
+    await db.from("m3u_lists").update({ sync_state: "error", last_error: msg(e).slice(0, 500), index_flags: { ...flags, lease: null } }).eq("id", listId);
+    throw e;
+  };
+  try {
+    if (flags.phase === "snapshot") {
+      const snap = await snapshotStep(listId, url, gen, flags);
+      if (snap.hash === flags.prevHash && !flags.force) {
+        await removeSnapshot(listId);
+        await db.from("m3u_lists").update({ sync_state: "indexed", last_synced_at: new Date().toISOString(), last_error: null, index_offset: 0, index_gen: gen - 1, index_flags: { ...(list.index_flags ?? {}), running: undefined, hash: snap.hash } }).eq("id", listId);
+        return { done: true as const, phase: "done" as const, unchanged: true, entries: list.total_items as number, offset: 0, total: snap.size };
+      }
+      flags = { running: true, phase: "read", snap, lease };
+      await setFlags(listId, flags, { index_total_bytes: snap.size, index_range: true });
+      return { done: false as const, phase: "read" as const, entries: 0, offset: 0, total: snap.size };
+    }
+    if (flags.phase === "finalize") return await finalizeStep(listId, gen, flags, entries);
+    return await readStep(listId, list, url, gen, offset, entries, flags);
+  } catch (e) { return await fail(e); }
+}
+
+async function readStep(listId: string, list: any, url: string, gen: number, offset: number, entries: number, flags: any) {
   const started = Date.now();
   const batchSize: number = list.index_batch_size ?? 500;
-  try {
-    const { res, ranged, total } = await openList(url, offset, 120_000);
-    const parser = createParser({ m3u: flags.m3u, plus: flags.plus });
-    const batch = new Map<string, any>();
-    let safe = offset, stepEntries = 0, ext = offset > 0, finished = true, processStart = 0;
-    const flush = async () => {
-      if (!batch.size) return;
-      const rows = [...batch.values()]; batch.clear();
-      let r = await db.from("m3u_items").upsert(rows, { onConflict: "list_id,ext_key" });
-      if (r.error) r = await db.from("m3u_items").upsert(rows, { onConflict: "list_id,ext_key" }); // one retry
-      if (r.error) throw new Error(`Falha ao gravar um lote do catálogo: ${r.error.message}`);
+  // Lists started before snapshots existed keep reading from the source.
+  const { res, ranged, total } = flags.snap ? await openSnapshot(listId, gen, flags.snap, offset) : await openList(url, offset, 120_000);
+  const parser = createParser({ m3u: flags.m3u, plus: flags.plus });
+  const batch = new Map<string, any>();
+  let safe = offset, stepEntries = 0, ext = offset > 0, finished = true, processStart = 0;
+  const flush = async () => {
+    if (!batch.size) return;
+    const rows = [...batch.values()]; batch.clear();
+    // Adaptive: a batch that hits the database time limit is split in halves instead of failing the sync.
+    const put = async (part: any[]): Promise<void> => {
+      const r = await withRetry(() => db.from("m3u_items").upsert(part, { onConflict: "list_id,ext_key" }), 2);
+      if (!r.error) return;
+      if (TRANSIENT.test(msg(r.error)) && part.length > 25) { const h = Math.ceil(part.length / 2); await put(part.slice(0, h)); await put(part.slice(h)); return; }
+      throw new Error(`Falha ao gravar um lote do catálogo: ${r.error.message}`);
     };
-    const save = (o: number) => db.from("m3u_lists").update({
-      index_offset: o, index_entries: entries, index_flags: { running: true, m3u: parser.isM3u, plus: parser.isPlus },
-      index_total_bytes: total ?? list.index_total_bytes, ...(offset > 0 ? { index_range: ranged } : {}),
-    }).eq("id", listId);
-
-    for await (const l of lines(res, offset, ranged ? 0 : offset)) {
-      if (!processStart) processStart = Date.now(); // skipped prefix (if any) costs network time, not parsing
-      if (!ext) { if (l.text.trim().startsWith("#EXT")) ext = true; else if (l.end > 4096) throw new Error(INVALID); }
-      const e = parser.line(l.text);
-      if (e && e !== "skip") {
-        entries++; stepEntries++;
-        const row = itemRow(listId, gen, e); batch.set(row.ext_key, row);
-        if (e.kind === "episode") { const s = seriesRow(listId, gen, e); if (!batch.has(s.ext_key)) batch.set(s.ext_key, s); }
-      }
-      if (!parser.pending) safe = l.end;
-      if (batch.size >= batchSize && !parser.pending) {
-        await flush(); await save(safe);
-        if (Date.now() - processStart > STEP_MS || Date.now() - started > STEP_WALL_MS || stepEntries >= STEP_MAX_ENTRIES) { finished = false; break; }
-      }
+    await put(rows);
+  };
+  const save = (o: number) => {
+    flags = { ...flags, m3u: parser.isM3u, plus: parser.isPlus, lease: { ...flags.lease, until: Date.now() + LEASE_MS } };
+    return withRetry(() => db.from("m3u_lists").update({
+      index_offset: o, index_entries: entries, index_flags: flags,
+      index_total_bytes: total ?? list.index_total_bytes, ...(offset > 0 && !flags.snap ? { index_range: ranged } : {}),
+    }).eq("id", listId));
+  };
+  for await (const l of lines(res, offset, ranged ? 0 : offset)) {
+    if (!processStart) processStart = Date.now();
+    if (!ext) { if (l.text.replace(/^\uFEFF/, "").trim().startsWith("#EXT")) ext = true; else if (l.end > 4096) throw new Error(INVALID); }
+    const e = parser.line(l.text);
+    if (e && e !== "skip") {
+      entries++; stepEntries++;
+      const row = itemRow(listId, gen, e); batch.set(row.ext_key, row);
+      if (e.kind === "episode") { const s = seriesRow(listId, gen, e); if (!batch.has(s.ext_key)) batch.set(s.ext_key, s); }
     }
-    if (!finished) return { done: false as const, phase: "read" as const, entries, offset: safe, total: total ?? list.index_total_bytes ?? null };
-    await flush();
-    if (!ext || (!parser.isM3u && entries === 0)) throw new Error(INVALID);
-    flags = { running: true, phase: "finalize", cursor: 0, checked: 0, counts: { movie: 0, series: 0, episode: 0, channel: 0, missing: 0 }, m3u: parser.isM3u, plus: parser.isPlus };
-    await db.from("m3u_lists").update({ index_offset: safe, index_entries: entries, index_flags: flags, detected_type: parser.isPlus ? "m3u_plus" : "m3u" }).eq("id", listId);
-    return await finalizeStep(listId, gen, flags, entries);
-  } catch (e) {
-    // Checkpoint is kept: the next call resumes from the last saved batch.
-    await db.from("m3u_lists").update({ sync_state: "error", last_error: msg(e).slice(0, 500) }).eq("id", listId);
-    throw e;
+    if (!parser.pending) safe = l.end;
+    if (batch.size >= batchSize && !parser.pending) {
+      await flush(); await save(safe);
+      if (Date.now() - processStart > STEP_MS || Date.now() - started > STEP_WALL_MS || stepEntries >= STEP_MAX_ENTRIES) { finished = false; break; }
+    }
   }
+  if (!finished) return { done: false as const, phase: "read" as const, entries, offset: safe, total: total ?? list.index_total_bytes ?? null };
+  await flush();
+  if (!ext || (!parser.isM3u && entries === 0)) throw new Error(INVALID);
+  flags = { running: true, phase: "finalize", cursor: 0, checked: 0, counts: { movie: 0, series: 0, episode: 0, channel: 0, missing: 0 }, m3u: parser.isM3u, plus: parser.isPlus, hash: flags.snap?.hash, lease: flags.lease };
+  await db.from("m3u_lists").update({ index_offset: safe, index_entries: entries, index_flags: flags, detected_type: parser.isPlus ? "m3u_plus" : "m3u" }).eq("id", listId);
+  await removeSnapshot(listId); // reading is complete; finalize only uses m3u_items
+  return { done: false as const, phase: "finalize" as const, entries, checked: 0, offset: 0, total: null };
 }
 
 const FINAL_CHUNK = 20_000;
 const FINAL_MS = 20_000;
 const SRC_CHUNK = 300;
-/** Closing phase, also chunked: flags vanished entries, recounts, refreshes sources of imported content. */
+/** Closing phase, also chunked: flags vanished entries (only after a complete read), recounts, refreshes sources of imported content. */
 async function finalizeStep(listId: string, gen: number, flags: any, entries: number) {
   const started = Date.now();
   while (!flags.sources && Date.now() - started < FINAL_MS) {
@@ -176,7 +294,8 @@ async function finalizeStep(listId: string, gen: number, flags: any, entries: nu
     const c = r.data as Record<string, number>;
     for (const k of ["movie", "series", "episode", "channel", "missing"]) flags.counts[k] += Number(c[k] ?? 0);
     flags.cursor = Number(c["next"]); flags.checked += Number(c["rows"]);
-    await db.from("m3u_lists").update({ index_flags: flags }).eq("id", listId);
+    flags.lease = { ...flags.lease, until: Date.now() + LEASE_MS };
+    await setFlags(listId, flags);
     if (Number(c["rows"]) < FINAL_CHUNK) { flags.sources = true; break; }
   }
   // Refresh links of imported content in small resumable chunks (one big UPDATE hit the statement timeout).
@@ -184,26 +303,37 @@ async function finalizeStep(listId: string, gen: number, flags: any, entries: nu
     const size: number = flags.srcSize ?? SRC_CHUNK;
     const r = await withRetry(() => db.rpc("m3u_finalize_sources_chunk", { _list: listId, _gen: gen, _after: flags.srcCursor ?? null, _limit: size }), 2);
     if (r.error) {
-      // Adaptive: a slow chunk (many changed links + audit rows) is retried smaller instead of failing the sync.
-      if (TRANSIENT.test(msg(r.error)) && size > 50) { flags.srcSize = Math.max(50, Math.floor(size / 2)); await db.from("m3u_lists").update({ index_flags: flags }).eq("id", listId); continue; }
+      if (TRANSIENT.test(msg(r.error)) && size > 50) { flags.srcSize = Math.max(50, Math.floor(size / 2)); await setFlags(listId, flags); continue; }
       throw new Error(`Falha ao atualizar as fontes importadas: ${msg(r.error)}`);
     }
     const c = r.data as Record<string, any>;
     if (Number(c["rows"]) === size && size < SRC_CHUNK) flags.srcSize = Math.min(SRC_CHUNK, size * 2);
     flags.srcChecked = (flags.srcChecked ?? 0) + Number(c["rows"]);
     if (c["last"]) flags.srcCursor = c["last"];
-    await db.from("m3u_lists").update({ index_flags: flags }).eq("id", listId);
+    flags.lease = { ...flags.lease, until: Date.now() + LEASE_MS };
+    await setFlags(listId, flags);
     if (Number(c["rows"]) < size) {
       const k = flags.counts;
       await db.from("m3u_lists").update({
         sync_state: "indexed", last_synced_at: new Date().toISOString(), last_error: null, index_offset: 0, index_entries: entries,
-        index_flags: { m3u: flags.m3u, plus: flags.plus }, movies_count: k.movie, series_count: k.series, episodes_count: k.episode,
+        index_flags: { m3u: flags.m3u, plus: flags.plus, hash: flags.hash, missing: k.missing }, movies_count: k.movie, series_count: k.series, episodes_count: k.episode,
         channels_count: k.channel, total_items: k.movie + k.episode + k.channel,
       }).eq("id", listId);
       return { done: true as const, phase: "done" as const, entries, counts: k as Record<string, number>, offset: 0, total: null };
     }
   }
   return { done: false as const, phase: "finalize" as const, entries, checked: (flags.checked + (flags.srcChecked ?? 0)) as number, offset: 0, total: null };
+}
+
+/** Real counts of the M3U catalog for the admin panel (totals come from the last completed sync). */
+export async function stats(listId: string) {
+  const [{ data: list }, r] = await Promise.all([
+    db.from("m3u_lists").select("total_items,index_flags").eq("id", listId).maybeSingle(),
+    withRetry(() => db.rpc("m3u_stats", { _list: listId })),
+  ]);
+  const total = Number(list?.total_items ?? 0), missing = Number(list?.index_flags?.missing ?? 0);
+  const imported = r.error ? null : Number((r.data as any).imported), errors = r.error ? null : Number((r.data as any).errors);
+  return { total, imported, errors, missing, pending: imported == null ? null : Math.max(0, total - imported - missing) };
 }
 
 /* ------------------------------ explore ------------------------------ */
@@ -247,6 +377,12 @@ export async function groups(listId: string, kind: string) {
 export async function pickIds(f: ExploreFilter, limit: number) {
   const r = await filtered(db.from("m3u_items").select("id"), { ...f, status: "not_imported" }).order("title_norm").order("id").limit(limit);
   if (r.error) throw new Error("Não foi possível selecionar os itens");
+  return (r.data ?? []).map((x: any) => x.id as number);
+}
+
+export async function pickErrorIds(listId: string, limit: number) {
+  const r = await db.from("m3u_items").select("id").eq("list_id", listId).neq("kind", "episode").is("content_id", null).not("import_error", "is", null).order("id").limit(limit);
+  if (r.error) throw new Error("Não foi possível selecionar os itens com erro");
   return (r.data ?? []).map((x: any) => x.id as number);
 }
 

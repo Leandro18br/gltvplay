@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Download, Loader2, RotateCcw, Search, Square } from "lucide-react";
 const IMPORT_CONCURRENCY = 3;
-import { exploreM3u, m3uGroups, pickM3uItems, importM3uItems } from "@/lib/integrations/m3u.functions";
+import { exploreM3u, m3uGroups, pickM3uItems, importM3uItems, pickM3uErrors } from "@/lib/integrations/m3u.functions";
 import { errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ const n = (x: number) => x.toLocaleString("pt-BR");
 
 export function M3uExplorer({ list, onClose }: { list: { id: string; name: string }; onClose: () => void }) {
   const qc = useQueryClient();
-  const explore = useServerFn(exploreM3u), loadGroups = useServerFn(m3uGroups), pick = useServerFn(pickM3uItems), imp = useServerFn(importM3uItems);
+  const explore = useServerFn(exploreM3u), loadGroups = useServerFn(m3uGroups), pick = useServerFn(pickM3uItems), imp = useServerFn(importM3uItems), pickErr = useServerFn(pickM3uErrors);
   const [kind, setKind] = useState<Kind>("all");
   const [status, setStatus] = useState<Status>("all");
   const [group, setGroup] = useState<string>("");
@@ -73,7 +73,7 @@ export function M3uExplorer({ list, onClose }: { list: { id: string; name: strin
     };
     await Promise.all(Array.from({ length: IMPORT_CONCURRENCY }, worker));
     p.running = false; setProg({ ...p }); setSel(new Set());
-    qc.invalidateQueries({ queryKey: ["admin", "m3u-explore"] });
+    qc.invalidateQueries({ queryKey: ["admin", "m3u-explore"] }); qc.invalidateQueries({ queryKey: ["admin", "m3u-stats"] });
     toast[p.errors ? "warning" : "success"](stop.current ? "Importação interrompida." : `Importação concluída: ${p.done} importados, ${p.skipped} ignorados, ${p.errors} erros.`);
   }
 
@@ -82,6 +82,15 @@ export function M3uExplorer({ list, onClose }: { list: { id: string; name: strin
       const ids = await pick({ data: { ...f, limit: lot } });
       if (!ids.length) { toast.info("Nenhum conteúdo não importado com esses filtros."); return; }
       if (!confirm(`Importar ${ids.length} conteúdo(s) com os filtros atuais? A importação acontece em pequenos lotes.`)) return;
+      await runImport(ids);
+    } catch (e) { toast.error(errMsg(e)); }
+  }
+
+  async function retryErrors() {
+    try {
+      const ids = await pickErr({ data: { listId: list.id, limit: lot } });
+      if (!ids.length) { toast.info("Nenhum item com erro para reprocessar."); return; }
+      if (!confirm(`Reprocessar somente ${ids.length} item(ns) que falharam?`)) return;
       await runImport(ids);
     } catch (e) { toast.error(errMsg(e)); }
   }
@@ -111,6 +120,7 @@ export function M3uExplorer({ list, onClose }: { list: { id: string; name: strin
                 <select aria-label="Tamanho do lote" className="sm:col-span-2 h-9 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-sm lg:w-auto" value={lot} onChange={e => setLot(Number(e.target.value) as typeof lot)} disabled={running}>
                   {[50, 100, 250, 500].map(x => <option key={x} value={x}>{x} por operação</option>)}</select>
                 <Button size="sm" variant="outline" disabled={running} onClick={importLot}><Download /> Importar por lote</Button>
+                <Button size="sm" variant="outline" disabled={running} onClick={retryErrors}><RotateCcw /> Reprocessar com erro</Button>
                 <Button size="sm" disabled={running || !sel.size} onClick={() => runImport([...sel])}><Download /> Importar selecionados ({sel.size})</Button>
               </div>
             </div>

@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Download, ListVideo, Loader2, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Wifi } from "lucide-react";
+import { Download, ListVideo, Loader2, Pause, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Wifi } from "lucide-react";
 import { db, errMsg } from "@/lib/admin/db";
-import { saveM3uList, testM3uList, indexM3uStep } from "@/lib/integrations/m3u.functions";
+import { saveM3uList, testM3uList, indexM3uStep, m3uStats } from "@/lib/integrations/m3u.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,13 +15,38 @@ import { M3uExplorer } from "./M3uExplorer";
 import { DiagnoseDialog } from "./DiagnoseDialog";
 import { fmtDate } from "./shared";
 
-type List = { id: string; name: string; list_type: string; detected_type: string | null; url_hint: string | null; is_active: boolean; enrich_tmdb: boolean; sync_state: string; last_synced_at: string | null; last_error: string | null; movies_count: number; series_count: number; episodes_count: number; channels_count: number; total_items: number; index_entries: number; index_offset: number; index_total_bytes: number | null; index_flags: { running?: boolean } | null; index_batch_size: number };
+type List = { id: string; name: string; list_type: string; detected_type: string | null; url_hint: string | null; is_active: boolean; enrich_tmdb: boolean; sync_state: string; last_synced_at: string | null; last_error: string | null; movies_count: number; series_count: number; episodes_count: number; channels_count: number; total_items: number; index_entries: number; index_offset: number; index_total_bytes: number | null; index_flags: { running?: boolean; phase?: string; snapBytes?: number; snap?: { size: number }; checked?: number; srcChecked?: number; lease?: { until: number } | null } | null; index_batch_size: number };
 const STATE: Record<string, string> = { idle: "Não indexada", indexing: "Indexando", indexed: "Catálogo indexado", error: "Erro", done: "Catálogo indexado" };
 const n = (x: number) => Number(x ?? 0).toLocaleString("pt-BR");
+const mb = (x: number) => `${(Number(x ?? 0) / 1048576).toFixed(0)} MB`;
+/** Stable per browser tab (survives reloads), so a reloaded tab can resume its own lease. */
+function runnerId() {
+  let id = sessionStorage.getItem("m3u-runner");
+  if (!id) { id = crypto.randomUUID(); sessionStorage.setItem("m3u-runner", id); }
+  return id;
+}
+/** Real stage and percentage from the persisted checkpoint (works after reopening the panel). */
+export function stageOf(l: Pick<List, "index_flags" | "index_offset" | "index_total_bytes" | "index_entries">) {
+  const f = l.index_flags;
+  if (!f?.running) return null;
+  if (f.phase === "snapshot") return { label: `Etapa 1 de 3 — Baixando a lista (${mb(f.snapBytes ?? 0)})`, pct: null as number | null };
+  if (f.phase === "finalize") {
+    const done = (f.checked ?? 0) + (f.srcChecked ?? 0);
+    return { label: `Etapa 3 de 3 — Conferindo itens e links (${n(done)})`, pct: l.index_entries ? Math.min(99, Math.floor((Math.min(done, l.index_entries) / l.index_entries) * 100)) : null };
+  }
+  const total = f.snap?.size ?? l.index_total_bytes;
+  return { label: `Etapa 2 de 3 — Lendo e salvando (${n(l.index_entries)} itens)`, pct: total ? Math.min(99, Math.floor((Number(l.index_offset) / total) * 100)) : null };
+}
 
 export function M3uListsCard() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["admin", "m3u"], queryFn: async () => { const r = await db.from("m3u_lists").select("*").order("created_at"); if (r.error) throw r.error; return r.data as unknown as List[]; } });
+  const q = useQuery({
+    queryKey: ["admin", "m3u"],
+    queryFn: async () => { const r = await db.from("m3u_lists").select("*").order("created_at"); if (r.error) throw r.error; return r.data as unknown as List[]; },
+    // While any sync is running (here or in another window) the panel reads the real persisted state.
+    refetchInterval: (query) => ((query.state.data as List[] | undefined)?.some(l => l.index_flags?.running) ? 3000 : false),
+  });
+  const stop = useRef<Record<string, boolean>>({});
   const test = useServerFn(testM3uList), step = useServerFn(indexM3uStep);
   const [edit, setEdit] = useState<List | "new" | null>(null);
   const [explore, setExplore] = useState<List | null>(null);
@@ -41,8 +66,10 @@ export function M3uListsCard() {
   }
 
   /** Indexing runs as many short server steps; progress is checkpointed so it can resume. */
-  async function runIndex(l: List, restart: boolean) {
+  async function runIndex(l: List, restart: boolean, force = false) {
     setB(l.id, "Conectando…");
+    stop.current[l.id] = false;
+    const runner = runnerId();
     setResult(x => { const y = { ...x }; delete y[l.id]; return y; });
     try {
       let first = true;
@@ -50,17 +77,17 @@ export function M3uListsCard() {
         let r: Awaited<ReturnType<typeof step>> | undefined;
         // Temporary failures (timeouts, network) are retried with backoff from the saved checkpoint.
         for (let attempt = 0; ; attempt++) {
-          try { r = await step({ data: { listId: l.id, restart: restart && first } }); } catch (e) { r = { ok: false as const, error: errMsg(e) }; }
+          try { r = await step({ data: { listId: l.id, restart: restart && first, runner, force } }); } catch (e) { r = { ok: false as const, error: errMsg(e) }; }
           if (r.ok || attempt >= 4 || !/timeout|canceling statement|fetch|network|conexão|50[234]|429/i.test(r.error)) break;
           setB(l.id, `Falha temporária, tentando novamente (${attempt + 1}/4)…`);
           await new Promise(res => setTimeout(res, 2000 * 2 ** attempt));
         }
         first = false;
         if (!r.ok) throw new Error(r.error);
-        const pct = r.total ? ` (${Math.min(99, Math.floor(((r.offset ?? 0) / r.total) * 100))}%)` : "";
-        setB(l.id, r.phase === "finalize" ? `Finalizando… ${n(("checked" in r ? r.checked : 0) ?? 0)} itens conferidos` : `Indexando… ${n(r.entries)} itens lidos${pct}`);
-        if (r.done) { toast.success("Catálogo M3U indexado. Agora é só explorar e importar."); break; }
+        if (r.done) { toast.success("unchanged" in r && r.unchanged ? "A lista não mudou desde a última sincronização — nada precisou ser reprocessado." : "Catálogo M3U indexado. Agora é só explorar e importar."); break; }
+        setB(l.id, "Em andamento");
         refresh();
+        if (stop.current[l.id]) { toast.info("Sincronização pausada. O progresso foi salvo."); break; }
       }
     } catch (e) { const m = e instanceof Error ? e.message : errMsg(e); toast.error(m); setResult(x => ({ ...x, [l.id]: `Erro: ${m} — o progresso foi salvo; clique em "Continuar indexação".` })); }
     finally { setB(l.id); refresh(); }
@@ -99,13 +126,22 @@ export function M3uListsCard() {
                 {indexed && !resumable && <p className="mt-1 text-xs text-primary">{l.detected_type && "✓ Lista conectada · "}✓ Catálogo indexado · ✓ Pronto para importação</p>}
                 {resumable && !busy[l.id] && <p className="mt-1 text-xs text-primary">Indexação pausada em {n(l.index_entries)} itens. Clique em "Continuar indexação" — ela continua de onde parou.</p>}
                 {l.last_error && l.sync_state === "error" && !busy[l.id] && <p className="mt-1 text-xs text-destructive">{l.last_error}</p>}
-                {busy[l.id] && <p className="mt-1 flex items-center gap-1 text-xs text-primary"><Loader2 className="size-3 shrink-0 animate-spin" />{busy[l.id]}</p>}
+                {(() => { const st = stageOf(l); const other = resumable && !busy[l.id] && (l.index_flags?.lease?.until ?? 0) > Date.now(); if (!st || (!busy[l.id] && !other)) return null; return (
+                  <div className="mt-2 max-w-2xl min-w-0 space-y-1">
+                    <p className="flex items-center gap-1 text-xs text-primary"><Loader2 className="size-3 shrink-0 animate-spin" />{st.label}{st.pct != null ? ` · ${st.pct}%` : ""}{other ? " · em andamento em outra janela" : ""}</p>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className={`h-full bg-primary transition-all ${st.pct == null ? "w-1/3 animate-pulse" : ""}`} style={st.pct != null ? { width: `${st.pct}%` } : undefined} /></div>
+                    {busy[l.id] && busy[l.id] !== "Em andamento" && <p className="text-xs text-muted-foreground">{busy[l.id]}</p>}
+                  </div>); })()}
+                {busy[l.id] && !stageOf(l) && <p className="mt-1 flex items-center gap-1 text-xs text-primary"><Loader2 className="size-3 shrink-0 animate-spin" />{busy[l.id]}</p>}
+                {indexed && <ListStats listId={l.id} key={`${l.id}-${l.last_synced_at}`} />}
                 {result[l.id] && <p className="mt-1 whitespace-pre-line text-xs">{result[l.id]}</p>}
               </div>
               <div className="grid min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap [&>button]:h-9 [&>button]:min-w-0 [&>button]:max-w-full [&>button]:whitespace-normal [&>button]:leading-tight">
                 <Button size="sm" variant="outline" disabled={!!busy[l.id]} onClick={() => runTest(l)}><Wifi /> Testar conexão</Button>
+                {busy[l.id] && <Button size="sm" variant="secondary" onClick={() => { stop.current[l.id] = true; setB(l.id, "Pausando ao fim da etapa atual…"); }}><Pause /> Pausar</Button>}
                 {resumable && <Button size="sm" disabled={!!busy[l.id] || !l.is_active} onClick={() => runIndex(l, false)}><RefreshCw /> Continuar indexação</Button>}
                 <Button size="sm" variant="outline" disabled={!!busy[l.id] || !l.is_active} onClick={() => (!resumable || confirm("Recomeçar a indexação do início?")) && runIndex(l, true)}><RefreshCw /> Sincronizar</Button>
+                {indexed && !resumable && <Button size="sm" variant="ghost" disabled={!!busy[l.id] || !l.is_active} onClick={() => confirm("Reindexar a lista inteira mesmo que ela não tenha mudado?") && runIndex(l, true, true)}><RefreshCw /> Reindexar tudo</Button>}
                 <Button size="sm" variant="outline" disabled={!indexed && !resumable} onClick={() => setExplore(l)}><Search /> Explorar conteúdo</Button>
                 <Button size="sm" variant="outline" disabled={!indexed && !resumable} onClick={() => setExplore(l)}><Download /> Importar selecionados</Button>
                 <Button size="sm" variant="outline" disabled={!!busy[l.id]} onClick={() => setDiag(l)}><Sparkles /> Diagnosticar falhas (IA)</Button>
@@ -121,6 +157,14 @@ export function M3uListsCard() {
       {diag && <DiagnoseDialog listId={diag.id} name={diag.name} onClose={() => setDiag(null)} />}
     </div>
   );
+}
+
+function ListStats({ listId }: { listId: string }) {
+  const get = useServerFn(m3uStats);
+  const s = useQuery({ queryKey: ["admin", "m3u-stats", listId], queryFn: () => get({ data: { listId } }), staleTime: 30_000 });
+  if (!s.data) return null;
+  const d = s.data;
+  return <p className="mt-1 text-xs text-muted-foreground">No catálogo da lista: {n(d.total)} itens · Importados: {d.imported == null ? "—" : n(d.imported)} · Pendentes: {d.pending == null ? "—" : n(d.pending)} · Com erro: {d.errors == null ? "—" : n(d.errors)} · Indisponíveis: {n(d.missing)}</p>;
 }
 
 function ListDialog({ row, onClose, onSaved }: { row: List | null; onClose: () => void; onSaved: () => void }) {
