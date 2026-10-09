@@ -8,7 +8,7 @@ import { CardGrid, GridSkeleton } from "@/components/site/ContentCard";
 import { PagedGridSection } from "@/components/site/Pager";
 
 export const Route = createFileRoute("/buscar")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { q: string; pf?: number | undefined; ps?: number | undefined } => ({
     q: typeof s["q"] === "string" ? s["q"] : "",
     pf: Number.isInteger(Number(s["pf"])) && Number(s["pf"]) > 1 ? Number(s["pf"]) : undefined,
     ps: Number.isInteger(Number(s["ps"])) && Number(s["ps"]) > 1 ? Number(s["ps"]) : undefined,

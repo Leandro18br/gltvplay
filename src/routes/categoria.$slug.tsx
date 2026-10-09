@@ -9,7 +9,7 @@ import { PagedGridSection } from "@/components/site/Pager";
 const pageParam = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) > 1 ? Number(v) : undefined);
 
 export const Route = createFileRoute("/categoria/$slug")({
-  validateSearch: (s: Record<string, unknown>) => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]) }),
+  validateSearch: (s: Record<string, unknown>): { pf?: number | undefined; ps?: number | undefined } => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]) }),
   loader: async ({ context, params }) => {
     const d = await context.queryClient.ensureQueryData(categoryQuery(params.slug));
     if (!d) throw notFound();
