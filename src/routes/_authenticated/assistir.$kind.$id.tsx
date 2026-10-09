@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { Button } from "@/components/ui/button";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
 import { VideoPlayerFrame } from "@/components/site/VideoPlayerFrame";
+import { attachMpegTs, isMpegTsUrl } from "@/lib/playback/mpegts";
 
 type PKind = "movie" | "episode" | "channel";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
