@@ -1,3 +1,7 @@
+# Public catalog grids
+- [ ] Use responsive multi-row movie/series grids outside Home; preserve Home and channel carousels and all data behavior.
+- [ ] Verify Home, movies, series, category, search and related titles across phone, tablet and desktop sizes.
+
 # Home management
 - [x] Persist draft and published Home configurations with staff permissions, validation and audit.
 - [x] Build section/banner editor, drag ordering, filters, manual selection and device previews.
