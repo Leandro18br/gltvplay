@@ -10,6 +10,7 @@ import { errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { TmdbCatalogBatch } from "./TmdbCatalogBatch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -231,6 +232,7 @@ export function TmdbIntegrationCard() {
         </div>
         <Button size="sm" variant="outline" disabled={busy} onClick={async () => { setBusy(true); try { setRes(await test()); } catch (x) { setRes({ ok: false, message: errMsg(x) }); } finally { setBusy(false); } }}>{busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Testar conexão</Button>
       </div>
+      <TmdbCatalogBatch />
     </div>
   );
 }
