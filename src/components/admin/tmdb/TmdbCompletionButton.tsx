@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { tmdbRefresh, tmdbResolveContent, tmdbCompleteSeasonEpisodes } from "@/lib/tmdb/tmdb.functions";
+import { tmdbRefresh, tmdbResolveContent, tmdbCompleteSeasonEpisodes, tmdbSearch } from "@/lib/tmdb/tmdb.functions";
 import type { MatchCandidate } from "@/lib/tmdb/completion";
 import { db, errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
@@ -15,21 +16,34 @@ function invalidate(qc: ReturnType<typeof useQueryClient>) {
   ["movies", "series", "seasons", "episodes", "genres"].forEach((table) => qc.invalidateQueries({ queryKey: ["admin", table] }));
   qc.invalidateQueries({ queryKey: ["catalog"] });
 }
+const FIELD_LABEL: Record<string, string> = {
+  tmdb_id: "TMDB ID", imdb_id: "IMDb ID", title: "título", original_title: "título original", description: "sinopse",
+  release_date: "data de lançamento", first_air_date: "primeira exibição", release_year: "ano", duration_minutes: "duração",
+  poster_url: "pôster", backdrop_url: "banner", vote_average: "nota", vote_count: "avaliações", popularity: "popularidade",
+  tagline: "slogan", tmdb_status: "status", language: "idioma original", country: "país", number_of_seasons: "temporadas", number_of_episodes: "episódios",
+};
+const labels = (keys: string[] = []) => [...new Set(keys.filter((k) => FIELD_LABEL[k]).map((k) => FIELD_LABEL[k]))].join(", ");
 export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: {
   kind: Kind; id: string; disabled?: boolean; onDone?: (result: CompletionResult) => void | Promise<void>; onBusyChange?: (busy: boolean) => void;
 }) {
   const qc = useQueryClient();
   const resolve = useServerFn(tmdbResolveContent);
   const refresh = useServerFn(tmdbRefresh);
+  const search = useServerFn(tmdbSearch);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
+  const [query, setQuery] = useState("");
+  const [year, setYear] = useState("");
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const markBusy = (value: boolean) => { setBusy(value); onBusyChange?.(value); };
   async function apply(tmdbId: number) {
     const result = await refresh({ data: { kind, id, tmdbId } });
-    invalidate(qc); await onDone?.(result); setCandidates([]);
-    const text = `Informações atualizadas! ${result.filled} campos foram preenchidos.${result.genres ? ` ${result.genres} gênero(s) associado(s).` : ""}`;
-    setMessage({ text, error: false }); toast.success(text);
+    invalidate(qc); await onDone?.(result); setOpen(false); setCandidates([]);
+    const filled = labels(result.filledFields);
+    const empty = labels(result.empty);
+    const text = `Informações atualizadas! ${result.filled} campos foram preenchidos${filled ? ` (${filled})` : ""}.${result.genres ? ` ${result.genres} gênero(s) associado(s).` : ""}${empty ? ` Sem dados no TMDB: ${empty}.` : ""}`;
+    setMessage({ text, error: false }); toast.success(`Informações atualizadas! ${result.filled} campos foram preenchidos.`);
   }
   async function run(tmdbId?: number) {
     markBusy(true); setMessage(null);
@@ -38,10 +52,22 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
       else {
         const result = await resolve({ data: { kind, id } });
         if (result.tmdbId) await apply(result.tmdbId);
-        else if (result.candidates.length) setCandidates(result.candidates);
-        else throw new Error("Não foi possível identificar este conteúdo no TMDB. Confira o título e o ano.");
+        else {
+          setCandidates(result.candidates); setOpen(true);
+          setMessage({ text: result.candidates.length ? "Há mais de uma correspondência possível. Selecione a correta." : "Não foi possível identificar este conteúdo no TMDB. Confira o título e o ano, ou use a busca manual.", error: !result.candidates.length });
+        }
       }
     } catch (error) { const text = errMsg(error); setMessage({ text, error: true }); toast.error(text); }
+    finally { markBusy(false); }
+  }
+  async function manualSearch() {
+    if (!query.trim()) return;
+    markBusy(true);
+    try {
+      const r = await search({ data: { kind, query: query.trim(), year: /^\d{4}$/.test(year) ? year : undefined, page: 1 } });
+      setCandidates(r.results.map((x) => ({ tmdb_id: x.tmdb_id, title: x.title, original_title: x.original_title, year: x.year, poster_url: x.poster_url, kind })));
+      if (!r.results.length) toast.error("Nenhum resultado no TMDB para essa busca.");
+    } catch (error) { toast.error(errMsg(error)); }
     finally { markBusy(false); }
   }
   return <div className="min-w-0 space-y-2">
@@ -49,12 +75,17 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
       {busy ? <Loader2 className="shrink-0 animate-spin" /> : <RefreshCw className="shrink-0" />}{busy ? "Buscando informações no TMDB..." : "Atualizar informações via TMDB"}
     </Button>
     {message && <p role={message.error ? "alert" : "status"} className={`max-w-xl text-xs ${message.error ? "text-destructive" : "text-muted-foreground"}`}>{message.text}</p>}
-    <Dialog open={candidates.length > 0} onOpenChange={(open) => !open && !busy && setCandidates([])}>
+    <Dialog open={open} onOpenChange={(o) => !o && !busy && (setOpen(false), setCandidates([]))}>
       <DialogContent className="max-h-[85dvh] max-w-2xl overflow-y-auto">
-        <DialogHeader><DialogTitle>Selecionar correspondência no TMDB</DialogTitle><DialogDescription>Confirme o título e o ano antes de atualizar este conteúdo.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Selecionar correspondência no TMDB</DialogTitle><DialogDescription>{candidates.length ? "Confirme título, ano e tipo antes de atualizar este conteúdo." : "Nenhuma correspondência confiável foi encontrada. Faça uma busca manual mais ampla."}</DialogDescription></DialogHeader>
+        <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); manualSearch(); }}>
+          <Input className="min-w-0 flex-1 basis-48" placeholder="Buscar título no TMDB" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input className="w-24" inputMode="numeric" maxLength={4} placeholder="Ano" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} />
+          <Button type="submit" size="sm" variant="secondary" disabled={busy || !query.trim()}><Search /> Buscar</Button>
+        </form>
         <div className="space-y-2">{candidates.map((candidate) => <div key={candidate.tmdb_id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-md border border-border p-3">
           <div className="aspect-[2/3] w-12 shrink-0 overflow-hidden rounded bg-muted">{candidate.poster_url && <img src={candidate.poster_url} alt="" className="h-full w-full object-cover" loading="lazy" />}</div>
-          <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium">{candidate.title}</p><p className="break-words text-xs text-muted-foreground">{candidate.original_title} · {candidate.year ?? "—"}</p><p className="text-xs text-muted-foreground">TMDB ID {candidate.tmdb_id}</p></div>
+          <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium">{candidate.title}</p><p className="break-words text-xs text-muted-foreground">{candidate.original_title} · {candidate.year ?? "—"} · {kind === "movie" ? "Filme" : "Série"}</p><p className="text-xs text-muted-foreground">TMDB ID {candidate.tmdb_id}</p></div>
           <Button type="button" size="sm" disabled={busy} onClick={() => run(candidate.tmdb_id)}>Selecionar</Button>
         </div>)}</div>
       </DialogContent>

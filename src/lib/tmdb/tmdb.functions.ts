@@ -2,7 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { missingMetadata, reliableMatch, searchTitles, type MatchCandidate, type CompletionKind } from "./completion";
+import { completionFields, isMissing, missingMetadata, rankCandidates, reliableMatch, rowYear, searchTitles, simplifiedTitle, type MatchCandidate, type CompletionKind } from "./completion";
 
 /**
  * Official TMDB integration — METADATA ONLY. Never creates playback sources.
@@ -103,16 +103,26 @@ export async function uniqueSlug(ctx: Ctx, table: string, title: string, y: numb
 }
 
 /* ---------- metadata mappers (only TMDB-owned columns) ---------- */
+/** pt-BR first, then pt-PT; never falls back to English text for synopsis. */
+function ptTranslation(body: any) {
+  const list = (body.translations?.translations ?? []) as any[];
+  const br = list.find((t) => t.iso_639_1 === "pt" && t.iso_3166_1 === "BR")?.data ?? {};
+  const pt = list.find((t) => t.iso_639_1 === "pt" && t.iso_3166_1 === "PT")?.data ?? {};
+  const pick = (k: string) => (typeof br[k] === "string" && br[k].trim()) || (typeof pt[k] === "string" && pt[k].trim()) || null;
+  return { title: (typeof br.title === "string" && br.title.trim()) || (typeof br.name === "string" && br.name.trim()) || null, overview: pick("overview"), tagline: pick("tagline") };
+}
+const DETAIL_APPEND = "external_ids,translations";
 export async function movieMeta(tmdbId: number, fresh: boolean) {
-  const [m, i] = await Promise.all([tmdbGet(`/movie/${tmdbId}`, { language: LANG, append_to_response: "external_ids" }, { ttl: DAY, fresh, notFound: "Filme não encontrado." }), imageConfig()]);
+  const [m, i] = await Promise.all([tmdbGet(`/movie/${tmdbId}`, { language: LANG, append_to_response: DETAIL_APPEND }, { ttl: DAY, fresh, notFound: "Filme não encontrado." }), imageConfig()]);
+  const tr = ptTranslation(m);
   const fields = {
     tmdb_id: m.id, imdb_id: m.imdb_id ?? m.external_ids?.imdb_id ?? null,
-    title: m.title || m.original_title, original_title: m.original_title ?? null, description: m.overview || null,
+    title: tr.title || m.title || m.original_title, original_title: m.original_title ?? null, description: m.overview || tr.overview || null,
     release_date: date(m.release_date), release_year: year(m.release_date), duration_minutes: m.runtime || null,
     poster_path: m.poster_path ?? null, backdrop_path: m.backdrop_path ?? null,
     poster_url: imgUrl(i, i.poster, m.poster_path), backdrop_url: imgUrl(i, i.backdrop, m.backdrop_path),
     vote_average: m.vote_average ?? null, vote_count: m.vote_count ?? null, popularity: m.popularity ?? null,
-    tagline: m.tagline || null, tmdb_status: m.status ?? null, language: m.original_language ?? null,
+    tagline: m.tagline || tr.tagline || null, tmdb_status: m.status ?? null, language: m.original_language ?? null,
     country: m.production_countries?.[0]?.name ?? m.origin_country?.[0] ?? null,
     external_source: "tmdb", external_id: `movie:${m.id}`, tmdb_synced_at: new Date().toISOString(),
   };
@@ -120,15 +130,16 @@ export async function movieMeta(tmdbId: number, fresh: boolean) {
 }
 
 export async function seriesMeta(tmdbId: number, fresh: boolean) {
-  const [s, i] = await Promise.all([tmdbGet(`/tv/${tmdbId}`, { language: LANG, append_to_response: "external_ids" }, { ttl: DAY, fresh, notFound: "Série não encontrada." }), imageConfig()]);
+  const [s, i] = await Promise.all([tmdbGet(`/tv/${tmdbId}`, { language: LANG, append_to_response: DETAIL_APPEND }, { ttl: DAY, fresh, notFound: "Série não encontrada." }), imageConfig()]);
+  const tr = ptTranslation(s);
   const fields = {
     tmdb_id: s.id, imdb_id: s.external_ids?.imdb_id ?? null,
-    title: s.name || s.original_name, original_title: s.original_name ?? null, description: s.overview || null,
+    title: tr.title || s.name || s.original_name, original_title: s.original_name ?? null, description: s.overview || tr.overview || null,
     first_air_date: date(s.first_air_date), release_year: year(s.first_air_date),
     poster_path: s.poster_path ?? null, backdrop_path: s.backdrop_path ?? null,
     poster_url: imgUrl(i, i.poster, s.poster_path), backdrop_url: imgUrl(i, i.backdrop, s.backdrop_path),
     vote_average: s.vote_average ?? null, vote_count: s.vote_count ?? null, popularity: s.popularity ?? null,
-    tagline: s.tagline || null, tmdb_status: s.status ?? null, language: s.original_language ?? null,
+    tagline: s.tagline || tr.tagline || null, tmdb_status: s.status ?? null, language: s.original_language ?? null,
     country: s.origin_country?.[0] ?? null, number_of_seasons: s.number_of_seasons ?? null, number_of_episodes: s.number_of_episodes ?? null,
     external_source: "tmdb", external_id: `tv:${s.id}`, tmdb_synced_at: new Date().toISOString(),
   };
@@ -243,16 +254,21 @@ export async function resolveCompletion(kind: "movie" | "series", row: any) {
   }
   const candidates = new Map<number, MatchCandidate>();
   const i = await imageConfig();
-  for (const query of searchTitles(row)) {
-    const r = await tmdbGet(kind === "movie" ? "/search/movie" : "/search/tv", {
-      query, language: LANG, page: 1, include_adult: "false",
-      ...(row.release_year ? (kind === "movie" ? { primary_release_year: row.release_year } : { first_air_date_year: row.release_year }) : {}),
-    }, { ttl: 900 });
-    for (const x of (r.results ?? []).slice(0, 20)) {
-      candidates.set(x.id, { tmdb_id: x.id, title: String(x.title ?? x.name ?? ""), original_title: x.original_title ?? x.original_name ?? null, year: year(x.release_date ?? x.first_air_date), poster_url: imgUrl(i, "w342", x.poster_path) });
-    }
+  const y = rowYear(row);
+  const path = kind === "movie" ? "/search/movie" : "/search/tv";
+  const add = (r: any) => { for (const x of (r.results ?? []).slice(0, 20)) if (!candidates.has(x.id)) candidates.set(x.id, { tmdb_id: x.id, kind, title: String(x.title ?? x.name ?? ""), original_title: x.original_title ?? x.original_name ?? null, year: year(x.release_date ?? x.first_air_date), poster_url: imgUrl(i, "w342", x.poster_path) }); };
+  const queries = [...new Set(searchTitles(row).flatMap((t) => [t, simplifiedTitle(t)]).filter((t) => t.length > 1))].slice(0, 6);
+  for (const query of queries) {
+    const base = { query, language: LANG, page: 1, include_adult: "false" };
+    // 1) Year-filtered search ("year" covers any release date of a movie, not only the primary one).
+    const yearParam = y ? (kind === "movie" ? { year: y } : { first_air_date_year: y }) : {};
+    const r = await tmdbGet(path, { ...base, ...yearParam }, { ttl: 900 });
+    add(r);
+    // 2) Registered year can differ from TMDB's (festival vs. local release): retry without year, scored later.
+    if (y && !(r.results ?? []).length) add(await tmdbGet(path, base, { ttl: 900 }));
+    if (reliableMatch(row, [...candidates.values()])) break;
   }
-  const results = [...candidates.values()];
+  const results = rankCandidates(row, [...candidates.values()]).slice(0, 12);
   return { tmdbId: reliableMatch(row, results), candidates: results };
 }
 
@@ -285,12 +301,14 @@ export const tmdbRefresh = createServerFn({ method: "POST" })
     const ctx = context as Ctx;
     await assertStaff(ctx);
     const row = await completionRow(ctx, data.kind, data.id);
-    const resolved = await resolveCompletion(data.kind, row);
-    const tmdbId = data.tmdbId ?? resolved.tmdbId;
-    if (!tmdbId || (data.tmdbId && tmdbId !== resolved.tmdbId && !resolved.candidates.some((c) => c.tmdb_id === tmdbId))) throw new Error(unidentified);
+    // An explicit admin choice (candidate list or wider manual search) is validated by the details fetch below.
+    const tmdbId = data.tmdbId ?? (await resolveCompletion(data.kind, row)).tmdbId;
+    if (!tmdbId) throw new Error(unidentified);
     const meta = data.kind === "movie" ? await movieMeta(tmdbId, false) : await seriesMeta(tmdbId, false);
     const result = await applyCompletion(ctx, data.kind, data.id, row, meta.fields, meta.genres);
-    return { ok: true, ...result };
+    const patch = missingMetadata(data.kind, row, meta.fields);
+    const empty = completionFields[data.kind].filter((k) => isMissing(row[k]) && !(k in patch) && !["poster_path", "backdrop_path"].includes(k));
+    return { ok: true, ...result, filledFields: Object.keys(patch), empty };
   }));
 
 /** One existing season per request. No imports, removals or renumbering. */

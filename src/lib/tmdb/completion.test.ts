@@ -27,3 +27,27 @@ describe("individual TMDB completion", () => {
     expect(missingMetadata("series", {}, { duration_minutes: 50, number_of_seasons: 7, number_of_episodes: 151 })).toEqual({ number_of_seasons: 7, number_of_episodes: 151 });
   });
 });
+import { matchScore, rankCandidates, rowYear, simplifiedTitle } from "./completion";
+describe("TMDB match precision", () => {
+  const c = (tmdb_id: number, title: string, year: number | null, original_title: string | null = null) => ({ tmdb_id, title, original_title, year, poster_url: null });
+  it("matches a Portuguese title via the original title and year", () => {
+    expect(reliableMatch({ title: "O Poderoso Chefão", original_title: "The Godfather", release_year: 1972 }, [c(238, "O Poderoso Chefão", 1972, "The Godfather"), c(240, "O Poderoso Chefão: Parte II", 1974, "The Godfather Part II")])).toBe(238);
+  });
+  it("separates remakes with the same name by year", () => {
+    const list = [c(1, "O Rei Leão", 1994), c(2, "O Rei Leão", 2019)];
+    expect(reliableMatch({ title: "O Rei Leão", release_year: 2019 }, list)).toBe(2);
+    expect(reliableMatch({ title: "O Rei Leão" }, list)).toBeNull();
+  });
+  it("uses the year written in an M3U title", () => {
+    expect(rowYear({ title: "Duna (2021) 4K" })).toBe(2021);
+    expect(reliableMatch({ title: "Duna (2021) 4K" }, [c(438631, "Duna", 2021), c(841, "Duna", 1984)])).toBe(438631);
+  });
+  it("never auto-accepts a similar-but-different title and ranks exact matches first", () => {
+    expect(reliableMatch({ title: "Alien", release_year: 1979 }, [c(9, "Alien vs. Predador", 1979)])).toBeNull();
+    expect(matchScore({ title: "Alien", release_year: 1979 }, c(348, "Alien, o 8º Passageiro", 1979, "Alien"))).toBe(100);
+    expect(rankCandidates({ title: "Alien", release_year: 1979 }, [c(9, "Alien vs. Predador", 2004), c(348, "Alien", 1979)])[0]?.tmdb_id).toBe(348);
+  });
+  it("removes punctuation for alternative queries", () => {
+    expect(simplifiedTitle("Missão: Impossível – Acerto de Contas")).toBe("Missão Impossível Acerto de Contas");
+  });
+});
