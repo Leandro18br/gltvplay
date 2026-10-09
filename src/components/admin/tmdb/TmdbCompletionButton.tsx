@@ -116,7 +116,7 @@ export function TmdbCompleteEpisodesButton({ seriesId, seasonId, disabled, onBus
   return <div className="min-w-0 space-y-2">
     <Button type="button" size="sm" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal text-left" disabled={busy || disabled} onClick={async () => {
       setBusy(true); onBusyChange?.(true); setMessage("Buscando informações no TMDB...");
-      let filled = 0, updated = 0, unmatched = 0;
+      let filled = 0, updated = 0, unmatched = 0; const cv = { analyzed: 0, fixed: 0, valid: 0, notFound: 0, failed: 0 };
       try {
         const { data: rows, error } = await db.from("seasons").select("id").eq("series_id", seriesId).order("season_number");
         if (error) throw error;
@@ -127,8 +127,9 @@ export function TmdbCompleteEpisodesButton({ seriesId, seasonId, disabled, onBus
           setMessage(`Buscando informações no TMDB... ${index + 1}/${seasons.length}`);
           const result = await complete({ data: { seriesId, seasonId: season.id } });
           filled += result.filled; updated += result.updated; unmatched += result.unmatched;
+          for (const k of Object.keys(cv) as (keyof typeof cv)[]) cv[k] += result.covers?.[k] ?? 0;
         }
-        const text = `Informações atualizadas! ${filled} campos foram preenchidos em temporadas e ${updated} episódio(s).${unmatched ? ` ${unmatched} episódio(s) sem correspondência foram preservados.` : ""}`;
+        const text = `Informações atualizadas! ${filled} campos foram preenchidos em temporadas e ${updated} episódio(s).${unmatched ? ` ${unmatched} episódio(s) sem correspondência foram preservados.` : ""} Capas: ${cv.analyzed} analisadas, ${cv.fixed} corrigidas, ${cv.valid} já válidas, ${cv.notFound} sem imagem no TMDB, ${cv.failed} falha(s).`;
         setMessage(text); toast.success(text);
       } catch (error) { const text = `${errMsg(error)}${filled ? ` ${filled} campos já foram preenchidos. Tente novamente para completar os restantes.` : ""}`; setMessage(text); toast.error(text); }
       finally { invalidate(qc); setBusy(false); onBusyChange?.(false); }

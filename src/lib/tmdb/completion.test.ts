@@ -62,3 +62,18 @@ describe("official TMDB dates", async () => {
     expect(officialDates("movie", { release_date: null })).toEqual({});
   });
 });
+
+import { coverDecision, safeImageUrl } from "./completion";
+describe("episode covers", () => {
+  it("upgrades malformed http TMDB urls", () => expect(safeImageUrl("http://image.tmdb.org//t/p/w227/a.jpg")).toBe("https://image.tmdb.org/t/p/w227/a.jpg"));
+  it("fixes missing, http and wrong-episode stills", () => {
+    expect(coverDecision(null, "/a.jpg")).toBe("fix");
+    expect(coverDecision("http://image.tmdb.org//t/p/w227/a.jpg", "/a.jpg")).toBe("fix");
+    expect(coverDecision("https://image.tmdb.org/t/p/w300/b.jpg", "/a.jpg")).toBe("fix");
+  });
+  it("keeps valid and custom covers", () => {
+    expect(coverDecision("https://image.tmdb.org/t/p/w300/a.jpg", "/a.jpg")).toBe("valid");
+    expect(coverDecision("https://cdn.example.com/x.jpg", "/a.jpg")).toBe("valid");
+  });
+  it("reports no official image", () => expect(coverDecision(null, null)).toBe("not_found"));
+});

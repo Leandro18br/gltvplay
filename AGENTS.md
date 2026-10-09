@@ -31,7 +31,5 @@
 - TMDB reuses cached metadata, staff-only allowlisted completion and locked import deduplication; year jobs persist bounded discovery/item checkpoints. Episode updates touch existing rows only. Why: preserve manual data, identities and playback.
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
 
-- Integration (MegaEmbed, M3U) and playback-format rules live in `src/lib/integrations/AGENTS.md` and `src/lib/playback/AGENTS.md`. Why: directory-scoped detail.
-- Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: layout independent of source logic.
+- Integration, playback and TMDB detail rules live in `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory-scoped detail.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
-- Non-Home movie/series lists use CardGrid with server paging (exact count + range, id tie-breaker, page in URL, Pager); Home/channel carousels keep Row. Why: whole catalog reachable without loading it all.

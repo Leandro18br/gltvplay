@@ -1,3 +1,4 @@
+import { safeImageUrl } from "@/lib/tmdb/completion";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -470,7 +471,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
 export function Thumb({ src, wide }: { src?: string | null; wide?: boolean }) {
   return (
     <div className={`${wide ? "aspect-video w-20" : "aspect-[2/3] w-10"} overflow-hidden rounded-md bg-muted`}>
-      {src && <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />}
+      {safeImageUrl(src) && <img src={safeImageUrl(src)!} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
     </div>
   );
 }

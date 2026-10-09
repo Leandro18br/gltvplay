@@ -1,3 +1,4 @@
+import { safeImageUrl } from "@/lib/tmdb/completion";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -48,7 +49,7 @@ function usePlaybackInfo(kind: PKind, id: string) {
         const { data } = await sb.from("episodes").select("title,episode_number,thumbnail_url,seasons!inner(season_number,series_id,series!inner(id,slug,title))").eq("id", id).maybeSingle();
         if (!data) throw new Error("Episódio indisponível.");
         const s = data.seasons.series;
-        title = s.title; subtitle = `T${data.seasons.season_number}:E${data.episode_number} · ${data.title}`; poster = data.thumbnail_url;
+        title = s.title; subtitle = `T${data.seasons.season_number}:E${data.episode_number} · ${data.title}`; poster = safeImageUrl(data.thumbnail_url);
         back = { to: "/serie/$slug", slug: s.slug || s.id };
         const all = await sb.from("seasons").select("season_number,episodes(id,episode_number,title,thumbnail_url,status)").eq("series_id", s.id).order("season_number");
         episodes = (all.data ?? []).flatMap((se: { season_number: number; episodes: (Ep & { status: string })[] }) =>
@@ -280,7 +281,7 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
     <Sheet open={epOpen} onOpenChange={setEpOpen}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md"><SheetTitle>Episódios</SheetTitle>
         <ol className="mt-4 space-y-2">{data.episodes.map(e => <li key={e.id}><Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} replace onClick={() => { persist(); setEpOpen(false); }} className={`flex items-center gap-3 rounded-xl p-2 transition hover:bg-accent ${e.id === id ? "bg-accent ring-1 ring-primary/50" : ""}`}>
-          <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-muted">{e.thumbnail_url && <img src={e.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
+          <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-muted">{safeImageUrl(e.thumbnail_url) && <img src={safeImageUrl(e.thumbnail_url)!} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
           <div className="min-w-0"><p className="text-xs text-primary">T{e.season_number}:E{e.episode_number}</p><p className="truncate text-sm font-medium">{e.title}</p></div>
         </Link></li>)}</ol>
       </SheetContent>
@@ -370,7 +371,7 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
               <li key={e.id}>
                 <Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} replace onClick={() => { persist(); setEpOpen(false); }}
                   className={`flex items-center gap-3 rounded-xl p-2 transition hover:bg-accent ${e.id === id ? "bg-accent ring-1 ring-primary/50" : ""}`}>
-                  <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-muted">{e.thumbnail_url && <img src={e.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
+                  <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-muted">{safeImageUrl(e.thumbnail_url) && <img src={safeImageUrl(e.thumbnail_url)!} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
                   <div className="min-w-0">
                     <p className="text-xs text-primary">T{e.season_number}:E{e.episode_number}</p>
                     <p className="truncate text-sm font-medium">{e.title}</p>

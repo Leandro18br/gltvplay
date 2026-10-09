@@ -1,3 +1,4 @@
+import { safeImageUrl } from "@/lib/tmdb/completion";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -145,7 +146,7 @@ export const continueWatchingQuery = (userId: string, profileId: string | null, 
           if (x) out.push({ ...base, kind: "movie", title: x.title, subtitle: x.release_year ? String(x.release_year) : null, image: x.backdrop_url || x.poster_url });
         } else if (r.content_kind === "episode") {
           const x = (e.data ?? []).find((y: Raw) => y.id === r.content_id);
-          if (x) out.push({ ...base, kind: "episode", title: x.seasons.series.title, subtitle: `T${x.seasons.season_number}:E${x.episode_number} · ${x.title}`, image: x.thumbnail_url || x.seasons.series.backdrop_url || x.seasons.series.poster_url });
+          if (x) out.push({ ...base, kind: "episode", title: x.seasons.series.title, subtitle: `T${x.seasons.season_number}:E${x.episode_number} · ${x.title}`, image: safeImageUrl(x.thumbnail_url) || x.seasons.series.backdrop_url || x.seasons.series.poster_url });
         }
       }
       return out;

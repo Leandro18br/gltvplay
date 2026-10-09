@@ -1,0 +1,1 @@
+- Episode covers: "Atualizar episódios" replaces missing/HTTP/malformed/wrong-episode TMDB stills matched by series TMDB id + season + episode number, keeping custom HTTPS images; displays pass URLs through `safeImageUrl`. Why: HTTP stills are blocked on the HTTPS site.
