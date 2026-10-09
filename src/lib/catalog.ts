@@ -304,3 +304,43 @@ export const searchQuery = (term: string) =>
     },
     staleTime: 15_000,
   });
+
+/* ---------- Server-side page navigation (exact count + range, stable order) ---------- */
+export type PagedFilter = { genre?: string | undefined; sort?: SortKey; categoryId?: string | undefined; term?: string | undefined };
+export type PagedResult = { items: Item[]; total: number; page: number; pages: number };
+export const pageCount = (total: number, size = PAGE_SIZE) => Math.max(1, Math.ceil(total / size));
+/** Clamps a requested 1-based page into [1, pages]. */
+export const clampPage = (page: number, pages: number) => Math.min(Math.max(1, Math.floor(page) || 1), Math.max(1, pages));
+
+export const pagedListQuery = (kind: Kind, filter: PagedFilter, page: number) =>
+  queryOptions({
+    queryKey: ["catalog", "paged", kind, filter.genre ?? "", filter.sort ?? "recent", filter.categoryId ?? "", filter.term ?? "", page],
+    queryFn: async (): Promise<PagedResult> => {
+      const table = kind === "movie" ? "movies" : kind === "series" ? "series" : "channels";
+      let sel = kind === "movie" ? MOVIE_SEL : kind === "series" ? SERIES_SEL : CHANNEL_SEL;
+      const join = kind === "movie" ? "movie_genres" : "series_genres";
+      if (filter.genre && kind !== "channel") sel = sel.replace(`${join}(genres(id,name,slug))`, `${join}!inner(genres!inner(id,name,slug))`);
+      if (filter.categoryId && kind !== "channel") sel += kind === "movie" ? ",movie_categories!inner(category_id)" : ",series_categories!inner(category_id)";
+      let q = sb.from(table).select(sel, { count: "exact" }).eq("status", "published");
+      if (filter.genre && kind !== "channel") q = q.eq(`${join}.genres.slug`, filter.genre);
+      if (filter.categoryId) q = kind === "channel" ? q.eq("category_id", filter.categoryId) : q.eq(kind === "movie" ? "movie_categories.category_id" : "series_categories.category_id", filter.categoryId);
+      if (filter.term?.trim()) {
+        const t = `%${filter.term.trim().replace(/[%_,()]/g, " ")}%`;
+        q = kind === "channel" ? q.ilike("name", t) : q.or(`title.ilike.${t},original_title.ilike.${t}`);
+      }
+      const sort = filter.sort ?? "recent";
+      if (filter.categoryId && !filter.sort) q = q.order("sort_order");
+      else if (sort === "title") q = q.order(kind === "channel" ? "name" : "title");
+      else if (sort === "year" && kind !== "channel") q = q.order("release_year", { ascending: false, nullsFirst: false });
+      else q = q.order("created_at", { ascending: false });
+      q = q.order("id"); // unique tie-breaker: batch imports share timestamps, which made pages repeat/skip rows
+      const p = Math.max(1, Math.floor(page) || 1);
+      const from = (p - 1) * PAGE_SIZE;
+      const { data, error, count } = await q.range(from, from + PAGE_SIZE - 1);
+      if (error && error.code !== "PGRST103") throw error; // PGRST103 = page beyond the end
+      const map = kind === "movie" ? toMovie : kind === "series" ? toSeries : toChannel;
+      const total = count ?? 0;
+      return { items: ((data ?? []) as Raw[]).map(map), total, page: p, pages: pageCount(total) };
+    },
+    staleTime: 30_000,
+  });
