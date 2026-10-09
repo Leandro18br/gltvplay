@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Download, ListVideo, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Wifi } from "lucide-react";
+import { Download, ListVideo, Loader2, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Wifi } from "lucide-react";
 import { db, errMsg } from "@/lib/admin/db";
 import { saveM3uList, testM3uList, indexM3uStep } from "@/lib/integrations/m3u.functions";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { M3uExplorer } from "./M3uExplorer";
+import { DiagnoseDialog } from "./DiagnoseDialog";
 import { fmtDate } from "./shared";
 
 type List = { id: string; name: string; list_type: string; detected_type: string | null; url_hint: string | null; is_active: boolean; enrich_tmdb: boolean; sync_state: string; last_synced_at: string | null; last_error: string | null; movies_count: number; series_count: number; episodes_count: number; channels_count: number; total_items: number; index_entries: number; index_offset: number; index_total_bytes: number | null; index_flags: { running?: boolean } | null; index_batch_size: number };
@@ -24,6 +25,7 @@ export function M3uListsCard() {
   const test = useServerFn(testM3uList), step = useServerFn(indexM3uStep);
   const [edit, setEdit] = useState<List | "new" | null>(null);
   const [explore, setExplore] = useState<List | null>(null);
+  const [diag, setDiag] = useState<List | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [result, setResult] = useState<Record<string, string>>({});
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin", "m3u"] });
@@ -106,6 +108,7 @@ export function M3uListsCard() {
                 <Button size="sm" variant="outline" disabled={!!busy[l.id] || !l.is_active} onClick={() => (!resumable || confirm("Recomeçar a indexação do início?")) && runIndex(l, true)}><RefreshCw /> Sincronizar</Button>
                 <Button size="sm" variant="outline" disabled={!indexed && !resumable} onClick={() => setExplore(l)}><Search /> Explorar conteúdo</Button>
                 <Button size="sm" variant="outline" disabled={!indexed && !resumable} onClick={() => setExplore(l)}><Download /> Importar selecionados</Button>
+                <Button size="sm" variant="outline" disabled={!!busy[l.id]} onClick={() => setDiag(l)}><Sparkles /> Diagnosticar falhas (IA)</Button>
                 <div className="flex gap-1"><Button size="icon" variant="ghost" aria-label="Editar" onClick={() => setEdit(l)}><Pencil /></Button>
                 <Button size="icon" variant="ghost" aria-label="Excluir" disabled={!!busy[l.id]} onClick={() => remove(l)}><Trash2 /></Button></div>
               </div>
