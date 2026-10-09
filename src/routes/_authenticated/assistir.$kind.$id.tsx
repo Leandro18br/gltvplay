@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { Button } from "@/components/ui/button";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
 import { VideoPlayerFrame } from "@/components/site/VideoPlayerFrame";
-import { attachMpegTs, isMpegTsUrl } from "@/lib/playback/mpegts";
+import { attachMpegTs, isMpegTsUrl, resolveSecureUrl, MIXED_CONTENT_MESSAGE } from "@/lib/playback/mpegts";
 
 type PKind = "movie" | "episode" | "channel";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -147,34 +147,45 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
   const idx = data.episodes.findIndex((e) => e.id === id);
   const next = idx >= 0 ? data.episodes[idx + 1] : undefined;
 
+  // HTTP source on an HTTPS page: use a verified HTTPS alternative if one exists (stored URL unchanged).
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let off = false;
+    setSrc(null);
+    setError(null);
+    if (embed || !url) return;
+    resolveSecureUrl(url).then((r) => { if (off) return; if (r) setSrc(r); else setError(MIXED_CONTENT_MESSAGE); });
+    return () => { off = true; };
+  }, [url, embed]);
+
   // Load source (HLS via hls.js when not natively supported)
   useEffect(() => {
     const v = video.current;
-    if (!v || embed) return;
+    if (!v || embed || !src) return;
     let cancelled = false;
-    const isHls = data.source?.type === "hls" || /\.m3u8(\?|$)/i.test(url);
+    const isHls = data.source?.type === "hls" || /\.m3u8(\?|$)/i.test(src);
     if (isHls && !v.canPlayType("application/vnd.apple.mpegurl")) {
       import("hls.js").then(({ default: Hls }) => {
         if (cancelled) return;
         if (!Hls.isSupported()) { setError("Seu navegador não suporta este formato."); return; }
         const hls = new Hls({ enableWorker: true, lowLatencyMode: live });
         hlsRef.current = hls;
-        hls.loadSource(url);
+        hls.loadSource(src);
         hls.attachMedia(v);
         hls.on(Hls.Events.MANIFEST_PARSED, (_e: unknown, d: { levels: { height: number; bitrate: number }[] }) => {
           setLevels(d.levels.map((l, i) => ({ i, label: l.height ? `${l.height}p` : `${Math.round(l.bitrate / 1000)} kbps` })).reverse());
         });
         hls.on(Hls.Events.ERROR, (_e: unknown, d: { fatal: boolean }) => { if (d.fatal) setError("Falha ao carregar a transmissão."); });
       });
-    } else if (!isHls && isMpegTsUrl(url)) {
+    } else if (!isHls && isMpegTsUrl(src)) {
       setError(null);
-      const release = attachMpegTs(v, url, live, (m) => { if (!cancelled) setError(m); });
+      const release = attachMpegTs(v, src, live, (m) => { if (!cancelled) setError(m); });
       return () => { cancelled = true; release(); };
     } else {
-      v.src = url;
+      v.src = src;
     }
     return () => { cancelled = true; hlsRef.current?.destroy(); hlsRef.current = null; };
-  }, [url, live, embed, data.source?.type]);
+  }, [src, live, embed, data.source?.type]);
 
   // Resume from history
   useEffect(() => {
