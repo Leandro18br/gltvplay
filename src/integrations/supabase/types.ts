@@ -896,6 +896,36 @@ export type Database = {
           },
         ]
       }
+      movie_categories: {
+        Row: {
+          category_id: string
+          movie_id: string
+        }
+        Insert: {
+          category_id: string
+          movie_id: string
+        }
+        Update: {
+          category_id?: string
+          movie_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movie_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movie_categories_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movie_genres: {
         Row: {
           genre_id: string
@@ -1364,6 +1394,36 @@ export type Database = {
           },
         ]
       }
+      series_categories: {
+        Row: {
+          category_id: string
+          series_id: string
+        }
+        Insert: {
+          category_id: string
+          series_id: string
+        }
+        Update: {
+          category_id?: string
+          series_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "series_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "series_categories_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       series_genres: {
         Row: {
           genre_id: string
@@ -1477,6 +1537,106 @@ export type Database = {
           expires_at?: string
         }
         Relationships: []
+      }
+      tmdb_catalog_job_items: {
+        Row: {
+          attempts: number
+          content_id: string | null
+          error: string | null
+          filled: number
+          item_key: string
+          job_id: string
+          outcome: string | null
+          state: string
+          tmdb_id: number | null
+        }
+        Insert: {
+          attempts?: number
+          content_id?: string | null
+          error?: string | null
+          filled?: number
+          item_key: string
+          job_id: string
+          outcome?: string | null
+          state?: string
+          tmdb_id?: number | null
+        }
+        Update: {
+          attempts?: number
+          content_id?: string | null
+          error?: string | null
+          filled?: number
+          item_key?: string
+          job_id?: string
+          outcome?: string | null
+          state?: string
+          tmdb_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tmdb_catalog_job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "tmdb_catalog_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tmdb_catalog_jobs: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          discovered: number
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          page: number
+          phase: string
+          segment_index: number
+          segments: Json
+          total_reported: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          discovered?: number
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          page?: number
+          phase?: string
+          segment_index?: number
+          segments?: Json
+          total_reported?: number
+          updated_at?: string
+          year?: number
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          discovered?: number
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          page?: number
+          phase?: string
+          segment_index?: number
+          segments?: Json
+          total_reported?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tmdb_catalog_jobs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -1644,6 +1804,7 @@ export type Database = {
         Returns: undefined
       }
       admin_stats: { Args: never; Returns: Json }
+      catalog_title_key: { Args: { t: string }; Returns: string }
       complete_tmdb_metadata: {
         Args: {
           _genre_ids?: number[]
@@ -1682,6 +1843,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      import_tmdb_movie_metadata: {
+        Args: { _genre_ids: number[]; _patch: Json }
+        Returns: Json
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
@@ -1743,6 +1908,7 @@ export type Database = {
         Returns: number
       }
       set_primary_playback: { Args: { _source_id: string }; Returns: undefined }
+      tmdb_catalog_report: { Args: { _job: string }; Returns: Json }
       validate_home_config: { Args: { c: Json }; Returns: undefined }
     }
     Enums: {
