@@ -282,7 +282,8 @@ export const tmdbResolveContent = createServerFn({ method: "POST" })
   }));
 
 export async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string, current: any, fields: any, genres: any[] = []) {
-  const patch = missingMetadata(kind, current, fields);
+  const patch: any = { ...missingMetadata(kind, current, fields), ...officialDates(kind, fields) };
+  if (kind === "movie" || kind === "series") patch._genres = genres.filter((g) => Number.isInteger(g.id) && g.name).map((g) => ({ id: g.id, name: PT_GENRE[g.id] ?? g.name }));
   const { data, error } = await ctx.supabase.rpc("complete_tmdb_metadata", {
     _kind: kind, _id: id, _patch: patch, _genre_ids: genres.map((g) => g.id).filter((id): id is number => Number.isInteger(id)),
   });
@@ -290,7 +291,15 @@ export async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string
     if (error.code === "23505") throw new Error("Este TMDB ID já está associado a outro conteúdo. Nenhum registro foi recriado ou mesclado.");
     throw new Error("Não foi possível salvar as informações. Tente novamente.");
   }
-  return data as { filled: number; genres: number; fields: Record<string, string | number | null> };
+  return data as { filled: number; genres: number; genres_created: number; fields: Record<string, string | number | null> };
+}
+/** pt-BR names for official TV genres TMDB only returns in English. */
+const PT_GENRE: Record<number, string> = { 10762: "Infantil", 10763: "Notícias", 10764: "Reality", 10766: "Novela", 10767: "Talk Show" };
+/** Official TMDB date + its year always win over a wrong registered year; absent/invalid dates are never sent. */
+export function officialDates(kind: CompletionKind, fields: any) {
+  const key = kind === "movie" ? "release_date" : kind === "series" ? "first_air_date" : null;
+  const d = key ? fields[key] : null;
+  return key && typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) ? { [key]: d, release_year: Number(d.slice(0, 4)) } : {};
 }
 
 /** Individual missing-field completion; never writes sources or internal provenance. */
@@ -306,9 +315,9 @@ export const tmdbRefresh = createServerFn({ method: "POST" })
     if (!tmdbId) throw new Error(unidentified);
     const meta = data.kind === "movie" ? await movieMeta(tmdbId, false) : await seriesMeta(tmdbId, false);
     const result = await applyCompletion(ctx, data.kind, data.id, row, meta.fields, meta.genres);
-    const patch = missingMetadata(data.kind, row, meta.fields);
-    const empty = completionFields[data.kind].filter((k) => isMissing(row[k]) && !(k in patch) && !["poster_path", "backdrop_path"].includes(k));
-    return { ok: true, ...result, filledFields: Object.keys(patch), empty };
+    const empty = completionFields[data.kind].filter((k) => isMissing(row[k]) && !(k in result.fields) && !["poster_path", "backdrop_path"].includes(k));
+    const dateConfirmed = Object.keys(officialDates(data.kind, meta.fields)).length > 0;
+    return { ok: true, ...result, filledFields: Object.keys(result.fields ?? {}), empty, dateConfirmed };
   }));
 
 /** One existing season per request. No imports, removals or renumbering. */

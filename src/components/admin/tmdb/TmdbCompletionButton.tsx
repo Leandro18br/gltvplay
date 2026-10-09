@@ -42,7 +42,7 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
     invalidate(qc); await onDone?.(result); setOpen(false); setCandidates([]);
     const filled = labels(result.filledFields);
     const empty = labels(result.empty);
-    const text = `Informações atualizadas! ${result.filled} campos foram preenchidos${filled ? ` (${filled})` : ""}.${result.genres ? ` ${result.genres} gênero(s) associado(s).` : ""}${empty ? ` Sem dados no TMDB: ${empty}.` : ""}`;
+    const text = `Informações atualizadas! ${result.filled} campos foram preenchidos${filled ? ` (${filled})` : ""}.${result.genres ? ` ${result.genres} gênero(s) associado(s).` : ""}${result.genres_created ? ` ${result.genres_created} gênero(s) novo(s) criado(s).` : ""}${empty ? ` Sem dados no TMDB: ${empty}.` : ""}${result.dateConfirmed ? "" : " A data de lançamento não pôde ser confirmada no TMDB; o valor atual foi mantido."}`;
     setMessage({ text, error: false }); toast.success(`Informações atualizadas! ${result.filled} campos foram preenchidos.`);
   }
   async function run(tmdbId?: number) {

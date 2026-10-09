@@ -134,6 +134,13 @@
       "when": 1791509587347,
       "tag": "0018_catalog_default_categories_and_batches",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791568038810,
+      "tag": "0019_tmdb_completion_dates_and_genres",
+      "breakpoints": true
     }
   ]
 }
