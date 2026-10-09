@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PlaybackField } from "./PlaybackField";
 import { SourcesManager } from "./integrations/SourcesManager";
-import { TmdbRefreshButton } from "./tmdb/TmdbTools";
+import { TmdbRefreshButton, TmdbCompleteEpisodesButton } from "./tmdb/TmdbTools";
 import { validatePlayback, savePlayback } from "@/lib/playback/playback.functions";
 import { emptyPlayback, playbackSchema, type PlaybackValue } from "@/lib/playback/embed";
 import { toast } from "sonner";
@@ -126,6 +126,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
   const [editing, setEditing] = useState<Row | null>(null);
   const [values, setValues] = useState<Row>({});
   const [saving, setSaving] = useState(false);
+  const [tmdbBusy, setTmdbBusy] = useState(false);
   const [toDelete, setToDelete] = useState<Row | null>(null);
 
   useEffect(() => {
@@ -386,10 +387,30 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
         <Button size="icon" variant="outline" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)} aria-label="Próxima"><ChevronRight /></Button>
       </div>
 
-      <Dialog open={!!editing} onOpenChange={(o) => !o && !saving && setEditing(null)}>
+      <Dialog open={!!editing} onOpenChange={(o) => !o && !saving && !tmdbBusy && setEditing(null)}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader><DialogTitle>{editing?.id ? `Editar ${config.singular.toLowerCase()}` : `Novo(a) ${config.singular.toLowerCase()}`}</DialogTitle></DialogHeader>
           <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
+            {editing?.id && (config.table === "movies" || config.table === "series") && (
+              <div className="flex min-w-0 flex-wrap items-start gap-3 md:col-span-2">
+                <TmdbRefreshButton key={editing.id} kind={config.table === "movies" ? "movie" : "series"} id={editing.id as string} disabled={saving || tmdbBusy} onBusyChange={setTmdbBusy} onDone={async (result) => {
+                  const id = editing.id;
+                  const join = config.table === "movies" ? "movie_genres" : "series_genres";
+                  const fk = config.table === "movies" ? "movie_id" : "series_id";
+                  const { data: genres } = await db.from(join).select("genre_id").eq(fk, id);
+                  setValues((current: Row) => {
+                    const next = { ...current };
+                    for (const [name, value] of Object.entries(result.fields)) {
+                      if (current[name] === editing[name] || current[name] == null || current[name] === "") next[name] = value;
+                    }
+                    next.genres = [...new Set([...(current.genres ?? []), ...(genres ?? []).map((g: Row) => g.genre_id)])];
+                    return next;
+                  });
+                  setEditing((current: Row | null) => current?.id === id ? { ...current, ...result.fields } : current);
+                }} />
+                {config.table === "series" && <TmdbCompleteEpisodesButton key={`episodes-${editing.id}`} seriesId={editing.id as string} disabled={saving || tmdbBusy} onBusyChange={setTmdbBusy} />}
+              </div>
+            )}
             {config.fields.filter((f) => !(lockScope && f.name === config.scope?.col) && !(f.editOnly && !editing?.id)).map((f) => (
               <div key={f.name} className={`space-y-1.5 ${f.full || ["textarea", "image", "genres", "playback", "sources"].includes(f.type) ? "md:col-span-2" : ""}`}>
                 {f.type !== "boolean" && <Label>{f.label}{f.required && " *"}</Label>}
@@ -431,12 +452,9 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
                 )}
               </div>
             ))}
-            {editing?.tmdb_id && (config.table === "movies" || config.table === "series") && (
-              <div className="flex flex-wrap items-center gap-2 md:col-span-2"><span className="text-xs text-muted-foreground">TMDB ID {editing.tmdb_id}</span><TmdbRefreshButton kind={config.table === "movies" ? "movie" : "series"} id={editing.id as string} onDone={() => setEditing(null)} /></div>
-            )}
             <DialogFooter className="md:col-span-2">
-              <Button type="button" variant="ghost" onClick={() => setEditing(null)} disabled={saving}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>{saving && <Loader2 className="animate-spin" />} Salvar</Button>
+              <Button type="button" variant="ghost" onClick={() => setEditing(null)} disabled={saving || tmdbBusy}>Cancelar</Button>
+              <Button type="submit" disabled={saving || tmdbBusy}>{saving && <Loader2 className="animate-spin" />} Salvar</Button>
             </DialogFooter>
           </form>
         </DialogContent>
