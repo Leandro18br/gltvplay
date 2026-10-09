@@ -118,6 +118,7 @@ export function M3uListsCard() {
       })}
       {edit && <ListDialog row={edit === "new" ? null : edit} onClose={() => setEdit(null)} onSaved={refresh} />}
       {explore && <M3uExplorer list={explore} onClose={() => setExplore(null)} />}
+      {diag && <DiagnoseDialog listId={diag.id} name={diag.name} onClose={() => setDiag(null)} />}
     </div>
   );
 }

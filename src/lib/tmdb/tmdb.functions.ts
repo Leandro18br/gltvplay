@@ -337,18 +337,30 @@ export const tmdbCompleteSeasonEpisodes = createServerFn({ method: "POST" })
     const { data: episodes, error: episodeError } = await ctx.supabase.from("episodes").select("*").eq("season_id", season.id);
     if (episodeError) throw new Error("Não foi possível carregar os episódios.");
     const plans = (episodes ?? []).flatMap((episode: any) => {
-      const e = (t.episodes ?? []).find((x: any) => episode.tmdb_id ? x.id === episode.tmdb_id : x.episode_number === episode.episode_number);
+      // Exact identity: series TMDB id + season number + episode number.
+      const e = (t.episodes ?? []).find((x: any) => x.episode_number === episode.episode_number);
       if (!e) return [];
       return [{ episode, fields: { tmdb_id: e.id ?? null, title: e.name || null, description: e.overview || null, release_date: date(e.air_date), duration_minutes: e.runtime || null, vote_average: e.vote_average ?? null, vote_count: e.vote_count ?? null, still_path: e.still_path ?? null, thumbnail_url: imgUrl(i, i.still, e.still_path) } }];
     });
     const seasonResult = await applyCompletion(ctx, "season", season.id, season, { tmdb_id: t.id, title: t.name || null, description: t.overview || null, air_date: date(t.air_date), poster_url: imgUrl(i, i.poster, t.poster_path) });
     let filled = seasonResult.filled, updated = 0;
+    const covers = { analyzed: (episodes ?? []).length, fixed: 0, valid: 0, notFound: (episodes ?? []).length - plans.length, failed: 0 };
     for (const plan of plans) {
-      const r = await applyCompletion(ctx, "episode", plan.episode.id, plan.episode, plan.fields);
-      filled += r.filled;
-      if (r.filled) updated++;
+      try {
+        const r = await applyCompletion(ctx, "episode", plan.episode.id, plan.episode, plan.fields);
+        filled += r.filled;
+        if (r.filled) updated++;
+        const fresh = r.fields?.thumbnail_url !== undefined ? r.fields.thumbnail_url : plan.episode.thumbnail_url;
+        const d = coverDecision(fresh as string | null, plan.fields.still_path);
+        if (d === "valid") covers.valid++;
+        else if (d === "not_found") covers.notFound++;
+        else {
+          const { error: e2 } = await ctx.supabase.from("episodes").update({ thumbnail_url: plan.fields.thumbnail_url, still_path: plan.fields.still_path }).eq("id", plan.episode.id);
+          if (e2) covers.failed++; else covers.fixed++;
+        }
+      } catch { covers.failed++; }
     }
-    return { filled, updated, matched: plans.length, unmatched: (episodes ?? []).length - plans.length };
+    return { filled, updated, matched: plans.length, unmatched: (episodes ?? []).length - plans.length, covers };
   }));
 
 /** Lists TMDB seasons of a series (including Specials / season 0) with "already imported" flags. */

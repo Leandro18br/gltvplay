@@ -74,3 +74,21 @@ export function matchScore(row: MetadataRow, c: MatchCandidate): number {
 export function rankCandidates(row: MetadataRow, candidates: MatchCandidate[]) {
   return [...candidates].map((c, i) => ({ c, i, s: matchScore(row, c) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.c);
 }
+
+/** Fixes malformed/HTTP TMDB image URLs (mixed content blocks http:// on the HTTPS site). */
+export function safeImageUrl(url: string | null | undefined): string | null {
+  if (!url || !url.trim()) return null;
+  const u = url.trim().replace(/^http:\/\/image\.tmdb\.org\/+/i, "https://image.tmdb.org/");
+  return /^https:\/\//i.test(u) ? u.replace(/^(https:\/\/image\.tmdb\.org)\/+/i, "$1/") : null;
+}
+const tmdbFile = (url: string) => (/image\.tmdb\.org\//i.test(url) ? url.split("/").pop() ?? null : undefined);
+export type CoverDecision = "fix" | "valid" | "not_found";
+/** Episode cover policy: replace missing/broken/wrong TMDB stills with the official still of that exact episode; keep custom HTTPS images. */
+export function coverDecision(current: string | null | undefined, officialStill: string | null | undefined): CoverDecision {
+  if (!officialStill) return "not_found";
+  const cur = current?.trim();
+  if (!cur || !/^https:\/\/[^/]+\/./i.test(cur) || /^https:\/\/image\.tmdb\.org\/\//i.test(cur)) return "fix";
+  const file = tmdbFile(cur);
+  if (file === undefined) return "valid";
+  return file === officialStill.replace(/^\//, "") ? "valid" : "fix";
+}
