@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { missingMetadata, reliableMatch, searchTitles, type MatchCandidate, type CompletionKind } from "./completion";
 
 /**
  * Official TMDB integration — METADATA ONLY. Never creates playback sources.
@@ -232,21 +233,107 @@ export const tmdbImportSeries = createServerFn({ method: "POST" })
     return { id, created: !found, exists: false };
   }));
 
-/** Refresh TMDB data of an existing movie/series by its internal id. */
-export const tmdbRefresh = createServerFn({ method: "POST" })
+const contentInput = z.object({ kind: z.enum(["movie", "series"]), id: z.string().uuid() });
+const unidentified = "Não foi possível identificar este conteúdo no TMDB. Confira o título e o ano.";
+
+async function completionRow(ctx: Ctx, kind: "movie" | "series", id: string) {
+  const { data: row, error } = await ctx.supabase.from(kind === "movie" ? "movies" : "series").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error("Não foi possível carregar este conteúdo.");
+  if (!row) throw new Error("Conteúdo não encontrado.");
+  return row;
+}
+
+async function resolveCompletion(kind: "movie" | "series", row: any) {
+  if (Number.isInteger(row.tmdb_id) && row.tmdb_id > 0) {
+    try {
+      await tmdbGet(`/${kind === "movie" ? "movie" : "tv"}/${row.tmdb_id}`, { language: LANG, append_to_response: "external_ids" }, { ttl: DAY, notFound: unidentified });
+      return { tmdbId: row.tmdb_id as number, candidates: [] as MatchCandidate[] };
+    } catch (e) {
+      if (!(e instanceof TmdbError) || e.message !== unidentified) throw e;
+      // Invalid registered identifiers are never used to apply unrelated metadata.
+    }
+  }
+  const candidates = new Map<number, MatchCandidate>();
+  const i = await imageConfig();
+  for (const query of searchTitles(row)) {
+    const r = await tmdbGet(kind === "movie" ? "/search/movie" : "/search/tv", {
+      query, language: LANG, page: 1, include_adult: "false",
+      ...(row.release_year ? (kind === "movie" ? { primary_release_year: row.release_year } : { first_air_date_year: row.release_year }) : {}),
+    }, { ttl: 900 });
+    for (const x of (r.results ?? []).slice(0, 20)) {
+      candidates.set(x.id, { tmdb_id: x.id, title: String(x.title ?? x.name ?? ""), original_title: x.original_title ?? x.original_name ?? null, year: year(x.release_date ?? x.first_air_date), poster_url: imgUrl(i, "w342", x.poster_path) });
+    }
+  }
+  const results = [...candidates.values()];
+  return { tmdbId: reliableMatch(row, results), candidates: results };
+}
+
+export const tmdbResolveContent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ kind: z.enum(["movie", "series"]), id: z.string().uuid() }).parse(d))
+  .inputValidator((d) => contentInput.parse(d))
   .handler(({ data, context }) => wrap(async () => {
     const ctx = context as Ctx;
     await assertStaff(ctx);
-    const table = data.kind === "movie" ? "movies" : "series";
-    const { data: row } = await ctx.supabase.from(table).select("tmdb_id").eq("id", data.id).maybeSingle();
-    if (!row?.tmdb_id) throw new Error("Este conteúdo não possui TMDB ID.");
-    const meta = data.kind === "movie" ? await movieMeta(row.tmdb_id, true) : await seriesMeta(row.tmdb_id, true);
-    const r = await ctx.supabase.from(table).update(meta.fields).eq("id", data.id);
-    if (r.error) throw r.error;
-    await linkGenres(ctx, data.kind, data.id, meta.genres);
-    return { ok: true };
+    return resolveCompletion(data.kind, await completionRow(ctx, data.kind, data.id));
+  }));
+
+async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string, current: any, fields: any, genres: any[] = []) {
+  const patch = missingMetadata(kind, current, fields);
+  const { data, error } = await ctx.supabase.rpc("complete_tmdb_metadata", {
+    _kind: kind, _id: id, _patch: patch, _genre_ids: genres.map((g) => g.id).filter((id): id is number => Number.isInteger(id)),
+  });
+  if (error) {
+    if (error.code === "23505") throw new Error("Este TMDB ID já está associado a outro conteúdo. Nenhum registro foi recriado ou mesclado.");
+    throw new Error("Não foi possível salvar as informações. Tente novamente.");
+  }
+  return data as { filled: number; genres: number; fields: Record<string, unknown> };
+}
+
+/** Individual missing-field completion; never writes sources or internal provenance. */
+export const tmdbRefresh = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => contentInput.extend({ tmdbId: z.number().int().positive().optional() }).parse(d))
+  .handler(({ data, context }) => wrap(async () => {
+    const ctx = context as Ctx;
+    await assertStaff(ctx);
+    const row = await completionRow(ctx, data.kind, data.id);
+    const resolved = await resolveCompletion(data.kind, row);
+    const tmdbId = data.tmdbId ?? resolved.tmdbId;
+    if (!tmdbId || (data.tmdbId && tmdbId !== resolved.tmdbId && !resolved.candidates.some((c) => c.tmdb_id === tmdbId))) throw new Error(unidentified);
+    const meta = data.kind === "movie" ? await movieMeta(tmdbId, false) : await seriesMeta(tmdbId, false);
+    const result = await applyCompletion(ctx, data.kind, data.id, row, meta.fields, meta.genres);
+    return { ok: true, ...result };
+  }));
+
+/** One existing season per request. No imports, removals or renumbering. */
+export const tmdbCompleteSeasonEpisodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ seriesId: z.string().uuid(), seasonId: z.string().uuid() }).parse(d))
+  .handler(({ data, context }) => wrap(async () => {
+    const ctx = context as Ctx;
+    await assertStaff(ctx);
+    const series = await completionRow(ctx, "series", data.seriesId);
+    if (!series.tmdb_id) throw new Error("Atualize as informações da série via TMDB primeiro.");
+    const { data: season, error } = await ctx.supabase.from("seasons").select("*").eq("id", data.seasonId).eq("series_id", data.seriesId).maybeSingle();
+    if (error || !season) throw new Error("Temporada não encontrada nesta série.");
+    const [t, i] = await Promise.all([
+      tmdbGet(`/tv/${series.tmdb_id}/season/${season.season_number}`, { language: LANG }, { ttl: DAY, notFound: "Temporada não encontrada no TMDB." }), imageConfig(),
+    ]);
+    const { data: episodes, error: episodeError } = await ctx.supabase.from("episodes").select("*").eq("season_id", season.id);
+    if (episodeError) throw new Error("Não foi possível carregar os episódios.");
+    const plans = (episodes ?? []).flatMap((episode: any) => {
+      const e = (t.episodes ?? []).find((x: any) => episode.tmdb_id ? x.id === episode.tmdb_id : x.episode_number === episode.episode_number);
+      if (!e) return [];
+      return [{ episode, fields: { tmdb_id: e.id ?? null, title: e.name || null, description: e.overview || null, release_date: date(e.air_date), duration_minutes: e.runtime || null, vote_average: e.vote_average ?? null, vote_count: e.vote_count ?? null, still_path: e.still_path ?? null, thumbnail_url: imgUrl(i, i.still, e.still_path) } }];
+    });
+    const seasonResult = await applyCompletion(ctx, "season", season.id, season, { tmdb_id: t.id, title: t.name || null, description: t.overview || null, air_date: date(t.air_date), poster_url: imgUrl(i, i.poster, t.poster_path) });
+    let filled = seasonResult.filled, updated = 0;
+    for (const plan of plans) {
+      const r = await applyCompletion(ctx, "episode", plan.episode.id, plan.episode, plan.fields);
+      filled += r.filled;
+      if (r.filled) updated++;
+    }
+    return { filled, updated, matched: plans.length, unmatched: (episodes ?? []).length - plans.length };
   }));
 
 /** Lists TMDB seasons of a series (including Specials / season 0) with "already imported" flags. */
