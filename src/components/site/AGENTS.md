@@ -1,0 +1,1 @@
+- Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: layout independent of source logic.
