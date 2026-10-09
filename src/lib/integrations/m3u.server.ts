@@ -166,7 +166,7 @@ export async function indexStep(listId: string, restart: boolean) {
 
 const FINAL_CHUNK = 20_000;
 const FINAL_MS = 20_000;
-const SRC_CHUNK = 1_000;
+const SRC_CHUNK = 300;
 /** Closing phase, also chunked: flags vanished entries, recounts, refreshes sources of imported content. */
 async function finalizeStep(listId: string, gen: number, flags: any, entries: number) {
   const started = Date.now();

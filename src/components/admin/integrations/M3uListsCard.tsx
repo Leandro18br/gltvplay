@@ -45,7 +45,14 @@ export function M3uListsCard() {
     try {
       let first = true;
       for (;;) {
-        const r = await step({ data: { listId: l.id, restart: restart && first } });
+        let r: Awaited<ReturnType<typeof step>> | undefined;
+        // Temporary failures (timeouts, network) are retried with backoff from the saved checkpoint.
+        for (let attempt = 0; ; attempt++) {
+          try { r = await step({ data: { listId: l.id, restart: restart && first } }); } catch (e) { r = { ok: false as const, error: errMsg(e) }; }
+          if (r.ok || attempt >= 4 || !/timeout|canceling statement|fetch|network|conexão|50[234]|429/i.test(r.error)) break;
+          setB(l.id, `Falha temporária, tentando novamente (${attempt + 1}/4)…`);
+          await new Promise(res => setTimeout(res, 2000 * 2 ** attempt));
+        }
         first = false;
         if (!r.ok) throw new Error(r.error);
         const pct = r.total ? ` (${Math.min(99, Math.floor(((r.offset ?? 0) / r.total) * 100))}%)` : "";
@@ -53,7 +60,7 @@ export function M3uListsCard() {
         if (r.done) { toast.success("Catálogo M3U indexado. Agora é só explorar e importar."); break; }
         refresh();
       }
-    } catch (e) { toast.error(errMsg(e)); setResult(x => ({ ...x, [l.id]: `Erro: ${errMsg(e)} — o progresso foi salvo; clique em "Continuar indexação".` })); }
+    } catch (e) { const m = e instanceof Error ? e.message : errMsg(e); toast.error(m); setResult(x => ({ ...x, [l.id]: `Erro: ${m} — o progresso foi salvo; clique em "Continuar indexação".` })); }
     finally { setB(l.id); refresh(); }
   }
 
