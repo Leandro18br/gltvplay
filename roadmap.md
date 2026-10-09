@@ -1,7 +1,7 @@
 # Individual TMDB metadata completion
-- [ ] Reuse TMDB lookup/cache to resolve an existing movie or series and fill only missing metadata, preserving playback and manual values.
-- [ ] Add individual admin update controls, ambiguous-match selection, result counts and separate existing-season/episode completion.
-- [ ] Test preservation/matching rules and verify authenticated movie and series update flows.
+- [x] Reuse TMDB lookup/cache to resolve an existing movie or series and fill only missing metadata through an atomic staff-only allowlisted RPC, preserving playback, existing values and M3U provenance.
+- [x] Add individual admin update controls, ambiguous-match selection, result counts, live editor refresh and separate existing-season/episode completion.
+- [x] 31 tests passed and build OK. Authenticated Dragon Tiger Gate M3U update filled 14 fields and linked 2 existing genres; 009-1 M3U series filled 16 fields and linked 7 genres after explicit match selection. Episode completion filled 75 fields for 12 existing episodes; unmatched episode preserved, all 13 IDs and 13 sources unchanged. O Mentalista re-run preserved 151 episodes and 151 sources. Database rejected manual/internal overwrites; editor remained open, controls fit 320/390/768/1280.
 
 # Public catalog grids
 - [x] Use responsive multi-row movie/series grids outside Home; preserve Home and channel carousels and all data behavior.
