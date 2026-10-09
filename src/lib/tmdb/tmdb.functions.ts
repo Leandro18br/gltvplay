@@ -2,7 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { completionFields, isMissing, missingMetadata, rankCandidates, reliableMatch, rowYear, searchTitles, simplifiedTitle, type MatchCandidate, type CompletionKind } from "./completion";
+import { completionFields, coverDecision, isMissing, missingMetadata, rankCandidates, reliableMatch, rowYear, searchTitles, simplifiedTitle, type MatchCandidate, type CompletionKind } from "./completion";
 
 /**
  * Official TMDB integration — METADATA ONLY. Never creates playback sources.
@@ -350,7 +350,7 @@ export const tmdbCompleteSeasonEpisodes = createServerFn({ method: "POST" })
         const r = await applyCompletion(ctx, "episode", plan.episode.id, plan.episode, plan.fields);
         filled += r.filled;
         if (r.filled) updated++;
-        const fresh = r.fields?.thumbnail_url !== undefined ? r.fields.thumbnail_url : plan.episode.thumbnail_url;
+        const fresh = isMissing(plan.episode.thumbnail_url) ? plan.fields.thumbnail_url : plan.episode.thumbnail_url;
         const d = coverDecision(fresh as string | null, plan.fields.still_path);
         if (d === "valid") covers.valid++;
         else if (d === "not_found") covers.notFound++;
