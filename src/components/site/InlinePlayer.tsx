@@ -72,7 +72,7 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
           <InlineHls key={source.id} url={source.url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
         ) : (
           <VideoPlayerFrame key={source.id} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer}>
-            <video src={source.url} autoPlay playsInline className="h-full w-full bg-player object-contain" />
+            <video src={source.url} autoPlay playsInline className="h-full w-full bg-player" />
           </VideoPlayerFrame>
         )}
       </div>
@@ -122,6 +122,6 @@ function InlineHls({ url, title, servers, selectedServer, onServerChange }: { ur
   const [level, setLevel] = useState(-1);
   const [engine, setEngine] = useState<{ currentLevel: number } | null>(null);
   return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={failed ? "HLS" : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
-    <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player object-contain" />
+    <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player" />
   </VideoPlayerFrame>;
 }

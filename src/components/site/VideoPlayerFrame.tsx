@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type ComponentProps } from "react";
-import { Cast, Loader2, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Settings2, Volume2, VolumeX, AlertTriangle } from "lucide-react";
+import { ZoomIn, ZoomOut, Cast, Loader2, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Settings2, Volume2, VolumeX, AlertTriangle } from "lucide-react";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
 import * as SliderPrimitive from "@radix-ui/react-slider";
@@ -55,6 +55,8 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
   const [failed, setFailed] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Visual-only framing: never touches playback state, source or resolution.
+  const [zoomed, setZoomed] = useState(false);
   const canSeek = Number.isFinite(duration) && duration > 0;
   const hasError = failed || !!error;
 
@@ -77,8 +79,8 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     const video = media.current;
     if (!video) return;
     if (video.paused) {
-      video.play().then(() => flash("play")).catch(() => { setNotice("Toque em Reproduzir para iniciar."); });
-    } else { video.pause(); flash("pause"); }
+      video.play().catch(() => { setNotice("Toque em Reproduzir para iniciar."); });
+    } else { video.pause(); }
   };
   const skip = (delta: number) => {
     const video = media.current;
@@ -176,9 +178,10 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
   );
 
   return <div ref={wrap} role="region" aria-label={`Player de ${title}`} tabIndex={0} onKeyDown={onKey} onPointerMove={reveal} onPointerDown={reveal} onFocus={reveal} onBlur={reveal}
-    className={`group/player relative isolate min-w-0 bg-player text-player-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary ${fullPage ? "fixed inset-0" : "aspect-video w-full rounded-lg"} ${visible || !playing ? "" : "cursor-none"} [&:fullscreen]:h-dvh [&:fullscreen]:w-full [&:fullscreen]:rounded-none [&_video]:absolute [&_video]:inset-0 [&_video]:h-full [&_video]:w-full [&_video]:rounded-[inherit] [&_video]:object-contain`}>
+    className={`group/player relative isolate min-w-0 bg-player text-player-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary ${fullPage ? "fixed inset-0" : "aspect-video w-full rounded-lg"} ${visible || !playing ? "" : "cursor-none"} [&:fullscreen]:h-dvh [&:fullscreen]:w-full [&:fullscreen]:rounded-none [&_video]:absolute [&_video]:inset-0 [&_video]:h-full [&_video]:w-full [&_video]:rounded-[inherit] [&_video]:transition-transform [&_video]:duration-300 [&_video]:origin-center overflow-hidden ${zoomed ? "[&_video]:object-cover [&_video]:scale-[1.15]" : "[&_video]:object-contain"}`}>
     {children}
-    <div onClick={() => { if (!visible) reveal(); else toggle(); }} className="absolute inset-0" aria-hidden="true" />
+    {/* Tapping the picture only shows/hides controls; pausing is exclusive to the Play/Pause button. */}
+    <div onClick={() => { if (!visible) reveal(); else if (playing) { clearTimeout(idle.current); setVisible(false); } }} className="absolute inset-0" aria-hidden="true" />
     {waiting && !hasError && <div className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2"><Loader2 className="size-6 animate-spin text-primary" /></div>}
     <div inert={!visible && playing && !hasError} className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${visible || !playing || hasError ? "opacity-100" : "opacity-0"}`}>
       {(header || fullPage) && <div className="pointer-events-auto absolute inset-x-0 top-0 flex min-w-0 items-center gap-3 bg-player/70 p-3 md:p-5">{header ?? <p className="truncate text-sm font-semibold">{title}</p>}</div>}
@@ -209,6 +212,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
             </Menu.Portal>
           </DropdownMenu>
           {cast && iconButton("Transmitir", <Cast />, () => { const video = media.current; if (cast === "remote") video?.remote?.prompt().catch(() => setNotice("Transmissão cancelada ou indisponível.")); else video?.webkitShowPlaybackTargetPicker?.(); })}
+          <Button type="button" variant="ghost" size="icon" aria-pressed={zoomed} title={zoomed ? "Enquadramento original" : "Ampliar imagem"} aria-label={zoomed ? "Enquadramento original" : "Ampliar imagem"} onClick={() => { setZoomed(z => !z); reveal(); }} className={`size-11 shrink-0 rounded-full hover:bg-player-foreground/15 [&_svg]:size-5 ${zoomed ? "bg-primary/20 text-primary hover:text-primary" : "text-player-foreground hover:text-player-foreground"}`}>{zoomed ? <ZoomOut /> : <ZoomIn />}</Button>
           {iconButton(fullscreen ? "Sair da tela cheia" : "Tela cheia", fullscreen ? <Minimize /> : <Maximize />, () => void toggleFullscreen())}
         </div>
       </div>
