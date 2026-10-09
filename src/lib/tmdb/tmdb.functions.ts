@@ -286,7 +286,7 @@ async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string, curre
     if (error.code === "23505") throw new Error("Este TMDB ID já está associado a outro conteúdo. Nenhum registro foi recriado ou mesclado.");
     throw new Error("Não foi possível salvar as informações. Tente novamente.");
   }
-  return data as { filled: number; genres: number; fields: Record<string, unknown> };
+  return data as { filled: number; genres: number; fields: Record<string, string | number | null> };
 }
 
 /** Individual missing-field completion; never writes sources or internal provenance. */

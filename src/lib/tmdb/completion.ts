@@ -19,9 +19,9 @@ export function missingMetadata(kind: CompletionKind, current: MetadataRow, inco
     if (typeof value === "number" && (!Number.isFinite(value) || value < 0)) continue;
     if (["tmdb_id", "release_year", "duration_minutes"].includes(key) && value === 0) continue;
     // Do not associate a TMDB image path with an existing custom image.
-    if (key === "poster_path" && !isMissing(current.poster_url)) continue;
-    if (key === "backdrop_path" && !isMissing(current.backdrop_url)) continue;
-    if (key === "still_path" && !isMissing(current.thumbnail_url)) continue;
+    if (key === "poster_path" && !isMissing(current["poster_url"])) continue;
+    if (key === "backdrop_path" && !isMissing(current["backdrop_url"])) continue;
+    if (key === "still_path" && !isMissing(current["thumbnail_url"])) continue;
     patch[key] = value;
   }
   return patch;
@@ -32,7 +32,7 @@ export function normalizeTitle(title: string) {
 }
 
 export function searchTitles(row: MetadataRow): string[] {
-  return [...new Set([row.original_title, row.title].filter((x): x is string => typeof x === "string" && !!x.trim()).flatMap((title) => {
+  return [...new Set([row["original_title"], row["title"]].filter((x): x is string => typeof x === "string" && !!x.trim()).flatMap((title) => {
     const clean = title.replace(/\[(?:[^\]]+)\]/g, " ").replace(/\b(?:4k|1080p|720p|480p|2160p|fhd|uhd|hd|dublado|legendado)\b/gi, " ").replace(/\(\d{4}\)/g, " ").replace(/\s+/g, " ").trim();
     return [clean, title.trim()];
   }))].slice(0, 4);
@@ -41,6 +41,6 @@ export function searchTitles(row: MetadataRow): string[] {
 export type MatchCandidate = { tmdb_id: number; title: string; original_title: string | null; year: number | null; poster_url: string | null };
 export function reliableMatch(row: MetadataRow, candidates: MatchCandidate[]): number | null {
   const titles = searchTitles(row).map(normalizeTitle);
-  const matches = candidates.filter((c) => [c.title, c.original_title].some((t) => t && titles.includes(normalizeTitle(t))) && typeof row.release_year === "number" && c.year === row.release_year);
+  const matches = candidates.filter((c) => [c.title, c.original_title].some((t) => t && titles.includes(normalizeTitle(t))) && typeof row["release_year"] === "number" && c.year === row["release_year"]);
   return matches.length === 1 ? matches[0]?.tmdb_id ?? null : null;
 }
