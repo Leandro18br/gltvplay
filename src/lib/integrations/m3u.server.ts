@@ -368,6 +368,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     let errors = 0;
     let size = BULK_START;
     let remaining: number | null = null;
+    let permanent = 0;
     const pendingQ = (sel: any) => sel.eq("list_id", listId).eq("kind", "episode").eq("series_key", it.series_key).is("content_id", null).eq("missing", false).or(`import_error.is.null,last_attempt_at.lt."${jobStart}"`);
     while (!over()) {
       const r: { error: any; data?: any } = await withRetry(() => db.rpc("m3u_import_series_chunk", { _list: listId, _series_key: it.series_key, _series_id: sid, _job_start: jobStart, _limit: size }));
@@ -376,8 +377,11 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
         // A single item keeps failing for a permanent reason: record it and move on.
         const { data: bad } = await pendingQ(db.from("m3u_items").select("*")).order("season").order("episode").order("id").limit(1);
         if (!bad?.length) break;
-        await markErr(bad[0] as Item, r.error); errors++; continue;
+        await markErr(bad[0] as Item, r.error); errors++;
+        if (++permanent >= 3) throw new Error(`Falha repetida ao gravar episódios: ${msg(r.error).slice(0, 200)}`); // systemic, not item data
+        size = BULK_START; continue;
       }
+      permanent = 0;
       const res = r.data as { processed: number; errors: number; remaining: number };
       errors += res.errors; remaining = res.remaining;
       if (!res.processed || !res.remaining) break;
