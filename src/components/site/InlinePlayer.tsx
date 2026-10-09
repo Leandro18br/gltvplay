@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -133,7 +133,7 @@ function InlineHls({ url, title, servers, selectedServer, onServerChange }: { ur
 }
 
 /** Resolves HTTP sources on HTTPS pages to a verified HTTPS alternative, or shows why it can't play. */
-function SecureSource({ url, title, servers, selectedServer, onServerChange, children }: { url: string; title: string; servers: Src[]; selectedServer: string; onServerChange: (index: number) => void; children: (url: string) => React.ReactNode }) {
+function SecureSource({ url, title, servers, selectedServer, onServerChange, children }: { url: string; title: string; servers: Src[]; selectedServer: string; onServerChange: (index: number) => void; children: (url: string) => ReactNode }) {
   const [state, setState] = useState<{ url: string | null; failed: boolean }>({ url: null, failed: false });
   useEffect(() => { let off = false; resolveSecureUrl(url).then(r => { if (!off) setState({ url: r, failed: !r }); }); return () => { off = true; }; }, [url]);
   if (state.url) return <>{children(state.url)}</>;
