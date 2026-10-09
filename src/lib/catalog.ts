@@ -261,10 +261,11 @@ export const categoryQuery = (slug: string) =>
       if (error) throw error;
       if (!cat) return null;
       const [m, s, c] = await Promise.all([
-        sb.from("movies").select(MOVIE_SEL).eq("status", "published").eq("category_id", cat.id).order("sort_order").limit(60),
-        sb.from("series").select(SERIES_SEL).eq("status", "published").eq("category_id", cat.id).order("sort_order").limit(60),
+        sb.from("movies").select(`${MOVIE_SEL},movie_categories!inner(category_id)`).eq("status", "published").eq("movie_categories.category_id", cat.id).order("sort_order").limit(60),
+        sb.from("series").select(`${SERIES_SEL},series_categories!inner(category_id)`).eq("status", "published").eq("series_categories.category_id", cat.id).order("sort_order").limit(60),
         sb.from("channels").select(CHANNEL_SEL).eq("status", "published").eq("category_id", cat.id).order("sort_order").limit(60),
       ]);
+      if (m.error || s.error || c.error) throw m.error ?? s.error ?? c.error;
       return {
         category: cat as { id: string; name: string; slug: string; description: string | null; image_url: string | null },
         movies: (m.data ?? []).map(toMovie) as Item[],

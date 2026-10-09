@@ -127,6 +127,13 @@
       "when": 1791508920946,
       "tag": "0017_tmdb_complete_missing_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791509587347,
+      "tag": "0018_catalog_default_categories_and_batches",
+      "breakpoints": true
     }
   ]
 }

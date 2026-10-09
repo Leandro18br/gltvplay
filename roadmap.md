@@ -1,3 +1,9 @@
+# 2026 catalog and default categories
+- [ ] Inspect existing categories and import paths; preserve existing associations and playback.
+- [ ] Add reusable default categories and additive movie/series associations for existing and new imports.
+- [ ] Discover all TMDB 2026 release pages and process metadata-only imports/completion in resumable bounded batches.
+- [ ] Execute real updates; verify database counts, idempotency, unchanged players and public/admin categories; report exact outcomes and errors.
+
 # Individual TMDB metadata completion
 - [x] Reuse TMDB lookup/cache to resolve an existing movie or series and fill only missing metadata through an atomic staff-only allowlisted RPC, preserving playback, existing values and M3U provenance.
 - [x] Add individual admin update controls, ambiguous-match selection, result counts, live editor refresh and separate existing-season/episode completion.
