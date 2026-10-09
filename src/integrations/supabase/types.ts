@@ -1869,6 +1869,10 @@ export type Database = {
         Args: { _gen: number; _list: string }
         Returns: undefined
       }
+      m3u_finalize_sources_chunk: {
+        Args: { _after: string; _gen: number; _limit: number; _list: string }
+        Returns: Json
+      }
       m3u_groups: {
         Args: { _kind: string; _list: string }
         Returns: {
