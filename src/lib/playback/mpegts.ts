@@ -57,3 +57,6 @@ export async function resolveSecureUrl(url: string): Promise<string | null> {
 }
 
 export const MIXED_CONTENT_MESSAGE = "Esta transmissão usa HTTP e o servidor não oferece uma versão HTTPS funcional. Para assistir neste site seguro, o provedor precisa oferecer HTTPS ou é necessária uma retransmissão HTTPS autorizada.";
+
+/** Only live channels go through mpegts.js; movie/episode ".ts" URLs keep the original <video> path. */
+export function usesLiveMpegTs(live: boolean, url: string): boolean { return live && isMpegTsUrl(url); }

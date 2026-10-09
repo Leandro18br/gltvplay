@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { Button } from "@/components/ui/button";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
 import { VideoPlayerFrame } from "@/components/site/VideoPlayerFrame";
-import { attachMpegTs, isMpegTsUrl, resolveSecureUrl, MIXED_CONTENT_MESSAGE } from "@/lib/playback/mpegts";
+import { attachMpegTs, usesLiveMpegTs, resolveSecureUrl, MIXED_CONTENT_MESSAGE } from "@/lib/playback/mpegts";
 
 type PKind = "movie" | "episode" | "channel";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,9 +154,11 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
     setSrc(null);
     setError(null);
     if (embed || !url) return;
+    // Movies/episodes use the stored URL exactly as before; the HTTPS check applies to live channels only.
+    if (!live) { setSrc(url); return; }
     resolveSecureUrl(url).then((r) => { if (off) return; if (r) setSrc(r); else setError(MIXED_CONTENT_MESSAGE); });
     return () => { off = true; };
-  }, [url, embed]);
+  }, [url, embed, live]);
 
   // Load source (HLS via hls.js when not natively supported)
   useEffect(() => {
@@ -177,7 +179,7 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
         });
         hls.on(Hls.Events.ERROR, (_e: unknown, d: { fatal: boolean }) => { if (d.fatal) setError("Falha ao carregar a transmissão."); });
       });
-    } else if (!isHls && isMpegTsUrl(src)) {
+    } else if (!isHls && usesLiveMpegTs(live, src)) {
       setError(null);
       const release = attachMpegTs(v, src, live, (m) => { if (!cancelled) setError(m); });
       return () => { cancelled = true; release(); };

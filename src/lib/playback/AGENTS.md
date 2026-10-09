@@ -1,1 +1,1 @@
-- Direct MPEG-TS (.ts) URLs play through mpegts.js via `mpegts.ts` (lazy import, destroyed on source change), URL unchanged; HLS/MP4/embeds keep their paths. Why: browsers cannot play raw MPEG-TS in <video>.
+- Only live channels use mpegts.js for ".ts" and the HTTPS-alternative check (`usesLiveMpegTs`, `resolveSecureUrl`); movie/episode sources always load their stored URL unchanged through the original video/HLS path. Why: probing or rerouting VOD broke playback of HTTP movie/episode files.

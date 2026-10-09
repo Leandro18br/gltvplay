@@ -12,3 +12,9 @@ describe("HTTPS alternative for HTTP sources", () => {
 describe("HTTP port on HTTPS variant", () => {
   it("drops explicit :80 when probing HTTPS", async () => { setProto("https:"); vi.stubGlobal("fetch", vi.fn(async (u: string) => ({ ok: true, url: u }))); expect(await resolveSecureUrl("http://x.tv:80/live/a.ts")).toBe("https://x.tv/live/a.ts"); });
 });
+import { usesLiveMpegTs } from "./mpegts";
+describe("movies and episodes never use the live IPTV pipeline", () => {
+  it("movie .ts URL stays on the original player", () => { expect(usesLiveMpegTs(false, "http://x.tv/movie/a.ts")).toBe(false); });
+  it("live channel .ts URL uses mpegts.js", () => { expect(usesLiveMpegTs(true, "http://x.tv/live/a.ts")).toBe(true); });
+  it("live channel .m3u8 does not use mpegts.js", () => { expect(usesLiveMpegTs(true, "https://x.tv/a.m3u8")).toBe(false); });
+});
