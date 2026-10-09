@@ -46,11 +46,11 @@ export const testM3uList = createServerFn({ method: "POST" }).middleware([requir
 
 /** One resumable indexing step (catalog only; never imports into the main catalog). */
 export const indexM3uStep = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
-  .inputValidator(z.object({ listId: z.string().uuid(), restart: z.boolean().default(false) }))
+  .inputValidator(z.object({ listId: z.string().uuid(), restart: z.boolean().default(false), runner: z.string().max(64).default("legacy"), force: z.boolean().default(false) }))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const S = await import("./m3u.server");
-    try { return { ok: true as const, ...(await S.indexStep(data.listId, data.restart)) }; } catch (e) { return { ok: false as const, error: msg(e) }; }
+    try { return { ok: true as const, ...(await S.indexStep(data.listId, data.restart, data.runner, data.force)) }; } catch (e) { return { ok: false as const, error: msg(e) }; }
   });
 
 export const exploreM3u = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
@@ -85,4 +85,22 @@ export const importM3uItems = createServerFn({ method: "POST" }).middleware([req
     await assertAdmin(context);
     const S = await import("./m3u.server");
     return S.importItems(data.listId, data.ids, data.jobStart, data.batchId);
+  });
+
+/** Real counts (total, imported, pending, errors, missing) for the admin panel. */
+export const m3uStats = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ listId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const S = await import("./m3u.server");
+    return S.stats(data.listId);
+  });
+
+/** Ids of items whose last import failed (for "Reprocessar com erro"). */
+export const pickM3uErrors = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ listId: z.string().uuid(), limit: z.number().int().min(1).max(500) }))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const S = await import("./m3u.server");
+    return S.pickErrorIds(data.listId, data.limit);
   });
