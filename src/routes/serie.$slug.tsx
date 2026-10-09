@@ -1,3 +1,4 @@
+import { safeImageUrl } from "@/lib/tmdb/completion";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -53,7 +54,7 @@ function SeriesPage() {
           item={data.item}
           extraMeta={<span>· {data.seasons.length} temporada{data.seasons.length === 1 ? "" : "s"}</span>}
           player={current ? (
-            <InlinePlayer kind="episode" id={current.id} title={`${data.item.title} — ${current.title}`} poster={current.thumbnail_url || data.item.backdrop_url || data.item.poster_url} />
+            <InlinePlayer kind="episode" id={current.id} title={`${data.item.title} — ${current.title}`} poster={safeImageUrl(current.thumbnail_url) || data.item.backdrop_url || data.item.poster_url} />
           ) : undefined}
         />
         <section id="episodios" aria-label="Episódios" className="mx-auto max-w-[1600px] scroll-mt-20 px-4 py-10 md:px-10">
@@ -79,7 +80,7 @@ function SeriesPage() {
                     className={`group grid w-full grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-4 rounded-xl p-2 text-left transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] ${e.id === current?.id ? "bg-card ring-1 ring-primary/40" : ""}`}>
                     <span className="hidden text-center font-display text-2xl text-muted-foreground md:block">{e.episode_number}</span>
                     <div className="relative aspect-video overflow-hidden rounded-lg bg-card">
-                      {e.thumbnail_url ? <img src={e.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" /> : <div className="h-full bg-accent" />}
+                      {safeImageUrl(e.thumbnail_url) ? <img src={safeImageUrl(e.thumbnail_url)!} alt="" loading="lazy" className="h-full w-full object-cover" onError={(ev) => { ev.currentTarget.style.display = "none"; }} /> : <div className="h-full bg-accent" />}
                       <span className="absolute inset-0 flex items-center justify-center bg-background/40 opacity-0 transition group-hover:opacity-100"><Play className="fill-current text-primary" /></span>
                     </div>
                     <div className="min-w-0">

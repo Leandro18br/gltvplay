@@ -1,3 +1,4 @@
+import { safeImageUrl } from "@/lib/tmdb/completion";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -80,7 +81,7 @@ function SearchPage() {
                   <li key={e.id}>
                     <Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2 transition hover:border-primary/50">
                       <div className="aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-accent">
-                        {(e.thumbnail_url || e.series.backdrop_url) && <img src={e.thumbnail_url || e.series.backdrop_url!} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                        {(safeImageUrl(e.thumbnail_url) || e.series.backdrop_url) && <img src={safeImageUrl(e.thumbnail_url) || e.series.backdrop_url!} alt="" loading="lazy" className="h-full w-full object-cover" />}
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{e.title}</p>
