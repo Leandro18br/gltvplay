@@ -14,6 +14,19 @@ const STEP_MS = 15_000;          // budget for parsing NEW data per indexing req
 const STEP_WALL_MS = 90_000;     // absolute wall cap (servers without Range support re-send the skipped prefix)
 const STEP_MAX_ENTRIES = 20_000; // hard cap of entries per indexing request
 const IMPORT_MS = 18_000;        // wall budget per import request
+const BULK_START = 200;          // episodes per set-based chunk (adapts between 1 and BULK_MAX)
+const BULK_MAX = 800;
+const TRANSIENT = /timeout|canceling statement|fetch failed|network|ECONN|503|502|504|429|rate limit|too many/i;
+/** Retries transient failures (timeouts, 429/5xx, connection) with progressive backoff; permanent errors return immediately. */
+export async function withRetry<T extends { error: any; data?: any }>(fn: () => PromiseLike<T>, tries = 3): Promise<T> {
+  let last: T | undefined;
+  for (let i = 0; i < tries; i++) {
+    try { last = await fn(); } catch (e) { last = { error: e } as T; }
+    if (!last.error || !TRANSIENT.test(msg(last.error))) return last;
+    await new Promise((r) => setTimeout(r, 400 * 2 ** i));
+  }
+  return last!;
+}
 const INVALID = "O conteúdo não é uma lista M3U válida.";
 const msg = (e: unknown) => (e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as any).message) : "Erro inesperado");
 
@@ -351,30 +364,30 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
       }
       await markOk(it, sid!);
     }
-    const seasons = new Map<number, string>();
+    // Set-based: one database call imports a whole chunk (seasons, episodes, sources, item status), instead of ~7 calls per episode.
     let errors = 0;
+    let size = BULK_START;
+    let remaining: number | null = null;
+    let permanent = 0;
     const pendingQ = (sel: any) => sel.eq("list_id", listId).eq("kind", "episode").eq("series_key", it.series_key).is("content_id", null).eq("missing", false).or(`import_error.is.null,last_attempt_at.lt."${jobStart}"`);
     while (!over()) {
-      const { data: eps } = await pendingQ(db.from("m3u_items").select("*")).order("season").order("episode").limit(50);
-      if (!eps?.length) break;
-      for (const ep of eps as Item[]) {
-        if (over()) break;
-        try {
-          let seasonId = seasons.get(ep.season!);
-          if (!seasonId) {
-            seasonId = (await db.from("seasons").select("id").eq("series_id", sid).eq("season_number", ep.season).limit(1).maybeSingle()).data?.id;
-            if (!seasonId) { const s = await db.from("seasons").insert({ series_id: sid, season_number: ep.season, title: `Temporada ${ep.season}`, status: "published", sort_order: ep.season }).select("id").single(); if (s.error) throw s.error; seasonId = s.data.id; }
-            seasons.set(ep.season!, seasonId!);
-          }
-          const cur = (await db.from("episodes").select("id,thumbnail_url").eq("season_id", seasonId).eq("episode_number", ep.episode).limit(1).maybeSingle()).data as any;
-          let eid: string;
-          if (cur) { eid = cur.id; if (!cur.thumbnail_url && ep.logo) await db.from("episodes").update({ thumbnail_url: ep.logo }).eq("id", eid); }
-          else { const ins = await db.from("episodes").insert({ season_id: seasonId, episode_number: ep.episode, title: ep.title.slice(0, 200), thumbnail_url: ep.logo, status: "published" }).select("id").single(); if (ins.error) throw ins.error; eid = ins.data.id; }
-          await source("episode", eid, ep);
-          await markOk(ep, eid);
-        } catch (e) { errors++; await markErr(ep, e); }
+      const r: { error: any; data?: any } = await withRetry(() => db.rpc("m3u_import_series_chunk", { _list: listId, _series_key: it.series_key, _series_id: sid, _job_start: jobStart, _limit: size }));
+      if (r.error) {
+        if (size > 1) { size = Math.max(1, Math.floor(size / 2)); continue; } // payload/timeout: shrink and repeat (idempotent)
+        // A single item keeps failing for a permanent reason: record it and move on.
+        const { data: bad } = await pendingQ(db.from("m3u_items").select("*")).order("season").order("episode").order("id").limit(1);
+        if (!bad?.length) break;
+        await markErr(bad[0] as Item, r.error); errors++;
+        if (++permanent >= 3) throw new Error(`Falha repetida ao gravar episódios: ${msg(r.error).slice(0, 200)}`); // systemic, not item data
+        size = BULK_START; continue;
       }
+      permanent = 0;
+      const res = r.data as { processed: number; errors: number; remaining: number };
+      errors += res.errors; remaining = res.remaining;
+      if (!res.processed || !res.remaining) break;
+      if (size < BULK_MAX) size = Math.min(BULK_MAX, size * 2);
     }
+    if (remaining !== null) return { remaining, errors };
     const { count } = await pendingQ(db.from("m3u_items").select("id", { count: "exact", head: true }));
     return { remaining: count ?? 0, errors };
   }

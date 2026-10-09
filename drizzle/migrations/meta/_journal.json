@@ -141,6 +141,20 @@
       "when": 1791568038810,
       "tag": "0019_tmdb_completion_dates_and_genres",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791569807343,
+      "tag": "0020_m3u_bulk_episode_import",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791570249530,
+      "tag": "0021_m3u_bulk_episode_import_casts",
+      "breakpoints": true
     }
   ]
 }
