@@ -165,6 +165,10 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
         });
         hls.on(Hls.Events.ERROR, (_e: unknown, d: { fatal: boolean }) => { if (d.fatal) setError("Falha ao carregar a transmissão."); });
       });
+    } else if (!isHls && isMpegTsUrl(url)) {
+      setError(null);
+      const release = attachMpegTs(v, url, live, (m) => { if (!cancelled) setError(m); });
+      return () => { cancelled = true; release(); };
     } else {
       v.src = url;
     }
