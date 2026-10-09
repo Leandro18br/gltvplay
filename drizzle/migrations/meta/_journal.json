@@ -120,6 +120,13 @@
       "when": 1791479155643,
       "tag": "0016_m3u_chunked_finalize",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791508920946,
+      "tag": "0017_tmdb_complete_missing_metadata",
+      "breakpoints": true
     }
   ]
 }

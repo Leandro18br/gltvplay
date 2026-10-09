@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { ResourceManager } from "@/components/admin/ResourceManager";
-import { TmdbEpisodesButton } from "@/components/admin/tmdb/TmdbTools";
+import { TmdbEpisodesButton, TmdbCompleteEpisodesButton } from "@/components/admin/tmdb/TmdbTools";
 import { episodesConfig } from "@/lib/admin/configs";
 import { adminHead } from "@/lib/admin/head";
 import { db, type Row } from "@/lib/admin/db";
@@ -31,7 +31,7 @@ function SeasonManage() {
         <Link to="/admin/series/$id" params={{ id }} className="hover:text-primary">{s?.series?.title ?? "Série"}</Link><ChevronRight className="h-4 w-4" />
         <span className="text-foreground">{label}</span>
       </nav>
-      {s?.series?.tmdb_id && <div className="flex justify-end"><TmdbEpisodesButton seasonId={seasonId} /></div>}
+      {s?.series?.tmdb_id && <div className="flex flex-wrap justify-end gap-2"><TmdbCompleteEpisodesButton seriesId={id} seasonId={seasonId} /><TmdbEpisodesButton seasonId={seasonId} /></div>}
       <ResourceManager config={episodesConfig} initialScope={seasonId} lockScope title={`Episódios · ${label}`} />
     </div>
   );

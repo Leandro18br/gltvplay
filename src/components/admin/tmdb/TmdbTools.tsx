@@ -4,7 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Check, CheckCircle2, DownloadCloud, Film, Loader2, RefreshCw, Search, Sparkles, XCircle } from "lucide-react";
-import { tmdbImportEpisodes, tmdbImportMovie, tmdbImportSeasons, tmdbImportSeries, tmdbListSeasons, tmdbRefresh, tmdbSearch, tmdbStatus, tmdbTestConnection } from "@/lib/tmdb/tmdb.functions";
+import { tmdbImportEpisodes, tmdbImportMovie, tmdbImportSeasons, tmdbImportSeries, tmdbListSeasons, tmdbSearch, tmdbStatus, tmdbTestConnection } from "@/lib/tmdb/tmdb.functions";
+export { TmdbRefreshButton, TmdbCompleteEpisodesButton } from "./TmdbCompletionButton";
 import { errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,20 +144,6 @@ function TmdbSearchDialog({ kind, onClose }: { kind: Kind; onClose: () => void }
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** "Atualizar dados do TMDB" — only TMDB-owned fields; players/status/categories untouched. */
-export function TmdbRefreshButton({ kind, id, onDone }: { kind: Kind; id: string; onDone?: () => void }) {
-  const qc = useQueryClient();
-  const refresh = useServerFn(tmdbRefresh);
-  const [busy, setBusy] = useState(false);
-  return (
-    <Button type="button" size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={async () => {
-      setBusy(true);
-      try { await refresh({ data: { kind, id } }); invalidateCatalog(qc); toast.success("Dados do TMDB atualizados."); onDone?.(); }
-      catch (x) { toast.error(errMsg(x)); } finally { setBusy(false); }
-    }}>{busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Atualizar dados do TMDB</Button>
   );
 }
 

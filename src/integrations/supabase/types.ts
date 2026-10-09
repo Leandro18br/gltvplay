@@ -1644,6 +1644,15 @@ export type Database = {
         Returns: undefined
       }
       admin_stats: { Args: never; Returns: Json }
+      complete_tmdb_metadata: {
+        Args: {
+          _genre_ids?: number[]
+          _id: string
+          _kind: string
+          _patch: Json
+        }
+        Returns: Json
+      }
       embed_url_allowed: { Args: { u: string }; Returns: boolean }
       ensure_fixed_genres: { Args: never; Returns: undefined }
       get_playback_source: {
