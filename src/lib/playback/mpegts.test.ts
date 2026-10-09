@@ -9,3 +9,6 @@ describe("HTTPS alternative for HTTP sources", () => {
   it("rejects when HTTPS redirects back to HTTP", async () => { setProto("https:"); vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, url: "http://1.2.3.4/auth/x" }))); expect(await resolveSecureUrl("http://x.tv/a.ts")).toBeNull(); });
   it("rejects when HTTPS fails", async () => { setProto("https:"); vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fail"); })); expect(await resolveSecureUrl("http://x.tv/a.ts")).toBeNull(); });
 });
+describe("HTTP port on HTTPS variant", () => {
+  it("drops explicit :80 when probing HTTPS", async () => { setProto("https:"); vi.stubGlobal("fetch", vi.fn(async (u: string) => ({ ok: true, url: u }))); expect(await resolveSecureUrl("http://x.tv:80/live/a.ts")).toBe("https://x.tv/live/a.ts"); });
+});
