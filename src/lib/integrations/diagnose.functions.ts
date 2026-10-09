@@ -43,7 +43,7 @@ export const diagnoseSyncFailures = createServerFn({ method: "POST" })
     if (!count && !list.data.last_error && !data.notes?.trim()) return { text: "Não há falhas registradas para esta lista. Cole registros adicionais para análise, se houver.", count: 0 };
     const input = redact(lines.join("\n")).slice(0, 60000);
 
-    const key = process.env.LOVABLE_API_KEY;
+    const key = process.env["LOVABLE_API_KEY"];
     if (!key) throw new Error("Serviço de IA não configurado.");
     const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",
