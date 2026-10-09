@@ -166,19 +166,34 @@ export async function indexStep(listId: string, restart: boolean) {
 
 const FINAL_CHUNK = 20_000;
 const FINAL_MS = 20_000;
+const SRC_CHUNK = 1_000;
 /** Closing phase, also chunked: flags vanished entries, recounts, refreshes sources of imported content. */
 async function finalizeStep(listId: string, gen: number, flags: any, entries: number) {
   const started = Date.now();
-  while (Date.now() - started < FINAL_MS) {
-    const r = await db.rpc("m3u_finalize_chunk", { _list: listId, _gen: gen, _from: flags.cursor, _limit: FINAL_CHUNK });
+  while (!flags.sources && Date.now() - started < FINAL_MS) {
+    const r = await withRetry(() => db.rpc("m3u_finalize_chunk", { _list: listId, _gen: gen, _from: flags.cursor, _limit: FINAL_CHUNK }));
     if (r.error) throw new Error(`Falha ao concluir a indexação: ${r.error.message}`);
     const c = r.data as Record<string, number>;
     for (const k of ["movie", "series", "episode", "channel", "missing"]) flags.counts[k] += Number(c[k] ?? 0);
     flags.cursor = Number(c["next"]); flags.checked += Number(c["rows"]);
     await db.from("m3u_lists").update({ index_flags: flags }).eq("id", listId);
-    if (Number(c["rows"]) < FINAL_CHUNK) {
-      const s = await db.rpc("m3u_finalize_sources", { _list: listId, _gen: gen });
-      if (s.error) throw new Error(`Falha ao atualizar as fontes importadas: ${s.error.message}`);
+    if (Number(c["rows"]) < FINAL_CHUNK) { flags.sources = true; break; }
+  }
+  // Refresh links of imported content in small resumable chunks (one big UPDATE hit the statement timeout).
+  while (flags.sources && Date.now() - started < FINAL_MS) {
+    const size: number = flags.srcSize ?? SRC_CHUNK;
+    const r = await withRetry(() => db.rpc("m3u_finalize_sources_chunk", { _list: listId, _gen: gen, _after: flags.srcCursor ?? null, _limit: size }), 2);
+    if (r.error) {
+      // Adaptive: a slow chunk (many changed links + audit rows) is retried smaller instead of failing the sync.
+      if (TRANSIENT.test(msg(r.error)) && size > 50) { flags.srcSize = Math.max(50, Math.floor(size / 2)); await db.from("m3u_lists").update({ index_flags: flags }).eq("id", listId); continue; }
+      throw new Error(`Falha ao atualizar as fontes importadas: ${msg(r.error)}`);
+    }
+    const c = r.data as Record<string, any>;
+    if (Number(c["rows"]) === size && size < SRC_CHUNK) flags.srcSize = Math.min(SRC_CHUNK, size * 2);
+    flags.srcChecked = (flags.srcChecked ?? 0) + Number(c["rows"]);
+    if (c["last"]) flags.srcCursor = c["last"];
+    await db.from("m3u_lists").update({ index_flags: flags }).eq("id", listId);
+    if (Number(c["rows"]) < size) {
       const k = flags.counts;
       await db.from("m3u_lists").update({
         sync_state: "indexed", last_synced_at: new Date().toISOString(), last_error: null, index_offset: 0, index_entries: entries,
@@ -188,7 +203,7 @@ async function finalizeStep(listId: string, gen: number, flags: any, entries: nu
       return { done: true as const, phase: "done" as const, entries, counts: k as Record<string, number>, offset: 0, total: null };
     }
   }
-  return { done: false as const, phase: "finalize" as const, entries, checked: flags.checked as number, offset: 0, total: null };
+  return { done: false as const, phase: "finalize" as const, entries, checked: (flags.checked + (flags.srcChecked ?? 0)) as number, offset: 0, total: null };
 }
 
 /* ------------------------------ explore ------------------------------ */
