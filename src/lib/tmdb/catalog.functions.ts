@@ -32,14 +32,14 @@ export const tmdbCatalogStart = createServerFn({method:"POST"}).middleware([requ
   return report(context,job);
 });
 export const tmdbCatalogStep = createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
-  .inputValidator(z.object({id:z.string().uuid()})).handler(async({data,context})=>{
+   .inputValidator(z.object({id:z.string().uuid(),work:z.enum(["discover","import"]).optional()})).handler(async({data,context})=>{
     await assertStaff(context);
     const {supabaseAdmin:db}=await import("@/integrations/supabase/client.server");
     const now=new Date().toISOString();
     const job=checked(await db.from("tmdb_catalog_jobs").update({lease_until:new Date(Date.now()+120000).toISOString()}).eq("id",data.id).or(`lease_until.is.null,lease_until.lt.${now}`).select("*").maybeSingle());
     if(!job) throw new Error("Este lote já está em execução. Aguarde e tente novamente.");
     try {
-      if(job.phase==="discover") {
+       if(job.phase==="discover"&&data.work!=="import") {
         const segments=job.segments as unknown as DateSegment[];
         const segment=segments[job.segment_index];
         if(!segment) throw new Error("Checkpoint de descoberta inválido.");
@@ -57,7 +57,7 @@ export const tmdbCatalogStep = createServerFn({method:"POST"}).middleware([requi
           if(job.segment_index>=segments.length) job.phase="import";
         }
         checked(await db.from("tmdb_catalog_jobs").update({segments:job.segments,segment_index:job.segment_index,page:job.page,phase:job.phase,discovered:job.discovered,total_reported:job.total_reported,last_error:null,updated_at:now}).eq("id",job.id));
-      } else if(job.phase==="import") {
+       } else if(job.phase==="import"||(job.phase==="discover"&&data.work==="import")) {
         const items=checked(await db.from("tmdb_catalog_job_items").select("*").eq("job_id",job.id).eq("state","pending").order("item_key").limit(CATALOG_BATCH_SIZE));
         await Promise.all(items.map(async item => {
           try {
@@ -83,7 +83,7 @@ export const tmdbCatalogStep = createServerFn({method:"POST"}).middleware([requi
             checked(await db.from("tmdb_catalog_job_items").update({state:"error",error:e instanceof Error?e.message:"Erro ao atualizar metadados.",attempts:item.attempts+1}).eq("job_id",job.id).eq("item_key",item.item_key));
           }
         }));
-        if(!items.length) {job.phase="done";checked(await db.from("tmdb_catalog_jobs").update({phase:"done",updated_at:now,last_error:null}).eq("id",job.id));}
+         if(!items.length&&job.phase==="import") {job.phase="done";checked(await db.from("tmdb_catalog_jobs").update({phase:"done",updated_at:now,last_error:null}).eq("id",job.id));}
       }
       return report(context,job);
     } catch(e) {

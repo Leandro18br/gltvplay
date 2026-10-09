@@ -1,8 +1,9 @@
 # 2026 catalog and default categories
 - [x] Inspect existing categories and import paths; preserve existing associations and playback.
 - [x] Add reusable default categories and additive movie/series associations for existing and new imports.
-- [ ] Discover all TMDB 2026 release pages and process metadata-only imports/completion in resumable bounded batches.
-- [ ] Execute real updates; verify database counts, idempotency, unchanged players and public/admin categories; report exact outcomes and errors.
+- [x] Discover all TMDB 2026 release pages: 38,899 unique candidates; implement bounded resumable metadata-only import/completion.
+- [x] Verify partial real execution: 1,032 created without sources; 15 existing movies completed (215 fields); 411 existing outcomes skipped; 3,064 movies and 18 series have defaults; no legacy category link missing; all 2,598 playback rows unchanged by hash; public categories and Home and admin readback checked; 23 tests pass and build OK.
+- [ ] Finish remaining 37,497 queued items using Continue update in ADM → APIs e Integrações; execution requires more active processing time than the completed sessions. No worker runs after this turn. Review 349 uncertain matches and 14 existing TMDB-ID conflicts without merging/deleting records.
 
 # Individual TMDB metadata completion
 - [x] Reuse TMDB lookup/cache to resolve an existing movie or series and fill only missing metadata through an atomic staff-only allowlisted RPC, preserving playback, existing values and M3U provenance.
