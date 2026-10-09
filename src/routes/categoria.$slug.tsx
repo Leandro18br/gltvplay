@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Film } from "lucide-react";
 import { categoryQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
-import { Row } from "@/components/site/ContentCard";
+import { GridSection, Row } from "@/components/site/ContentCard";
 
 export const Route = createFileRoute("/categoria/$slug")({
   loader: async ({ context, params }) => {
@@ -40,8 +40,8 @@ function Page() {
       <PageTitle title={data.category.name} subtitle={data.category.description} />
       {empty ? <EmptyState icon={<Film />} title="Ainda não há conteúdos nesta categoria" /> : (
         <div className="space-y-4">
-          <Row title="Filmes" items={data.movies} />
-          <Row title="Séries" items={data.series} />
+          <GridSection title="Filmes" items={data.movies} />
+          <GridSection title="Séries" items={data.series} />
           <Row title="Canais" items={data.channels} />
         </div>
       )}

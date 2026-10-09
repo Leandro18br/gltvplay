@@ -100,15 +100,27 @@ export function Row({ title, items, action }: { title: string; items: Item[]; ac
 export function CardGrid({ items }: { items: Item[] }) {
   const channels = items[0]?.kind === "channel";
   return (
-    <div className={`mx-auto grid max-w-[1600px] gap-x-3 gap-y-6 px-4 md:px-10 ${channels ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 2xl:grid-cols-8"}`}>
+    <div className={`mx-auto grid max-w-[1600px] gap-x-3 gap-y-6 px-4 md:px-10 ${channels ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : posterGridColumns}`}>
       {items.map((i) => <ContentCard key={`${i.kind}-${i.id}`} item={i} size="fluid" />)}
     </div>
   );
 }
 
+const posterGridColumns = "grid-cols-[repeat(auto-fill,minmax(min(100%,8.25rem),1fr))] sm:grid-cols-[repeat(auto-fill,minmax(min(100%,10rem),1fr))] md:grid-cols-[repeat(auto-fill,minmax(min(100%,11.25rem),1fr))] xl:grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))]";
+
+export function GridSection({ title, items }: { title: string; items: Item[] }) {
+  if (!items.length) return null;
+  return (
+    <section className="animate-rise" aria-label={title}>
+      <h2 className="mx-auto mb-5 max-w-[1600px] break-words px-4 text-lg font-semibold md:px-10 md:text-xl">{title}</h2>
+      <CardGrid items={items} />
+    </section>
+  );
+}
+
 export function GridSkeleton({ count = 12 }: { count?: number }) {
   return (
-    <div className="mx-auto grid max-w-[1600px] grid-cols-3 gap-3 px-4 sm:grid-cols-4 md:grid-cols-5 md:px-10 lg:grid-cols-6 2xl:grid-cols-8">
+    <div className={`mx-auto grid max-w-[1600px] gap-x-3 gap-y-6 px-4 md:px-10 ${posterGridColumns}`}>
       {Array.from({ length: count }).map((_, i) => <Skeleton key={i} className="aspect-[2/3] rounded-xl" />)}
     </div>
   );
