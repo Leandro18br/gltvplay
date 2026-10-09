@@ -70,6 +70,8 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
           <EmbedPlayer url={source.url} title={title} />
         ) : isHls ? (
           <InlineHls key={source.id} url={source.url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
+        ) : isMpegTsUrl(source.url) ? (
+          <InlineMpegTs key={source.id} url={source.url} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer} />
         ) : (
           <VideoPlayerFrame key={source.id} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer}>
             <video src={source.url} autoPlay playsInline className="h-full w-full bg-player object-contain" />
