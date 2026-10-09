@@ -51,3 +51,14 @@ describe("TMDB match precision", () => {
     expect(simplifiedTitle("Missão: Impossível – Acerto de Contas")).toBe("Missão Impossível Acerto de Contas");
   });
 });
+
+import { vi } from "vitest";
+vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
+describe("official TMDB dates", async () => {
+  const { officialDates } = await import("./tmdb.functions");
+  it("corrects the year from the official date and never invents one", () => {
+    expect(officialDates("movie", { release_date: "2018-06-06" })).toEqual({ release_date: "2018-06-06", release_year: 2018 });
+    expect(officialDates("series", { first_air_date: "2023-09-27" })).toEqual({ first_air_date: "2023-09-27", release_year: 2023 });
+    expect(officialDates("movie", { release_date: null })).toEqual({});
+  });
+});

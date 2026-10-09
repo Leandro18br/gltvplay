@@ -283,7 +283,7 @@ export const tmdbResolveContent = createServerFn({ method: "POST" })
 
 export async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string, current: any, fields: any, genres: any[] = []) {
   const patch: any = { ...missingMetadata(kind, current, fields), ...officialDates(kind, fields) };
-  if (kind === "movie" || kind === "series") patch._genres = genres.filter((g) => Number.isInteger(g.id) && g.name).map((g) => ({ id: g.id, name: g.name }));
+  if (kind === "movie" || kind === "series") patch._genres = genres.filter((g) => Number.isInteger(g.id) && g.name).map((g) => ({ id: g.id, name: PT_GENRE[g.id] ?? g.name }));
   const { data, error } = await ctx.supabase.rpc("complete_tmdb_metadata", {
     _kind: kind, _id: id, _patch: patch, _genre_ids: genres.map((g) => g.id).filter((id): id is number => Number.isInteger(id)),
   });
@@ -293,6 +293,8 @@ export async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string
   }
   return data as { filled: number; genres: number; genres_created: number; fields: Record<string, string | number | null> };
 }
+/** pt-BR names for official TV genres TMDB only returns in English. */
+const PT_GENRE: Record<number, string> = { 10762: "Infantil", 10763: "Notícias", 10764: "Reality", 10766: "Novela", 10767: "Talk Show" };
 /** Official TMDB date + its year always win over a wrong registered year; absent/invalid dates are never sent. */
 export function officialDates(kind: CompletionKind, fields: any) {
   const key = kind === "movie" ? "release_date" : kind === "series" ? "first_air_date" : null;
