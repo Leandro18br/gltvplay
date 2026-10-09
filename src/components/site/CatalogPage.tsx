@@ -34,10 +34,10 @@ export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; tit
   return (
     <>
       <PageTitle title={title} subtitle={subtitle}>
-        <div className="flex gap-2">
+        <div className={kind === "channel" ? "flex gap-2" : "grid min-w-0 grid-cols-2 gap-2 sm:flex sm:shrink-0"}>
           {kind !== "channel" && (
             <Select value={search.genero ?? "all"} onValueChange={(v) => set({ genero: v === "all" ? undefined : v })}>
-              <SelectTrigger className="w-40 rounded-full"><SelectValue placeholder="Gênero" /></SelectTrigger>
+              <SelectTrigger className="min-w-0 w-full rounded-full sm:w-40 [&>span]:truncate"><SelectValue placeholder="Gênero" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os gêneros</SelectItem>
                 {genres.map((g) => <SelectItem key={g.id} value={g.slug}>{g.name}</SelectItem>)}
@@ -45,7 +45,7 @@ export function CatalogPage({ kind, title, subtitle, search }: { kind: Kind; tit
             </Select>
           )}
           <Select value={sort} onValueChange={(v) => set({ ordem: v as SortKey })}>
-            <SelectTrigger className="w-40 rounded-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className={kind === "channel" ? "w-40 rounded-full" : "min-w-0 w-full rounded-full sm:w-40 [&>span]:truncate"}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="recent">Mais recentes</SelectItem>
               {kind !== "channel" && <SelectItem value="year">Ano de lançamento</SelectItem>}
