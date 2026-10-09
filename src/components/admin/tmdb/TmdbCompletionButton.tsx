@@ -35,6 +35,15 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
   const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("");
+  const [selected, setSelected] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState("");
+  async function confirm() {
+    if (!selected) return;
+    markBusy(true); setSaveError("");
+    try { await apply(selected); setSelected(null); }
+    catch (error) { const text = errMsg(error); setSaveError(text); toast.error(text); }
+    finally { markBusy(false); }
+  }
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const markBusy = (value: boolean) => { setBusy(value); onBusyChange?.(value); };
   async function apply(tmdbId: number) {
@@ -53,7 +62,7 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
         const result = await resolve({ data: { kind, id } });
         if (result.tmdbId) await apply(result.tmdbId);
         else {
-          setCandidates(result.candidates); setOpen(true);
+          setCandidates(result.candidates); setSelected(null); setSaveError(""); setOpen(true);
           setMessage({ text: result.candidates.length ? "Há mais de uma correspondência possível. Selecione a correta." : "Não foi possível identificar este conteúdo no TMDB. Confira o título e o ano, ou use a busca manual.", error: !result.candidates.length });
         }
       }
@@ -65,6 +74,7 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
     markBusy(true);
     try {
       const r = await search({ data: { kind, query: query.trim(), year: /^\d{4}$/.test(year) ? year : undefined, page: 1 } });
+      setSelected(null);
       setCandidates(r.results.map((x) => ({ tmdb_id: x.tmdb_id, title: x.title, original_title: x.original_title, year: x.year, poster_url: x.poster_url, kind })));
       if (!r.results.length) toast.error("Nenhum resultado no TMDB para essa busca.");
     } catch (error) { toast.error(errMsg(error)); }
@@ -75,19 +85,25 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
       {busy ? <Loader2 className="shrink-0 animate-spin" /> : <RefreshCw className="shrink-0" />}{busy ? "Buscando informações no TMDB..." : "Atualizar informações via TMDB"}
     </Button>
     {message && <p role={message.error ? "alert" : "status"} className={`max-w-xl text-xs ${message.error ? "text-destructive" : "text-muted-foreground"}`}>{message.text}</p>}
-    <Dialog open={open} onOpenChange={(o) => !o && !busy && (setOpen(false), setCandidates([]))}>
+    <Dialog open={open} onOpenChange={(o) => !o && !busy && (setOpen(false), setCandidates([]), setSelected(null))}>
       <DialogContent className="max-h-[85dvh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>Selecionar correspondência no TMDB</DialogTitle><DialogDescription>{candidates.length ? "Confirme título, ano e tipo antes de atualizar este conteúdo." : "Nenhuma correspondência confiável foi encontrada. Faça uma busca manual mais ampla."}</DialogDescription></DialogHeader>
-        <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); manualSearch(); }}>
-          <Input className="min-w-0 flex-1 basis-48" placeholder="Buscar título no TMDB" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <Input className="w-24" inputMode="numeric" maxLength={4} placeholder="Ano" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} />
-          <Button type="submit" size="sm" variant="secondary" disabled={busy || !query.trim()}><Search /> Buscar</Button>
-        </form>
+        {/* Not a <form>: this dialog is portaled inside the admin edit form and React submit events bubble through portals, which saved and closed the record. */}
+        <div className="flex flex-wrap gap-2" role="search">
+          <Input className="min-w-0 flex-1 basis-48" placeholder="Buscar título no TMDB" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); manualSearch(); } }} />
+          <Input className="w-24" inputMode="numeric" maxLength={4} placeholder="Ano" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); manualSearch(); } }} />
+          <Button type="button" size="sm" variant="secondary" disabled={busy || !query.trim()} onClick={manualSearch}><Search /> Buscar</Button>
+        </div>
         <div className="space-y-2">{candidates.map((candidate) => <div key={candidate.tmdb_id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-md border border-border p-3">
           <div className="aspect-[2/3] w-12 shrink-0 overflow-hidden rounded bg-muted">{candidate.poster_url && <img src={candidate.poster_url} alt="" className="h-full w-full object-cover" loading="lazy" />}</div>
           <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium">{candidate.title}</p><p className="break-words text-xs text-muted-foreground">{candidate.original_title} · {candidate.year ?? "—"} · {kind === "movie" ? "Filme" : "Série"}</p><p className="text-xs text-muted-foreground">TMDB ID {candidate.tmdb_id}</p></div>
-          <Button type="button" size="sm" disabled={busy} onClick={() => run(candidate.tmdb_id)}>Selecionar</Button>
+          <Button type="button" size="sm" variant={selected === candidate.tmdb_id ? "default" : "outline"} disabled={busy} aria-pressed={selected === candidate.tmdb_id} onClick={() => setSelected(candidate.tmdb_id)}>{selected === candidate.tmdb_id ? "Selecionado" : "Selecionar"}</Button>
         </div>)}</div>
+        {saveError && <p role="alert" className="text-xs text-destructive">{saveError}</p>}
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => { setOpen(false); setCandidates([]); setSelected(null); }}>Cancelar</Button>
+          <Button type="button" size="sm" disabled={busy || !selected} onClick={confirm}>{busy ? <Loader2 className="animate-spin" /> : null} Confirmar atualização</Button>
+        </div>
       </DialogContent>
     </Dialog>
   </div>;
