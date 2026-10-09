@@ -33,4 +33,3 @@
 
 - Integration, playback and TMDB detail rules live in `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory-scoped detail.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
-- Non-Home movie/series lists use CardGrid with server paging (exact count + range, id tie-breaker, page in URL, Pager); Home/channel carousels keep Row. Why: whole catalog reachable without loading it all.
