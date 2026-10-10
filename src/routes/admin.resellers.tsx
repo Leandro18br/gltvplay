@@ -3,10 +3,10 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, Plus, Search } from "lucide-react";
+import { Copy, Loader2, Plus, Search } from "lucide-react";
 import { db, type Row } from "@/lib/admin/db";
 import { adminHead } from "@/lib/admin/head";
-import { createResellerAccount } from "@/lib/resellers/resellers.functions";
+import { createResellerAccount, resetResellerLogin } from "@/lib/resellers/resellers.functions";
 import { fmtDate, resellerErr, TX_REASON, ORDER_STATUS, CONTENT_STATUS } from "@/lib/resellers/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PasswordInput } from "@/components/site/PasswordInput";
 
 export const Route = createFileRoute("/admin/resellers")({
   head: () => adminHead("Gerenciar revendedores", "Cadastro, bloqueio e consulta dos revendedores e seus pedidos."),
@@ -79,7 +78,7 @@ function ResellersPage() {
               <table className="w-full text-sm"><thead className={head}><tr><th className={th}>Revendedor</th><th className={th}>Cadastro</th><th className={th}>Saldo</th><th className={th}>Status</th><th className={th}></th></tr></thead>
                 <tbody>{rows.map((r) => (
                   <tr key={r.user_id} className={tr}>
-                    <td className={th}><p className="font-medium">{r.display_name ?? "—"}</p><p className="text-xs text-muted-foreground">{r.profiles?.email}</p></td>
+                    <td className={th}><p className="font-medium">{r.display_name ?? "—"}</p><p className="text-xs text-muted-foreground">{shownEmail(r.profiles?.email)}</p></td>
                     <td className={`${th} text-muted-foreground`}>{new Date(r.created_at).toLocaleDateString("pt-BR")}</td>
                     <td className={`${th} font-semibold`}>{r.credits}</td>
                     <td className={th}>{r.status === "active" ? "Ativo" : <span className="text-destructive">Bloqueado</span>}</td>
@@ -100,7 +99,7 @@ function ResellersPage() {
                 <tbody>{requests.data.map((c) => (
                   <tr key={c.id} className={tr}>
                     <td className={`${th} whitespace-nowrap text-muted-foreground`}>{fmtDate(c.created_at)}</td>
-                    <td className={th}>{c.resellers?.display_name ?? "—"}<p className="text-xs text-muted-foreground">{c.resellers?.profiles?.email}</p></td>
+                    <td className={th}>{c.resellers?.display_name ?? "—"}<p className="text-xs text-muted-foreground">{shownEmail(c.resellers?.profiles?.email)}</p></td>
                     <td className={th}>{c.kind === "movie" ? "Filme" : "Série"}</td>
                     <td className={th}><p className="font-medium">{c.title}{c.release_year ? ` (${c.release_year})` : ""}</p>{c.note && <p className="text-xs text-muted-foreground">{c.note}</p>}</td>
                     <td className={th}>
@@ -120,34 +119,60 @@ function ResellersPage() {
   );
 }
 
+const shownEmail = (e?: string | null) => (e && !e.endsWith(".invalid") ? e : "Login por usuário numérico");
+
+const RESELLER_LOGIN_URL = "https://content-sync-stream.lovable.app/revendedor/login";
+
+function copy(text: string, label: string) {
+  navigator.clipboard.writeText(text).then(() => toast.success(`${label} copiado`), () => toast.error("Não foi possível copiar"));
+}
+
+function CredsView({ name, login, password }: { name: string; login: string; password: string }) {
+  const all = `Olá, ${name}! Seu acesso ao painel de revenda:\nLink: ${RESELLER_LOGIN_URL}\nUsuário: ${login}\nSenha: ${password}`;
+  const rows: [string, string][] = [["Usuário", login], ["Senha", password], ["Link", RESELLER_LOGIN_URL]];
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">Copie agora: a senha não poderá ser exibida novamente.</p>
+      {rows.map(([l, v]) => (
+        <div key={l} className="flex items-center justify-between gap-2 rounded-xl border border-border p-3">
+          <div className="min-w-0"><p className="text-xs text-muted-foreground">{l}</p><p className="break-all font-mono text-sm">{v}</p></div>
+          <Button size="icon" variant="outline" aria-label={`Copiar ${l}`} onClick={() => copy(v, l)}><Copy className="h-4 w-4" /></Button>
+        </div>
+      ))}
+      <Button className="w-full" onClick={() => copy(all, "Acesso")}><Copy className="h-4 w-4" /> Copiar tudo</Button>
+    </div>
+  );
+}
+
 function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const create = useServerFn(createResellerAccount);
-  const [f, setF] = useState({ name: "", email: "", password: "", credits: "0" });
+  const [f, setF] = useState({ name: "", credits: "0" });
   const [busy, setBusy] = useState(false);
+  const [creds, setCreds] = useState<{ login: string; password: string } | null>(null);
   async function submit() {
     if (busy) return;
     if (f.name.trim().length < 2) return void toast.error("Informe o nome.");
-    if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) return void toast.error("E-mail inválido.");
-    if (f.password.length < 8) return void toast.error("A senha precisa ter ao menos 8 caracteres.");
     const credits = Number(f.credits || 0);
     if (!Number.isInteger(credits) || credits < 0) return void toast.error("Saldo inicial inválido.");
     setBusy(true);
     try {
-      const r = await create({ data: { name: f.name, email: f.email, password: f.password, credits } });
-      if ("warning" in r && r.warning) toast.warning(r.warning); else toast.success("Revendedor cadastrado");
-      onDone(); onClose();
+      const r = await create({ data: { name: f.name, credits } });
+      if (r.warning) toast.warning(r.warning); else toast.success("Revendedor cadastrado");
+      setCreds({ login: r.login, password: r.password });
+      onDone();
     } catch (e) { toast.error(resellerErr(e)); } finally { setBusy(false); }
   }
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Novo revendedor</DialogTitle></DialogHeader>
-        <div className="space-y-1.5"><Label htmlFor="rn">Nome</Label><Input id="rn" maxLength={120} value={f.name} onChange={set("name")} /></div>
-        <div className="space-y-1.5"><Label htmlFor="re">E-mail de acesso</Label><Input id="re" type="email" maxLength={255} value={f.email} onChange={set("email")} /></div>
-        <div className="space-y-1.5"><Label htmlFor="rp">Senha</Label><PasswordInput id="rp" autoComplete="new-password" maxLength={72} value={f.password} onChange={set("password")} /></div>
-        <div className="space-y-1.5"><Label htmlFor="rc">Saldo inicial</Label><Input id="rc" type="number" min={0} value={f.credits} onChange={set("credits")} /></div>
-        <DialogFooter><Button variant="outline" onClick={onClose}>Cancelar</Button><Button disabled={busy} onClick={submit}>{busy && <Loader2 className="animate-spin" />}Cadastrar</Button></DialogFooter>
+        <DialogHeader><DialogTitle>{creds ? "Revendedor criado" : "Novo revendedor"}</DialogTitle></DialogHeader>
+        {creds ? (<><CredsView name={f.name.trim()} {...creds} /><DialogFooter><Button variant="outline" onClick={onClose}>Fechar</Button></DialogFooter></>) : (<>
+          <p className="text-sm text-muted-foreground">O usuário e a senha de 6 números são gerados automaticamente.</p>
+          <div className="space-y-1.5"><Label htmlFor="rn">Nome</Label><Input id="rn" maxLength={120} value={f.name} onChange={set("name")} /></div>
+          <div className="space-y-1.5"><Label htmlFor="rc">Saldo inicial</Label><Input id="rc" type="number" min={0} value={f.credits} onChange={set("credits")} /></div>
+          <DialogFooter><Button variant="outline" onClick={onClose}>Cancelar</Button><Button disabled={busy} onClick={submit}>{busy && <Loader2 className="animate-spin" />}Cadastrar</Button></DialogFooter>
+        </>)}
       </DialogContent>
     </Dialog>
   );
@@ -156,6 +181,13 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
 function EditDialog({ row, onClose, onDone }: { row: Row; onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState<string>(row.display_name ?? "");
   const [busy, setBusy] = useState(false);
+  const reset = useServerFn(resetResellerLogin);
+  const [creds, setCreds] = useState<{ login: string; password: string } | null>(null);
+  async function newPassword() {
+    setBusy(true);
+    try { setCreds(await reset({ data: { userId: row.user_id } })); toast.success("Nova senha gerada"); }
+    catch (e) { toast.error(resellerErr(e)); } finally { setBusy(false); }
+  }
   async function save() {
     if (name.trim().length < 2) return void toast.error("Informe o nome.");
     setBusy(true);
@@ -167,8 +199,9 @@ function EditDialog({ row, onClose, onDone }: { row: Row; onClose: () => void; o
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader><DialogTitle>Editar revendedor</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground">{row.profiles?.email}</p>
+        <p className="text-sm text-muted-foreground">{shownEmail(row.profiles?.email)}</p>
         <div className="space-y-1.5"><Label htmlFor="en">Nome</Label><Input id="en" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></div>
+        {creds ? <CredsView name={name.trim()} {...creds} /> : <Button variant="outline" disabled={busy} onClick={newPassword}>Gerar usuário/nova senha de acesso</Button>}
         <DialogFooter><Button variant="outline" onClick={onClose}>Cancelar</Button><Button disabled={busy} onClick={save}>Salvar</Button></DialogFooter>
       </DialogContent>
     </Dialog>

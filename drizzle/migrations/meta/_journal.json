@@ -225,6 +225,13 @@
       "when": 1791637289155,
       "tag": "0031_my_credit_balance",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791639145764,
+      "tag": "0032_reseller_numeric_login",
+      "breakpoints": true
     }
   ]
 }

@@ -54,7 +54,7 @@ function AuthPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const errs: typeof errors = {};
-    if (!CODE.test(form.login)) errs.login = "O login tem 6 números.";
+    if (!CODE.test(form.login)) errs.login = "O usuário tem 6 números.";
     if (!CODE.test(form.password)) errs.password = "A senha tem 6 números.";
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -82,7 +82,7 @@ function AuthPage() {
         <p className="mt-1 text-sm text-muted-foreground">Use o login e a senha de 6 números fornecidos pelo seu revendedor.</p>
         <form onSubmit={submit} noValidate className="mt-6 space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="l">Login</Label>
+            <Label htmlFor="l">Usuário</Label>
             <Input id="l" inputMode="numeric" autoComplete="username" pattern="\d{6}" maxLength={6} value={form.login} onChange={set("login")} aria-invalid={!!errors.login} className="font-mono tracking-widest" />
             <FieldError msg={errors.login} />
           </div>

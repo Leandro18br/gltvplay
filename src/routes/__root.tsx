@@ -179,7 +179,7 @@ function RootComponent() {
     const iv = setInterval(async () => {
       if (document.visibilityState !== "visible") return;
       const p = window.location.pathname;
-      if (/^\/(admin|revenda|auth|reset-password)/.test(p)) return;
+      if (/^\/(admin|revend|auth|reset-password)/.test(p)) return;
       if (!(await checkSiteAccess(true))) { queryClient.removeQueries({ queryKey: ["catalog"] }); router.invalidate(); }
     }, 60_000);
     return () => { data.subscription.unsubscribe(); clearInterval(iv); };
