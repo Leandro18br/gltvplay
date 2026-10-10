@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput, FieldError } from "@/components/site/PasswordInput";
-import { useServerFn } from "@tanstack/react-start";
-import { resellerLogin } from "@/lib/resellers/resellers.functions";
 
 export const Route = createFileRoute("/revendedor_/login")({
   ssr: false,
@@ -36,8 +34,7 @@ async function isReseller(uid: string) {
 function ResellerLogin() {
   const navigate = useNavigate();
   const { denied } = Route.useSearch();
-  const login = useServerFn(resellerLogin);
-  const [form, setForm] = useState({ login: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
 
@@ -48,19 +45,21 @@ function ResellerLogin() {
     });
   }, [denied, navigate]);
 
-  const set = (k: "login" | "password") => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value.replace(/\D/g, "").slice(0, 6) }));
+  const set = (k: "email" | "password") => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^\d{6}$/.test(form.login) || !/^\d{6}$/.test(form.password)) return setError("Usuário e senha têm 6 números.");
+    const email = form.email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(email) || !form.password) return setError("Informe o e-mail e a senha.");
     setError(undefined); setLoading(true);
     try {
-      const r = await login({ data: form });
-      if (!r.ok) return setError(r.message);
-      // Replaces any other session in this browser (client or admin) with the reseller session.
-      const { error: se } = await supabase.auth.setSession({ access_token: r.access_token, refresh_token: r.refresh_token });
-      if (se) throw se;
+      const { data, error: se } = await supabase.auth.signInWithPassword({ email, password: form.password });
+      if (se || !data.user) return setError(/rate|too many/i.test(se?.message ?? "") ? "Muitas tentativas. Aguarde alguns minutos." : "E-mail ou senha incorretos.");
+      if (!(await isReseller(data.user.id))) {
+        await supabase.auth.signOut();
+        return setError("Esta conta não é de um revendedor ativo.");
+      }
       navigate({ to: "/revendedor", replace: true });
     } catch {
       toast.error("Não foi possível entrar agora. Tente novamente.");
@@ -73,10 +72,10 @@ function ResellerLogin() {
       <div className="animate-rise relative w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-glow">
         <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-primary"><Store /></div>
         <h1 className="text-2xl font-semibold">Painel de revenda</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Entre com o usuário e a senha de 6 números enviados pelo administrador.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Entre com o e-mail e a senha cadastrados pelo administrador.</p>
         <form onSubmit={submit} noValidate className="mt-6 space-y-4">
-          <div className="space-y-1.5"><Label htmlFor="ru">Usuário</Label><Input id="ru" inputMode="numeric" autoComplete="username" maxLength={6} value={form.login} onChange={set("login")} className="font-mono tracking-widest" /></div>
-          <div className="space-y-1.5"><Label htmlFor="rp">Senha</Label><PasswordInput id="rp" inputMode="numeric" autoComplete="current-password" maxLength={6} value={form.password} onChange={set("password")} className="font-mono tracking-widest" /></div>
+          <div className="space-y-1.5"><Label htmlFor="ru">E-mail</Label><Input id="ru" type="email" autoComplete="username" value={form.email} onChange={set("email")} /></div>
+          <div className="space-y-1.5"><Label htmlFor="rp">Senha</Label><PasswordInput id="rp" autoComplete="current-password" value={form.password} onChange={set("password")} /></div>
           <FieldError msg={error} />
           <Button type="submit" className="w-full rounded-full" disabled={loading}>{loading && <Loader2 className="animate-spin" />} Entrar</Button>
         </form>

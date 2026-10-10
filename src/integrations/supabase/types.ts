@@ -2140,6 +2140,7 @@ export type Database = {
         }
         Returns: number
       }
+      admin_delete_reseller: { Args: { _user_id: string }; Returns: undefined }
       admin_set_role: {
         Args: {
           _enabled: boolean

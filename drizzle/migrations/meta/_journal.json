@@ -232,6 +232,13 @@
       "when": 1791639145764,
       "tag": "0032_reseller_numeric_login",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791640345140,
+      "tag": "0033_reseller_soft_delete",
+      "breakpoints": true
     }
   ]
 }
