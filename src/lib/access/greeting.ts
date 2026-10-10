@@ -7,7 +7,7 @@ const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").t
 export function greetingFor(name: string | null | undefined): string {
   const n = (name ?? "").trim().replace(/\s+/g, " ");
   if (!n) return "Bem-vindo(a)!";
-  const first = n.split(" ")[0];
+  const first = n.split(" ")[0] ?? n;
   const key = norm(first);
   if (FEMALE.has(key)) return `Bem-vinda, ${first}!`;
   if (MALE.has(key)) return `Bem-vindo, ${first}!`;
