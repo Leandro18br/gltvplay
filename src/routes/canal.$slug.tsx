@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Play, Radio } from "lucide-react";
@@ -7,6 +8,8 @@ import { Row } from "@/components/site/ContentCard";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/canal/$slug")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   loader: async ({ context, params }) => {
     const data = await context.queryClient.ensureQueryData(channelDetailQuery(params.slug));
     if (!data) throw notFound();

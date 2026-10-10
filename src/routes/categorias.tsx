@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Tags } from "lucide-react";
@@ -5,6 +6,8 @@ import { categoriesQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
 
 export const Route = createFileRoute("/categorias")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   loader: ({ context }) => context.queryClient.ensureQueryData(categoriesQuery),
   head: () => ({
     meta: [

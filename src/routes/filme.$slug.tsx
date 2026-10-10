@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { movieDetailQuery } from "@/lib/catalog";
@@ -7,6 +8,8 @@ import { InlinePlayer } from "@/components/site/InlinePlayer";
 import { GridSection } from "@/components/site/ContentCard";
 
 export const Route = createFileRoute("/filme/$slug")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   loader: async ({ context, params }) => {
     const data = await context.queryClient.ensureQueryData(movieDetailQuery(params.slug));
     if (!data) throw notFound();

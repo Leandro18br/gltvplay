@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Film } from "lucide-react";
@@ -9,6 +10,8 @@ import { PagedGridSection } from "@/components/site/Pager";
 const pageParam = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) > 1 ? Number(v) : undefined);
 
 export const Route = createFileRoute("/categoria/$slug")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   validateSearch: (s: Record<string, unknown>): { pf?: number | undefined; ps?: number | undefined } => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]) }),
   loader: async ({ context, params }) => {
     const d = await context.queryClient.ensureQueryData(categoryQuery(params.slug));

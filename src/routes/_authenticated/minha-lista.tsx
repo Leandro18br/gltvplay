@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ListVideo } from "lucide-react";
 import { useWatchlist } from "@/lib/user-data";
@@ -6,6 +7,7 @@ import { CardGrid, GridSkeleton } from "@/components/site/ContentCard";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/minha-lista")({
+  beforeLoad: requireSiteAccess,
   head: () => ({
     meta: [
       { title: "Minha lista — Streaming" },

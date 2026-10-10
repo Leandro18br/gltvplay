@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { publishedHomeQuery } from "@/lib/home/queries";
@@ -7,6 +8,8 @@ import { HomeContent } from "@/components/site/HomeContent";
 import { siteSettingsQuery } from "@/lib/catalog";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   loader: async ({ context }) => {
     const [home] = await Promise.all([context.queryClient.ensureQueryData(publishedHomeQuery), context.queryClient.ensureQueryData(siteSettingsQuery)]);
     return home;

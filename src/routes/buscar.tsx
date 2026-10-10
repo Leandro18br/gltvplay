@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { safeImageUrl } from "@/lib/tmdb/completion";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -9,6 +10,8 @@ import { CardGrid, GridSkeleton } from "@/components/site/ContentCard";
 import { PagedGridSection } from "@/components/site/Pager";
 
 export const Route = createFileRoute("/buscar")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   validateSearch: (s: Record<string, unknown>): { q: string; pf?: number | undefined; ps?: number | undefined } => ({
     q: typeof s["q"] === "string" ? s["q"] : "",
     pf: Number.isInteger(Number(s["pf"])) && Number(s["pf"]) > 1 ? Number(s["pf"]) : undefined,
