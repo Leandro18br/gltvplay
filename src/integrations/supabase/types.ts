@@ -17,8 +17,10 @@ export type Database = {
       access_accounts: {
         Row: {
           auth_user_id: string | null
+          client_name: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           duration_hours: number
           expires_at: string
           id: string
@@ -31,8 +33,10 @@ export type Database = {
         }
         Insert: {
           auth_user_id?: string | null
+          client_name?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           duration_hours: number
           expires_at: string
           id?: string
@@ -45,8 +49,10 @@ export type Database = {
         }
         Update: {
           auth_user_id?: string | null
+          client_name?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           duration_hours?: number
           expires_at?: string
           id?: string
@@ -2184,6 +2190,15 @@ export type Database = {
         }
         Returns: Json
       }
+      create_client_access: {
+        Args: {
+          _hours: number
+          _kind: string
+          _name: string
+          _reseller_id: string
+        }
+        Returns: Json
+      }
       decide_credit_order: {
         Args: {
           _approve: boolean
@@ -2193,6 +2208,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_access: { Args: { _access_id: string }; Returns: undefined }
       delete_trial_access: { Args: { _access_id: string }; Returns: undefined }
       embed_url_allowed: { Args: { u: string }; Returns: boolean }
       ensure_fixed_genres: { Args: never; Returns: undefined }
@@ -2333,6 +2349,10 @@ export type Database = {
           id: string
           total: number
         }[]
+      }
+      set_access_name: {
+        Args: { _access_id: string; _name: string }
+        Returns: undefined
       }
       set_access_status: {
         Args: { _access_id: string; _status: string }
