@@ -12,7 +12,9 @@ export function resellerErr(e: unknown) {
   if (/reason required/i.test(raw)) return "Informe o motivo (mínimo 3 caracteres).";
   if (/invalid quantity/i.test(raw)) return "Quantidade inválida.";
   if (/staff accounts/i.test(raw)) return "Contas da equipe do painel não podem ser revendedoras.";
-  if (/^forbidden$/i.test(raw)) return "Somente o administrador principal pode fazer isso.";
+  if (/access deleted/i.test(raw)) return "Este acesso foi excluído.";
+  if (/name too long/i.test(raw)) return "Nome muito longo (máximo 120 caracteres).";
+  if (/^forbidden$/i.test(raw)) return "Você não tem permissão para esta ação.";
   return errMsg(e);
 }
 
