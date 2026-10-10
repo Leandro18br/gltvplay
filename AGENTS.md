@@ -34,4 +34,4 @@
 - Integration, playback and TMDB detail rules live in `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory-scoped detail.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
 - Movie and series details opt into headerless SiteShell and flush DetailHero with scoped movie-top-player sizing; series show artwork until explicit episode selection mounts a keyed InlinePlayer with opt-in autoStart and post-commit scrolling. Why: share presentation while preventing default/wrong-episode playback and preserving movie Play gating.
-- Access/credit tables are written only via security-definer RPCs (idempotent by request id); password hashes sit in a no-grant table; reseller panel lives at `/revenda` with its own login. Why: atomic charging, reseller isolation.
+- Access/credit writes go only through idempotent security-definer RPCs; hashes in a no-grant table; reseller panel at `/revenda`. Why: atomic charging, isolation.
