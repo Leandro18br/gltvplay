@@ -1,2 +1,2 @@
-- Movie and series details share a player-first layout in DetailHero; InlinePlayer handles playback unchanged by page positioning. Why: layout independent of source logic.
+- Movie and series details reuse flush DetailHero presentation; series show its artwork banner until explicit selection mounts a keyed InlinePlayer with autoStart. Why: share styles without default episode playback or changing movie Play gating.
 - Non-Home movie/series lists use CardGrid with server paging (exact count + range, id tie-breaker, page in URL, Pager); Home/channel carousels keep Row. Why: whole catalog reachable without loading it all.

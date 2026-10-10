@@ -1,3 +1,7 @@
+# Series detail visual parity
+- [ ] Reuse movie details and 260px faded banner; mount the existing player only for an explicitly selected episode and scroll after mounting.
+- [ ] Test initial state, correct episode sources, season navigation and mobile/desktop layout without changing catalog data.
+
 # 2026 catalog and default categories
 - [x] Inspect existing categories and import paths; preserve existing associations and playback.
 - [x] Add reusable default categories and additive movie/series associations for existing and new imports.

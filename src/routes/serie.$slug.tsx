@@ -1,12 +1,13 @@
 import { safeImageUrl } from "@/lib/tmdb/completion";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { formatDuration, seriesDetailQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
 import { InlinePlayer } from "@/components/site/InlinePlayer";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/serie/$slug")({
@@ -42,19 +43,27 @@ function SeriesPage() {
   const { data } = useSuspenseQuery(seriesDetailQuery(slug));
   const [seasonId, setSeasonId] = useState(data?.seasons[0]?.id ?? "");
   const [episodeId, setEpisodeId] = useState<string | null>(null);
+  const season = data?.seasons.find((s) => s.id === seasonId) ?? data?.seasons[0];
+  const current = data?.seasons.flatMap((s) => s.episodes).find((e) => e.id === episodeId);
+  const currentId = current?.id;
+  useEffect(() => {
+    if (!currentId) return;
+    // Run after the selected player's DOM has committed, not in the click handler.
+    const frame = requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }));
+    return () => cancelAnimationFrame(frame);
+  }, [currentId]);
   if (!data) return null;
-  const season = data.seasons.find((s) => s.id === seasonId) ?? data.seasons[0];
-  const first = data.seasons.flatMap((s) => s.episodes)[0];
-  const current = data.seasons.flatMap((s) => s.episodes).find((e) => e.id === episodeId) ?? first;
 
   return (
-    <SiteShell padTop={false}>
+    <SiteShell padTop={false} hideHeader>
       <article>
         <DetailHero
           item={data.item}
+          flushPlayer
+          banner
           extraMeta={<span>· {data.seasons.length} temporada{data.seasons.length === 1 ? "" : "s"}</span>}
           player={current ? (
-            <InlinePlayer kind="episode" id={current.id} title={`${data.item.title} — ${current.title}`} poster={safeImageUrl(current.thumbnail_url) || data.item.backdrop_url || data.item.poster_url} />
+            <InlinePlayer key={current.id} autoStart className="movie-top-player" kind="episode" id={current.id} title={`${data.item.title} — ${current.title}`} poster={safeImageUrl(current.thumbnail_url) || data.item.backdrop_url || data.item.poster_url} />
           ) : undefined}
         />
         <section id="episodios" aria-label="Episódios" className="mx-auto max-w-[1600px] scroll-mt-20 px-4 py-10 md:px-10">
@@ -73,24 +82,27 @@ function SeriesPage() {
             <p className="text-muted-foreground">Nenhum episódio disponível nesta temporada ainda.</p>
           ) : (
             <ol className="grid gap-3">
-              {season.episodes.map((e) => (
+              {season.episodes.map((e) => {
+                const thumbnail = safeImageUrl(e.thumbnail_url);
+                return (
                 <li key={e.id}>
-                  <button type="button" onClick={() => { setEpisodeId(e.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  <Button type="button" variant="ghost" onClick={() => setEpisodeId(e.id)}
                     aria-current={e.id === current?.id}
-                    className={`group grid w-full grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-4 rounded-xl p-2 text-left transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] ${e.id === current?.id ? "bg-card ring-1 ring-primary/40" : ""}`}>
+                    className={`group grid h-auto w-full grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-3 whitespace-normal rounded-lg p-2 text-left transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] md:gap-4 ${e.id === current?.id ? "bg-card ring-1 ring-primary/40" : ""}`}>
                     <span className="hidden text-center font-display text-2xl text-muted-foreground md:block">{e.episode_number}</span>
                     <div className="relative aspect-video overflow-hidden rounded-lg bg-card">
-                      {safeImageUrl(e.thumbnail_url) ? <img src={safeImageUrl(e.thumbnail_url)!} alt="" loading="lazy" className="h-full w-full object-cover" onError={(ev) => { ev.currentTarget.style.display = "none"; }} /> : <div className="h-full bg-accent" />}
+                      {thumbnail ? <img src={thumbnail} alt="" loading="lazy" className="h-full w-full object-cover" onError={(ev) => { ev.currentTarget.style.display = "none"; }} /> : <div className="h-full bg-accent" />}
                       <span className="absolute inset-0 flex items-center justify-center bg-background/40 opacity-0 transition group-hover:opacity-100"><Play className="fill-current text-primary" /></span>
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold"><span className="md:hidden">{e.episode_number}. </span>{e.title}</p>
+                      <p className="break-words font-semibold"><span className="md:hidden">{e.episode_number}. </span>{e.title}</p>
                       {e.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{e.description}</p>}
+                      {e.duration_minutes && <p className="mt-1 text-xs text-muted-foreground md:hidden">{formatDuration(e.duration_minutes)}</p>}
                     </div>
                     <span className="hidden text-sm text-muted-foreground md:block">{formatDuration(e.duration_minutes)}</span>
-                  </button>
+                  </Button>
                 </li>
-              ))}
+              ); })}
             </ol>
           )}
         </section>
