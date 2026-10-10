@@ -282,6 +282,7 @@ function ManageDialog({ row, onClose, onDone, onStatus }: { row: Row; onClose: (
     void run(async () => { const r = await reset({ data: { userId: row.user_id, password: pass || undefined } }); setNewPass(r.password); setPass(""); }, "Senha redefinida");
   };
   const addCredits = () => {
+    if (busy) return;
     const n = Number(amount);
     if (!Number.isInteger(n) || n < 1 || n > 100000) return void toast.error("Informe uma quantidade inteira positiva.");
     void run(async () => {
