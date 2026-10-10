@@ -25,6 +25,7 @@ import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
+import { Route as AdminCreditsRouteImport } from './routes/admin.credits'
 import { Route as AdminGenresRouteImport } from './routes/admin.genres'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminIntegrationsRouteImport } from './routes/admin.integrations'
@@ -120,6 +121,11 @@ const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
 const AdminChannelsRoute = AdminChannelsRouteImport.update({
   id: '/channels',
   path: '/channels',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCreditsRoute = AdminCreditsRouteImport.update({
+  id: '/credits',
+  path: '/credits',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminGenresRoute = AdminGenresRouteImport.update({
@@ -225,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
@@ -258,6 +265,7 @@ export interface FileRoutesByTo {
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
@@ -294,6 +302,7 @@ export interface FileRoutesById {
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
@@ -330,6 +339,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
     | '/admin/integrations'
@@ -363,6 +373,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
     | '/admin/integrations'
@@ -398,6 +409,7 @@ export interface FileRouteTypes {
     | '/_authenticated/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
     | '/admin/integrations'
@@ -553,6 +565,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChannelsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/credits': {
+      id: '/admin/credits'
+      path: '/credits'
+      fullPath: '/admin/credits'
+      preLoaderRoute: typeof AdminCreditsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/genres': {
       id: '/admin/genres'
       path: '/genres'
@@ -693,6 +712,7 @@ const AuthenticatedRouteRouteWithChildren =
 interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminChannelsRoute: typeof AdminChannelsRoute
+  AdminCreditsRoute: typeof AdminCreditsRoute
   AdminGenresRoute: typeof AdminGenresRoute
   AdminHomeRoute: typeof AdminHomeRoute
   AdminIntegrationsRoute: typeof AdminIntegrationsRoute
@@ -708,6 +728,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminChannelsRoute: AdminChannelsRoute,
+  AdminCreditsRoute: AdminCreditsRoute,
   AdminGenresRoute: AdminGenresRoute,
   AdminHomeRoute: AdminHomeRoute,
   AdminIntegrationsRoute: AdminIntegrationsRoute,
