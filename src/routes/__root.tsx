@@ -17,6 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useQuery } from "@tanstack/react-query";
 import { siteSettingsQuery } from "@/lib/catalog";
 import { checkSiteAccess, clearSiteAccessCache } from "@/lib/access/gate";
+import { syncSlots, isSwapping } from "@/lib/auth/session-vault";
 
 // Admin → site sync: the database is the single source of truth. Realtime change events
 // (plus a periodic safety refresh) invalidate cached catalog reads so the public site re-queries.
@@ -164,7 +165,9 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN" || event === "USER_UPDATED") syncSlots(session);
+      if (isSwapping()) { clearSiteAccessCache(); return; }
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       clearSiteAccessCache();
       if (event === "SIGNED_IN") {

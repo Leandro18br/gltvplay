@@ -4,6 +4,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureSlot } from "@/lib/auth/session-vault";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,7 @@ function AdminLogin() {
 
   useEffect(() => {
     if (denied) toast.error("Sua conta não tem permissão de administrador.");
-    supabase.auth.getUser().then(async ({ data }) => {
+    ensureSlot("admin").then(() => supabase.auth.getUser()).then(async ({ data }) => {
       if (data.user && (await isStaff(data.user.id))) navigate({ to: "/admin", replace: true });
     });
   }, [denied, navigate]);
@@ -51,7 +52,7 @@ function AdminLogin() {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error) throw new Error("E-mail ou senha inválidos");
       if (!(await isStaff(data.user.id))) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         throw new Error("Acesso negado: esta conta não é administradora.");
       }
       await supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", data.user.id);

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, LogOut, Plus, Trash2, Check, Baby } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { signOutSlot } from "@/lib/auth/session-vault";
 import { setActiveProfileId, useActiveProfile, useWatchlist } from "@/lib/user-data";
 import { nameSchema } from "@/lib/validation";
 import { SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
@@ -40,7 +41,7 @@ function Page() {
   const signOut = async () => {
     await qc.cancelQueries();
     qc.removeQueries({ queryKey: ["me"] });
-    await supabase.auth.signOut();
+    await signOutSlot("client");
     navigate({ to: "/", replace: true });
   };
   return (

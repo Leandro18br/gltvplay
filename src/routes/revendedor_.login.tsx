@@ -4,6 +4,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2, Store } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureSlot } from "@/lib/auth/session-vault";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +41,7 @@ function ResellerLogin() {
 
   useEffect(() => {
     if (denied) toast.error("Entre com uma conta de revendedor ativa.");
-    supabase.auth.getUser().then(async ({ data }) => {
+    ensureSlot("reseller").then(() => supabase.auth.getUser()).then(async ({ data }) => {
       if (data.user && (await isReseller(data.user.id))) navigate({ to: "/revendedor", replace: true });
     });
   }, [denied, navigate]);
@@ -57,7 +58,7 @@ function ResellerLogin() {
       const { data, error: se } = await supabase.auth.signInWithPassword({ email, password: form.password });
       if (se || !data.user) return setError(/rate|too many/i.test(se?.message ?? "") ? "Muitas tentativas. Aguarde alguns minutos." : "E-mail ou senha incorretos.");
       if (!(await isReseller(data.user.id))) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         return setError("Esta conta não é de um revendedor ativo.");
       }
       navigate({ to: "/revendedor", replace: true });

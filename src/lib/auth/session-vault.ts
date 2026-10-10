@@ -53,6 +53,6 @@ export async function signOutSlot(slot: Slot) {
   await ensureSlot(slot);
   const saved = read(slot);
   const { data } = await supabase.auth.getSession();
-  forgetSlot(slot);
+  for (const s of SLOTS) if (s === slot || (saved && read(s)?.user_id === saved.user_id)) forgetSlot(s);
   if (data.session && (!saved || data.session.user.id === saved.user_id)) await supabase.auth.signOut({ scope: "local" });
 }
