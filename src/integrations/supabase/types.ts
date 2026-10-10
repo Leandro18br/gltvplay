@@ -1492,6 +1492,35 @@ export type Database = {
         }
         Relationships: []
       }
+      reseller_credentials: {
+        Row: {
+          login: string
+          password_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          login: string
+          password_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          login?: string
+          password_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reseller_credentials_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "resellers"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       resellers: {
         Row: {
           created_at: string
@@ -2191,6 +2220,7 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      issue_reseller_login: { Args: { _user_id: string }; Returns: Json }
       m3u_episode_counts: {
         Args: { _keys: string[]; _list: string }
         Returns: {
@@ -2302,6 +2332,10 @@ export type Database = {
       tmdb_catalog_report: { Args: { _job: string }; Returns: Json }
       validate_home_config: { Args: { c: Json }; Returns: undefined }
       verify_access_login: {
+        Args: { _login: string; _password: string }
+        Returns: Json
+      }
+      verify_reseller_login: {
         Args: { _login: string; _password: string }
         Returns: Json
       }
