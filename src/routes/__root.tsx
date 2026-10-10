@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { useQuery } from "@tanstack/react-query";
 import { siteSettingsQuery } from "@/lib/catalog";
+import { checkSiteAccess, clearSiteAccessCache } from "@/lib/access/gate";
 
 // Admin → site sync: the database is the single source of truth. Realtime change events
 // (plus a periodic safety refresh) invalidate cached catalog reads so the public site re-queries.
@@ -165,6 +166,7 @@ function RootComponent() {
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      clearSiteAccessCache();
       if (event === "SIGNED_IN") {
         const dest = sessionStorage.getItem("post_auth_redirect");
         if (dest && dest.startsWith("/") && !dest.startsWith("//")) { sessionStorage.removeItem("post_auth_redirect"); router.navigate({ to: dest }); }
@@ -173,7 +175,14 @@ function RootComponent() {
       if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
       else queryClient.clear();
     });
-    return () => data.subscription.unsubscribe();
+    // Expired or revoked accesses lose the catalog without waiting for a navigation.
+    const iv = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      const p = window.location.pathname;
+      if (/^\/(admin|revenda|auth|reset-password)/.test(p)) return;
+      if (!(await checkSiteAccess(true))) { queryClient.removeQueries({ queryKey: ["catalog"] }); router.invalidate(); }
+    }, 60_000);
+    return () => { data.subscription.unsubscribe(); clearInterval(iv); };
   }, [router, queryClient]);
 
   return (
