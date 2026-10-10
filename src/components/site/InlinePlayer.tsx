@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,17 +17,18 @@ type Src = { id: string; url: string; type: "url" | "embed" | "hls"; label: stri
  * (embed/iframe, direct URL or HLS) in the same space. Requires sign-in,
  * exactly like the full watch page.
  */
-export function InlinePlayer({ kind, id, title, poster, className = "" }: { kind: "movie" | "episode"; id: string; title: string; poster: string | null; className?: string }) {
+export function InlinePlayer({ kind, id, title, poster, className = "", autoStart = false }: { kind: "movie" | "episode"; id: string; title: string; poster: string | null; className?: string; autoStart?: boolean }) {
   const navigate = useNavigate();
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sources, setSources] = useState<Src[]>([]);
   const [server, setServer] = useState(0);
+  const autoStartedId = useRef<string | null>(null);
 
   useEffect(() => { setStarted(false); setLoading(false); setError(null); setSources([]); setServer(0); }, [kind, id]);
 
-  const start = async () => {
+  const start = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -47,7 +48,15 @@ export function InlinePlayer({ kind, id, title, poster, className = "" }: { kind
     } finally {
       setLoading(false);
     }
-  };
+  }, [kind, id, navigate]);
+
+  // Explicit episode selection is already the viewer's playback gesture.
+  // Movies retain the existing thumbnail/Play gate by default.
+  useEffect(() => {
+    if (!autoStart || autoStartedId.current === id) return;
+    autoStartedId.current = id;
+    void start();
+  }, [autoStart, id, start]);
 
   const source = sources[Math.min(server, sources.length - 1)];
   const isHls = source?.type === "hls" || /\.m3u8(\?|$)/i.test(source?.url ?? "");

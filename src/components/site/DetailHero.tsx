@@ -15,13 +15,17 @@ function trailerEmbed(url: string) {
 }
 
 /** Player first, followed by the existing poster and details (no separate banner). */
-export function DetailHero({ item, extraMeta, player, flushPlayer = false }: { item: Item; extraMeta?: ReactNode; player?: ReactNode; flushPlayer?: boolean }) {
+export function DetailHero({ item, extraMeta, player, flushPlayer = false, banner = false }: { item: Item; extraMeta?: ReactNode; player?: ReactNode; flushPlayer?: boolean; banner?: boolean }) {
   const [trailer, setTrailer] = useState(false);
   const meta = [item.release_year, item.kind === "movie" ? formatDuration(item.duration_minutes) : null, item.quality, item.language, item.country].filter(Boolean);
   const embed = item.trailer_url ? trailerEmbed(item.trailer_url) : null;
   return (
     <section className="relative w-full overflow-hidden">
-      {flushPlayer && player}
+      {flushPlayer && (player || (banner && <div aria-label={`Banner de ${item.title}`} className="detail-artwork-banner relative h-[260px] w-full overflow-hidden bg-player">
+        {(item.backdrop_url || item.poster_url) && <img src={item.backdrop_url || item.poster_url || undefined} alt="" className="h-full w-full object-cover" />}
+        <div className="pointer-events-none absolute inset-0 bg-background/40" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-fade" />
+      </div>))}
       <div className={`mx-auto flex max-w-[1600px] flex-col gap-8 px-4 pb-10 md:px-10 ${flushPlayer ? "pt-8" : "pt-20"}`}>
         {!flushPlayer && player && <div className="w-full min-w-0 max-w-5xl">{player}</div>}
          <div className={`flex min-w-0 flex-col gap-8 md:flex-row md:items-start ${flushPlayer ? "movie-detail-info" : ""}`}>

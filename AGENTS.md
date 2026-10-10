@@ -33,4 +33,4 @@
 
 - Integration, playback and TMDB detail rules live in `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory-scoped detail.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
-- Movie details opt into headerless SiteShell and flush DetailHero with scoped movie-top-player sizing; series keep the default layout. Why: isolate page presentation from shared playback and navigation behavior.
+- Movie and series details opt into headerless SiteShell and flush DetailHero with scoped movie-top-player sizing; series show artwork until explicit episode selection mounts a keyed InlinePlayer with opt-in autoStart and post-commit scrolling. Why: share presentation while preventing default/wrong-episode playback and preserving movie Play gating.
