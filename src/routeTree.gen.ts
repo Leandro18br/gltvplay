@@ -18,6 +18,7 @@ import { Route as CanaisRouteImport } from './routes/canais'
 import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as FilmesRouteImport } from './routes/filmes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as RevendaRouteImport } from './routes/revenda'
 import { Route as RevendedorRouteImport } from './routes/revendedor'
 import { Route as SeriesRouteImport } from './routes/series'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -90,6 +91,11 @@ const FilmesRoute = FilmesRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RevendaRoute = RevendaRouteImport.update({
+  id: '/revenda',
+  path: '/revenda',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RevendedorRoute = RevendedorRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/revenda': typeof RevendaRoute
   '/revendedor': typeof RevendedorRoute
   '/series': typeof SeriesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -287,6 +294,7 @@ export interface FileRoutesByTo {
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/revenda': typeof RevendaRoute
   '/revendedor': typeof RevendedorRoute
   '/series': typeof SeriesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -328,6 +336,7 @@ export interface FileRoutesById {
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/revenda': typeof RevendaRoute
   '/revendedor': typeof RevendedorRoute
   '/series': typeof SeriesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -369,6 +378,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/filmes'
     | '/reset-password'
+    | '/revenda'
     | '/revendedor'
     | '/series'
     | '/sitemap.xml'
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/filmes'
     | '/reset-password'
+    | '/revenda'
     | '/revendedor'
     | '/series'
     | '/sitemap.xml'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/filmes'
     | '/reset-password'
+    | '/revenda'
     | '/revendedor'
     | '/series'
     | '/sitemap.xml'
@@ -488,6 +500,7 @@ export interface RootRouteChildren {
   CategoriasRoute: typeof CategoriasRoute
   FilmesRoute: typeof FilmesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  RevendaRoute: typeof RevendaRoute
   RevendedorRoute: typeof RevendedorRoute
   SeriesRoute: typeof SeriesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -564,6 +577,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/revenda': {
+      id: '/revenda'
+      path: '/revenda'
+      fullPath: '/revenda'
+      preLoaderRoute: typeof RevendaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/revendedor': {
@@ -835,6 +855,7 @@ const rootRouteChildren: RootRouteChildren = {
   CategoriasRoute: CategoriasRoute,
   FilmesRoute: FilmesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  RevendaRoute: RevendaRoute,
   RevendedorRoute: RevendedorRoute,
   SeriesRoute: SeriesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
