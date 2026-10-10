@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InlinePlayer } from "./InlinePlayer";
 
@@ -21,10 +22,10 @@ describe("Explicit inline playback", () => {
     expect(screen.getByRole("button", { name: "Reproduzir Movie" })).toBeEnabled();
   });
   it("loads only the explicitly selected episode and its own source", async () => {
-    const { container, rerender } = render(<InlinePlayer key="episode-2" autoStart kind="episode" id="episode-2" title="Episode 2" poster={null} />);
+    const { container, rerender } = render(<StrictMode><InlinePlayer key="episode-2" autoStart kind="episode" id="episode-2" title="Episode 2" poster={null} /></StrictMode>);
     await waitFor(() => expect(container.querySelector("video")?.getAttribute("src")).toBe("https://example.test/episode-2.mp4"));
     expect(mocks.rpc).toHaveBeenCalledWith("get_playback_sources", { _kind: "episode", _content_id: "episode-2" });
-    rerender(<InlinePlayer key="episode-3" autoStart kind="episode" id="episode-3" title="Episode 3" poster={null} />);
+    rerender(<StrictMode><InlinePlayer key="episode-3" autoStart kind="episode" id="episode-3" title="Episode 3" poster={null} /></StrictMode>);
     await waitFor(() => expect(container.querySelector("video")?.getAttribute("src")).toBe("https://example.test/episode-3.mp4"));
     expect(mocks.rpc.mock.calls.map(call => call[1]._content_id)).toEqual(["episode-2", "episode-3"]);
   });
