@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export const Route = createFileRoute("/revenda")({
+export const Route = createFileRoute("/revendedor")({
   ssr: false,
   head: () => ({
     meta: [
@@ -28,9 +28,9 @@ export const Route = createFileRoute("/revenda")({
   }),
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/revenda/login", search: { denied: undefined } });
+    if (!data.user) throw redirect({ to: "/revendedor/login", search: { denied: undefined } });
     const { data: ok } = await supabase.rpc("is_active_reseller", { _user_id: data.user.id });
-    if (!ok) throw redirect({ to: "/revenda/login", search: { denied: 1 } });
+    if (!ok) throw redirect({ to: "/revendedor/login", search: { denied: 1 } });
     return { user: data.user };
   },
   component: ResellerPanel,
@@ -106,7 +106,7 @@ function ResellerPanel() {
     if (error) { toast.error(resellerErr(error)); return; }
     toast.success(`Renovado até ${fmtDate((data as Row).expires_at)}`); setRenewing(null); refresh();
   }
-  async function logout() { qc.clear(); await supabase.auth.signOut(); navigate({ to: "/revenda/login", replace: true, search: { denied: undefined } }); }
+  async function logout() { qc.clear(); await supabase.auth.signOut(); navigate({ to: "/revendedor/login", replace: true, search: { denied: undefined } }); }
 
   const now = Date.now();
   const list = accs.data ?? [];

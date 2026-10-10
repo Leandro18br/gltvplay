@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/site/PasswordInput";
 
-export const Route = createFileRoute("/revenda_/login")({
+export const Route = createFileRoute("/revendedor_/login")({
   ssr: false,
   validateSearch: z.object({ denied: z.coerce.number().optional() }),
   head: () => ({
@@ -41,7 +41,7 @@ function ResellerLogin() {
   useEffect(() => {
     if (denied) toast.error("Esta conta não é de um revendedor ativo.");
     supabase.auth.getUser().then(async ({ data }) => {
-      if (data.user && (await isReseller(data.user.id))) navigate({ to: "/revenda", replace: true });
+      if (data.user && (await isReseller(data.user.id))) navigate({ to: "/revendedor", replace: true });
     });
   }, [denied, navigate]);
 
@@ -55,7 +55,7 @@ function ResellerLogin() {
         await supabase.auth.signOut();
         throw new Error("Acesso negado: conta não é de revendedor ou está bloqueada.");
       }
-      navigate({ to: "/revenda", replace: true });
+      navigate({ to: "/revendedor", replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao entrar");
     } finally { setLoading(false); }
