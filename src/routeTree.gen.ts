@@ -25,11 +25,13 @@ import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
+import { Route as AdminCreditsRouteImport } from './routes/admin.credits'
 import { Route as AdminGenresRouteImport } from './routes/admin.genres'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminIntegrationsRouteImport } from './routes/admin.integrations'
 import { Route as AdminMoviesRouteImport } from './routes/admin.movies'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
+import { Route as AdminResellersRouteImport } from './routes/admin.resellers'
 import { Route as AdminSeriesRouteImport } from './routes/admin.series'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminHomePreviewRouteImport } from './routes/admin_.home-preview'
@@ -122,6 +124,11 @@ const AdminChannelsRoute = AdminChannelsRouteImport.update({
   path: '/channels',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCreditsRoute = AdminCreditsRouteImport.update({
+  id: '/credits',
+  path: '/credits',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGenresRoute = AdminGenresRouteImport.update({
   id: '/genres',
   path: '/genres',
@@ -145,6 +152,11 @@ const AdminMoviesRoute = AdminMoviesRouteImport.update({
 const AdminProfileRoute = AdminProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminResellersRoute = AdminResellersRouteImport.update({
+  id: '/resellers',
+  path: '/resellers',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminSeriesRoute = AdminSeriesRouteImport.update({
@@ -225,11 +237,13 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/resellers': typeof AdminResellersRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
@@ -258,11 +272,13 @@ export interface FileRoutesByTo {
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/resellers': typeof AdminResellersRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
@@ -294,11 +310,13 @@ export interface FileRoutesById {
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/resellers': typeof AdminResellersRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin_/home-preview': typeof AdminHomePreviewRoute
@@ -330,11 +348,13 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
     | '/admin/integrations'
     | '/admin/movies'
     | '/admin/profile'
+    | '/admin/resellers'
     | '/admin/series'
     | '/admin/users'
     | '/admin/home-preview'
@@ -363,11 +383,13 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
     | '/admin/integrations'
     | '/admin/movies'
     | '/admin/profile'
+    | '/admin/resellers'
     | '/admin/series'
     | '/admin/users'
     | '/admin/home-preview'
@@ -398,11 +420,13 @@ export interface FileRouteTypes {
     | '/_authenticated/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
     | '/admin/integrations'
     | '/admin/movies'
     | '/admin/profile'
+    | '/admin/resellers'
     | '/admin/series'
     | '/admin/users'
     | '/admin_/home-preview'
@@ -553,6 +577,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChannelsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/credits': {
+      id: '/admin/credits'
+      path: '/credits'
+      fullPath: '/admin/credits'
+      preLoaderRoute: typeof AdminCreditsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/genres': {
       id: '/admin/genres'
       path: '/genres'
@@ -586,6 +617,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/admin/profile'
       preLoaderRoute: typeof AdminProfileRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/resellers': {
+      id: '/admin/resellers'
+      path: '/resellers'
+      fullPath: '/admin/resellers'
+      preLoaderRoute: typeof AdminResellersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/series': {
@@ -693,11 +731,13 @@ const AuthenticatedRouteRouteWithChildren =
 interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminChannelsRoute: typeof AdminChannelsRoute
+  AdminCreditsRoute: typeof AdminCreditsRoute
   AdminGenresRoute: typeof AdminGenresRoute
   AdminHomeRoute: typeof AdminHomeRoute
   AdminIntegrationsRoute: typeof AdminIntegrationsRoute
   AdminMoviesRoute: typeof AdminMoviesRoute
   AdminProfileRoute: typeof AdminProfileRoute
+  AdminResellersRoute: typeof AdminResellersRoute
   AdminSeriesRoute: typeof AdminSeriesRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -708,11 +748,13 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminChannelsRoute: AdminChannelsRoute,
+  AdminCreditsRoute: AdminCreditsRoute,
   AdminGenresRoute: AdminGenresRoute,
   AdminHomeRoute: AdminHomeRoute,
   AdminIntegrationsRoute: AdminIntegrationsRoute,
   AdminMoviesRoute: AdminMoviesRoute,
   AdminProfileRoute: AdminProfileRoute,
+  AdminResellersRoute: AdminResellersRoute,
   AdminSeriesRoute: AdminSeriesRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,

@@ -518,11 +518,66 @@ export type Database = {
           },
         ]
       }
+      content_requests: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          decided_by: string | null
+          id: string
+          kind: string
+          note: string | null
+          release_year: number | null
+          reseller_id: string
+          status: string
+          title: string
+          tmdb_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          decided_by?: string | null
+          id?: string
+          kind: string
+          note?: string | null
+          release_year?: number | null
+          reseller_id: string
+          status?: string
+          title: string
+          tmdb_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          decided_by?: string | null
+          id?: string
+          kind?: string
+          note?: string | null
+          release_year?: number | null
+          reseller_id?: string
+          status?: string
+          title?: string
+          tmdb_id?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_requests_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "resellers"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       credit_orders: {
         Row: {
+          admin_note: string | null
           created_at: string
           decided_at: string | null
           decided_by: string | null
+          granted_quantity: number | null
           id: string
           note: string | null
           quantity: number
@@ -530,9 +585,11 @@ export type Database = {
           status: string
         }
         Insert: {
+          admin_note?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
+          granted_quantity?: number | null
           id?: string
           note?: string | null
           quantity: number
@@ -540,9 +597,11 @@ export type Database = {
           status?: string
         }
         Update: {
+          admin_note?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
+          granted_quantity?: number | null
           id?: string
           note?: string | null
           quantity?: number
@@ -570,6 +629,7 @@ export type Database = {
           note: string | null
           order_id: string | null
           reason: string
+          request_id: string | null
           reseller_id: string
         }
         Insert: {
@@ -582,6 +642,7 @@ export type Database = {
           note?: string | null
           order_id?: string | null
           reason: string
+          request_id?: string | null
           reseller_id: string
         }
         Update: {
@@ -594,6 +655,7 @@ export type Database = {
           note?: string | null
           order_id?: string | null
           reason?: string
+          request_id?: string | null
           reseller_id?: string
         }
         Relationships: [
@@ -2003,7 +2065,12 @@ export type Database = {
     Functions: {
       access_code_ok: { Args: { c: string }; Returns: boolean }
       admin_adjust_credits: {
-        Args: { _delta: number; _note?: string; _reseller_id: string }
+        Args: {
+          _delta: number
+          _note: string
+          _request_id: string
+          _reseller_id: string
+        }
         Returns: number
       }
       admin_set_role: {
@@ -2039,7 +2106,12 @@ export type Database = {
         Returns: Json
       }
       decide_credit_order: {
-        Args: { _approve: boolean; _order_id: string }
+        Args: {
+          _approve: boolean
+          _granted?: number
+          _note?: string
+          _order_id: string
+        }
         Returns: undefined
       }
       embed_url_allowed: { Args: { u: string }; Returns: boolean }
@@ -2079,6 +2151,7 @@ export type Database = {
       is_active_reseller: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       m3u_episode_counts: {
         Args: { _keys: string[]; _list: string }
         Returns: {
@@ -2148,6 +2221,16 @@ export type Database = {
         Args: { _event: string; _source_id: string }
         Returns: undefined
       }
+      request_content: {
+        Args: {
+          _kind: string
+          _note?: string
+          _title: string
+          _tmdb_id?: number
+          _year?: number
+        }
+        Returns: string
+      }
       request_credits: {
         Args: { _note?: string; _quantity: number }
         Returns: string
@@ -2165,6 +2248,10 @@ export type Database = {
       }
       set_access_status: {
         Args: { _access_id: string; _status: string }
+        Returns: undefined
+      }
+      set_content_request_status: {
+        Args: { _id: string; _note?: string; _status: string }
         Returns: undefined
       }
       set_primary_playback: { Args: { _source_id: string }; Returns: undefined }
