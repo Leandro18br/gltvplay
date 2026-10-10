@@ -31,6 +31,7 @@ import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminIntegrationsRouteImport } from './routes/admin.integrations'
 import { Route as AdminMoviesRouteImport } from './routes/admin.movies'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
+import { Route as AdminResellersRouteImport } from './routes/admin.resellers'
 import { Route as AdminSeriesRouteImport } from './routes/admin.series'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminHomePreviewRouteImport } from './routes/admin_.home-preview'
@@ -153,6 +154,11 @@ const AdminProfileRoute = AdminProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminResellersRoute = AdminResellersRouteImport.update({
+  id: '/resellers',
+  path: '/resellers',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSeriesRoute = AdminSeriesRouteImport.update({
   id: '/series',
   path: '/series',
@@ -237,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/resellers': typeof AdminResellersRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
@@ -271,6 +278,7 @@ export interface FileRoutesByTo {
   '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/resellers': typeof AdminResellersRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
@@ -308,6 +316,7 @@ export interface FileRoutesById {
   '/admin/integrations': typeof AdminIntegrationsRoute
   '/admin/movies': typeof AdminMoviesRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/resellers': typeof AdminResellersRoute
   '/admin/series': typeof AdminSeriesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin_/home-preview': typeof AdminHomePreviewRoute
@@ -345,6 +354,7 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/movies'
     | '/admin/profile'
+    | '/admin/resellers'
     | '/admin/series'
     | '/admin/users'
     | '/admin/home-preview'
@@ -379,6 +389,7 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/movies'
     | '/admin/profile'
+    | '/admin/resellers'
     | '/admin/series'
     | '/admin/users'
     | '/admin/home-preview'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/movies'
     | '/admin/profile'
+    | '/admin/resellers'
     | '/admin/series'
     | '/admin/users'
     | '/admin_/home-preview'
@@ -607,6 +619,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProfileRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/resellers': {
+      id: '/admin/resellers'
+      path: '/resellers'
+      fullPath: '/admin/resellers'
+      preLoaderRoute: typeof AdminResellersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/series': {
       id: '/admin/series'
       path: '/series'
@@ -718,6 +737,7 @@ interface AdminRouteChildren {
   AdminIntegrationsRoute: typeof AdminIntegrationsRoute
   AdminMoviesRoute: typeof AdminMoviesRoute
   AdminProfileRoute: typeof AdminProfileRoute
+  AdminResellersRoute: typeof AdminResellersRoute
   AdminSeriesRoute: typeof AdminSeriesRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -734,6 +754,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIntegrationsRoute: AdminIntegrationsRoute,
   AdminMoviesRoute: AdminMoviesRoute,
   AdminProfileRoute: AdminProfileRoute,
+  AdminResellersRoute: AdminResellersRoute,
   AdminSeriesRoute: AdminSeriesRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,

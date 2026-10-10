@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, LayoutTemplate, Film, Tv, Radio, Tags, Shapes, Users,
-  UserCircle, LogOut, Menu, ExternalLink, Cable,
+  UserCircle, LogOut, Menu, ExternalLink, Cable, Coins, Store,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ROLE_LABEL, isAdminRole, type StaffRole } from "@/lib/admin/db";
@@ -34,6 +34,8 @@ const NAV = [
   { to: "/admin/genres", label: "Gêneros", icon: Shapes },
   { to: "/admin/users", label: "Usuários", icon: Users, adminOnly: true },
   { to: "/admin/integrations", label: "APIs e Integrações", icon: Cable, adminOnly: true },
+  { to: "/admin/credits", label: "Gerenciar créditos", icon: Coins, superOnly: true },
+  { to: "/admin/resellers", label: "Gerenciar revendedores", icon: Store, superOnly: true },
   { to: "/admin/profile", label: "Meu perfil", icon: UserCircle },
 ] as const;
 
@@ -52,7 +54,7 @@ function Nav({ onNavigate, role }: { onNavigate?: () => void; role: StaffRole })
         <span className="mr-2 text-primary">●</span> Painel ADM
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-        {NAV.filter((n) => !("adminOnly" in n) || isAdminRole(role)).map(({ to, label, icon: Icon, ...rest }) => (
+        {NAV.filter((n) => (!("adminOnly" in n) || isAdminRole(role)) && (!("superOnly" in n) || role === "super_admin")).map(({ to, label, icon: Icon, ...rest }) => (
           <Link key={to} to={to} onClick={onNavigate} activeOptions={{ exact: "exact" in rest }}
             className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-sidebar-foreground/70 transition hover:bg-sidebar-accent hover:text-sidebar-foreground"
             activeProps={{ className: "!bg-sidebar-accent !text-primary font-medium" }}>
