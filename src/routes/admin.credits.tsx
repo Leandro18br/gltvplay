@@ -27,7 +27,7 @@ function CreditsPage() {
   const resellers = useQuery({
     queryKey: ["admin", "resellers", "list"],
     queryFn: async () => {
-      const { data, error } = await db.from("resellers").select("*, profiles(email,name)").order("created_at", { ascending: false });
+      const { data, error } = await db.from("resellers").select("*, profiles(email,name)").neq("status", "deleted").order("created_at", { ascending: false });
       if (error) throw error; return data as Row[];
     },
   });
