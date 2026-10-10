@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, LogOut } from "lucide-react";
 import { AccessManager, type Created } from "@/components/access/AccessManager";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
 import { db, type Row } from "@/lib/admin/db";
 import { fmtDate, resellerErr, ORDER_STATUS, CONTENT_STATUS, TX_REASON } from "@/lib/resellers/shared";
 import { Button } from "@/components/ui/button";
@@ -27,10 +28,12 @@ export const Route = createFileRoute("/revendedor")({
     ],
   }),
   beforeLoad: async () => {
+    await ensureSlot("reseller");
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/revendedor/login", search: { denied: undefined } });
     const { data: ok } = await supabase.rpc("is_active_reseller", { _user_id: data.user.id });
     if (!ok) throw redirect({ to: "/revendedor/login", search: { denied: 1 } });
+    await claimSlot("reseller");
     return { user: data.user };
   },
   component: ResellerPanel,
@@ -93,7 +96,7 @@ function ResellerPanel() {
     if (error) { toast.error(resellerErr(error)); refresh(); return; }
     setCreated(data as unknown as Created); setClientName(""); setTab("list"); refresh();
   }
-  async function logout() { qc.clear(); await supabase.auth.signOut(); navigate({ to: "/revendedor/login", replace: true, search: { denied: undefined } }); }
+  async function logout() { qc.clear(); await signOutSlot("reseller"); navigate({ to: "/revendedor/login", replace: true, search: { denied: undefined } }); }
 
   const now = Date.now();
   const list = accs.data ?? [];

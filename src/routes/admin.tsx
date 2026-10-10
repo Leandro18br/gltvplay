@@ -6,6 +6,7 @@ import {
   UserCircle, LogOut, Menu, ExternalLink, Cable, Coins, Store, UserPlus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
 import { ROLE_LABEL, isAdminRole, type StaffRole } from "@/lib/admin/db";
 import { adminHead } from "@/lib/admin/head";
 import { Button } from "@/components/ui/button";
@@ -15,10 +16,12 @@ export const Route = createFileRoute("/admin")({
   ssr: false,
   head: () => adminHead("Painel", "Administração do catálogo e das fontes de reprodução autorizadas."),
   beforeLoad: async () => {
+    await ensureSlot("admin");
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/admin/login" });
     const { data: role } = await supabase.rpc("my_role");
     if (role !== "super_admin" && role !== "admin" && role !== "editor") throw redirect({ to: "/admin/login", search: { denied: 1 } });
+    await claimSlot("admin");
     return { user: data.user, role: role as StaffRole };
   },
   component: AdminLayout,
@@ -46,7 +49,7 @@ function Nav({ onNavigate, role }: { onNavigate?: () => void; role: StaffRole })
   async function logout() {
     await qc.cancelQueries();
     qc.clear();
-    await supabase.auth.signOut();
+    await signOutSlot("admin");
     navigate({ to: "/admin/login", replace: true });
   }
   return (

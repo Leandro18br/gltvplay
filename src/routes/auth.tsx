@@ -11,6 +11,7 @@ import { Logo } from "@/components/site/SiteHeader";
 import { PasswordInput, FieldError } from "@/components/site/PasswordInput";
 import { accessLogin } from "@/lib/access/access.functions";
 import { checkSiteAccess, clearSiteAccessCache } from "@/lib/access/gate";
+import { claimSlot } from "@/lib/auth/session-vault";
 
 const safeRedirect = (r: unknown) => (typeof r === "string" && r.startsWith("/") && !r.startsWith("//") && !r.startsWith("/auth") ? r : "/");
 const CODE = /^\d{6}$/;
@@ -45,6 +46,10 @@ function AuthPage() {
 
   // Already signed in with a valid access → go straight to destination
   useEffect(() => {
+    if (sessionStorage.getItem("access_denied")) {
+      sessionStorage.removeItem("access_denied");
+      toast.error("Sua sessão terminou ou seu acesso está vencido ou bloqueado. Entre novamente.");
+    }
     checkSiteAccess(true).then((ok) => { if (ok) navigate({ to: target, replace: true }); });
   }, [navigate, target]);
 
@@ -66,6 +71,8 @@ function AuthPage() {
       const { error } = await supabase.auth.setSession({ access_token: r.access_token, refresh_token: r.refresh_token });
       if (error) throw error;
       clearSiteAccessCache();
+      await claimSlot("client");
+      sessionStorage.removeItem("access_denied");
       navigate({ to: target, replace: true });
     } catch {
       toast.error("Não foi possível entrar agora. Tente novamente.");

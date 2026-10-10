@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, User, LogOut, ListVideo, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { signOutSlot } from "@/lib/auth/session-vault";
 import { siteSettingsQuery } from "@/lib/catalog";
 import { useAuthUser } from "@/lib/user-data";
 import { greetingFor } from "@/lib/access/greeting";
@@ -74,7 +75,7 @@ export function SiteHeader() {
   const signOut = async () => {
     await qc.cancelQueries();
     qc.removeQueries({ queryKey: ["me"] });
-    await supabase.auth.signOut();
+    await signOutSlot("client");
     navigate({ to: "/", replace: true });
   };
 

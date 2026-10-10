@@ -14,10 +14,10 @@
 - Roles live in `user_roles` and are checked with `has_role`/`is_staff` SQL functions; first signup becomes admin. Why: prevent privilege escalation.
 - Playback sources live only in staff-only `playback_sources` and are resolved through `get_playback_source` for signed-in active users; the legacy URL RPC excludes embeds. Why: one authorization model for all source types.
 - History/watchlist/playback reference content polymorphically via `content_kind` + `content_id`. Why: one structure for movies, series, episodes and channels.
-- Catalog writes are audited by the `audit_trigger` into `audit_logs`. Why: traceable admin actions.
-- Media uploads go to the private `media` storage bucket (public buckets blocked by workspace). Why: workspace policy.
-- Admin CRUD screens are config-driven via `ResourceManager` + `src/lib/admin/configs.tsx`; add new admin entities as configs, not bespoke pages. Why: consistency and less code.
-- Admin area lives under `/admin` (own ssr:false gate checking `is_staff`); login at `/admin/login` (`admin_.login.tsx`, un-nested). Why: separate admin entry from public auth.
+- Catalog writes audited via `audit_trigger` → `audit_logs`. Why: traceability.
+- Media uploads use the private `media` bucket. Why: workspace blocks public buckets.
+- Admin CRUD screens are config-driven via `ResourceManager` + `src/lib/admin/configs.tsx`; add new admin entities as configs, not bespoke pages. Why: consistency.
+- Admin area lives under `/admin` (own ssr:false gate checking `is_staff`); login at `/admin/login` (`admin_.login.tsx`, un-nested). Why: separate admin entry.
 - Catalog import providers live in `src/lib/import/import.functions.ts` (licensed APIs only, keys via server secrets); imports dedupe on (external_source, external_id). Why: pluggable future integrations.
 - Public site reads go through query factories in `src/lib/catalog.ts`; viewer data (history/watchlist) through `src/lib/user-data.ts`; signed-in pages (player, Minha lista, Perfil) live under `_authenticated/`. Why: one source for catalog reads and RLS-scoped user data.
 - Permission levels: super_admin > admin > editor > user, enforced by RLS (`is_staff` = create/edit, `is_admin` = delete/settings/logs/users) and `admin_set_role`; UI hiding is cosmetic only. Why: backend is the security boundary.
@@ -31,6 +31,7 @@
 - TMDB reuses cached metadata, staff-only allowlisted completion and locked import deduplication; year jobs persist bounded discovery/item checkpoints. Episode updates touch existing rows only. Why: preserve manual data, identities and playback.
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
 
-- Integration, playback and TMDB detail rules live in `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory-scoped detail.
+- Detail rules: `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory scope.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
 - Access/credit writes go only through idempotent security-definer RPCs; hashes in a no-grant table; reseller panel `/revendedor` uses e-mail/password auth accounts managed by owner-only server functions; resellers and client accesses are soft-deleted (status deleted; deleted accesses lose their hash and are trigger-locked) to keep history. Catalog RLS/playback require `has_site_access`; client 6-digit login (`/auth`) mints a session for a per-access internal account; catalog routes use ssr:false + `requireSiteAccess`. Why: atomic charging, server-enforced lock.
+- Per-area session slots (`session-vault.ts`): guards restore slot, then re-check server-side. Why: logins must not evict each other.
