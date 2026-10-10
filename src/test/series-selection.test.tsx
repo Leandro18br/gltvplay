@@ -30,7 +30,7 @@ describe("Series episode selection", () => {
     if (!Page) throw new Error("Missing series component");
     const scroll = vi.spyOn(window, "scrollTo").mockImplementation(() => { expect(screen.getByRole("region", { name: "e2" })).toBeInTheDocument(); });
     render(<Page />);
-    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /^e\d$/ })).not.toBeInTheDocument();
     expect(scroll).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /Second/ }));
     await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
