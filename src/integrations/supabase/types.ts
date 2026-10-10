@@ -662,7 +662,7 @@ export type Database = {
           {
             foreignKeyName: "credit_transactions_access_id_fkey"
             columns: ["access_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "access_accounts"
             referencedColumns: ["id"]
           },
@@ -2217,6 +2217,10 @@ export type Database = {
         Returns: number
       }
       random_access_code: { Args: never; Returns: string }
+      renew_access: {
+        Args: { _access_id: string; _request_id: string }
+        Returns: Json
+      }
       report_playback_error: {
         Args: { _event: string; _source_id: string }
         Returns: undefined
@@ -2257,6 +2261,10 @@ export type Database = {
       set_primary_playback: { Args: { _source_id: string }; Returns: undefined }
       tmdb_catalog_report: { Args: { _job: string }; Returns: Json }
       validate_home_config: { Args: { c: Json }; Returns: undefined }
+      verify_access_login: {
+        Args: { _login: string; _password: string }
+        Returns: Json
+      }
     }
     Enums: {
       account_status: "active" | "suspended" | "banned"

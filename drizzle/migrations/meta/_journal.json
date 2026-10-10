@@ -204,6 +204,13 @@
       "when": 1791633968171,
       "tag": "0028_reseller_admin_management",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791634635785,
+      "tag": "0029_reseller_panel_renewals",
+      "breakpoints": true
     }
   ]
 }
