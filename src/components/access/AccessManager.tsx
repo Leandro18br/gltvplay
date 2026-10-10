@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ConfirmDelete } from "@/components/admin/ConfirmDelete";
 
 /** Public client login link (6-digit login, then redirects to the requested title). */
-export const CLIENT_LINK = "https://content-sync-stream.lovable.app/auth?redirect=%2Ffilme%2Fsaudades-te-amo";
+export const CLIENT_LINK = "https://content-sync-stream.lovable.app/";
 
 export type Created = { id: string; login: string; client_name?: string | null; password: string; kind: string; starts_at?: string; expires_at: string };
 
