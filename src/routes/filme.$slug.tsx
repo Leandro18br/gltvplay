@@ -39,9 +39,9 @@ function MoviePage() {
   const { data } = useSuspenseQuery(movieDetailQuery(slug));
   if (!data) return null;
   return (
-    <SiteShell padTop={false}>
+    <SiteShell padTop={false} hideHeader>
       <article>
-        <DetailHero item={data.item} player={<InlinePlayer kind="movie" id={data.item.id} title={data.item.title} poster={data.item.backdrop_url || data.item.poster_url} />} />
+        <DetailHero item={data.item} flushPlayer player={<InlinePlayer className="movie-top-player" kind="movie" id={data.item.id} title={data.item.title} poster={data.item.backdrop_url || data.item.poster_url} />} />
         <div className="py-8"><GridSection title="Títulos semelhantes" items={data.related} /></div>
       </article>
     </SiteShell>

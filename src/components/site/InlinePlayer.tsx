@@ -17,7 +17,7 @@ type Src = { id: string; url: string; type: "url" | "embed" | "hls"; label: stri
  * (embed/iframe, direct URL or HLS) in the same space. Requires sign-in,
  * exactly like the full watch page.
  */
-export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "episode"; id: string; title: string; poster: string | null }) {
+export function InlinePlayer({ kind, id, title, poster, className = "" }: { kind: "movie" | "episode"; id: string; title: string; poster: string | null; className?: string }) {
   const navigate = useNavigate();
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -53,7 +53,7 @@ export function InlinePlayer({ kind, id, title, poster }: { kind: "movie" | "epi
   const isHls = source?.type === "hls" || /\.m3u8(\?|$)/i.test(source?.url ?? "");
 
   return (
-    <div className="w-full min-w-0 space-y-3">
+    <div className={`w-full min-w-0 space-y-3 ${className}`}>
       <div className={`relative w-full ${started ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
         {!started ? (
           <Button type="button" variant="ghost" onClick={start} disabled={loading} aria-label={`Reproduzir ${title}`} className="group relative block h-full w-full rounded-none p-0 [&_svg]:size-9">

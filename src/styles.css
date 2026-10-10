@@ -129,6 +129,17 @@
 @utility bg-side-fade { background-image: var(--gradient-side); }
 @utility shadow-glow { box-shadow: var(--glow); }
 @utility animate-rise { animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Movie details only: artwork, native video and embeds share one flush stage.
+ * Provider actions stay below it; fullscreen keeps the viewport-sized frame. */
+.movie-top-player .aspect-video,
+.movie-top-player [role="region"]:not(:fullscreen) {
+  height: 260px;
+  aspect-ratio: auto;
+  border-radius: 0;
+  background-color: var(--player);
+}
+
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {

@@ -15,14 +15,15 @@ function trailerEmbed(url: string) {
 }
 
 /** Player first, followed by the existing poster and details (no separate banner). */
-export function DetailHero({ item, extraMeta, player }: { item: Item; extraMeta?: ReactNode; player?: ReactNode }) {
+export function DetailHero({ item, extraMeta, player, flushPlayer = false }: { item: Item; extraMeta?: ReactNode; player?: ReactNode; flushPlayer?: boolean }) {
   const [trailer, setTrailer] = useState(false);
   const meta = [item.release_year, item.kind === "movie" ? formatDuration(item.duration_minutes) : null, item.quality, item.language, item.country].filter(Boolean);
   const embed = item.trailer_url ? trailerEmbed(item.trailer_url) : null;
   return (
     <section className="relative w-full overflow-hidden">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-8 px-4 pb-10 pt-20 md:px-10">
-        {player && <div className="w-full min-w-0 max-w-5xl">{player}</div>}
+      {flushPlayer && player}
+      <div className={`mx-auto flex max-w-[1600px] flex-col gap-8 px-4 pb-10 md:px-10 ${flushPlayer ? "pt-8" : "pt-20"}`}>
+        {!flushPlayer && player && <div className="w-full min-w-0 max-w-5xl">{player}</div>}
         <div className="flex min-w-0 flex-col gap-8 md:flex-row md:items-start">
         {item.poster_url && <img src={item.poster_url} alt={`Pôster de ${item.title}`} className="aspect-[2/3] w-32 shrink-0 animate-rise rounded-2xl object-cover shadow-glow ring-1 ring-primary/30 md:w-44" />}
         <div className="flex min-w-0 max-w-3xl animate-rise flex-1 flex-col gap-4">
