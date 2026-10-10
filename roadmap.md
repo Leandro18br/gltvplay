@@ -1,6 +1,6 @@
 # Client and reseller profiles
-- [ ] Remove client profile password and avatar editing; check reseller profile/menu options without changing ADM recovery or names.
-- [ ] Verify real client and reseller views and responsive layout.
+- [x] Remove client profile password and avatar editing; reseller has no self-service profile or upload/password settings. ADM profile, administrative recovery and account names unchanged.
+- [x] Verified actual client profile at 320/390/1280 with no overflow, password/file inputs or runtime errors; viewer profiles intact. Actual reseller dashboard and access-list tab verified at those widths; no profile password/file inputs. ADM password field remains. Routing test passes; build OK. No account values or passwords changed.
 
 # Series detail visual parity
 - [x] Reuse movie details and 260px faded banner; mount the existing player only for an explicitly selected episode and scroll after mounting.
