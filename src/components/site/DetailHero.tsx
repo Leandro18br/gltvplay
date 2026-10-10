@@ -24,7 +24,7 @@ export function DetailHero({ item, extraMeta, player, flushPlayer = false }: { i
       {flushPlayer && player}
       <div className={`mx-auto flex max-w-[1600px] flex-col gap-8 px-4 pb-10 md:px-10 ${flushPlayer ? "pt-8" : "pt-20"}`}>
         {!flushPlayer && player && <div className="w-full min-w-0 max-w-5xl">{player}</div>}
-        <div className="flex min-w-0 flex-col gap-8 md:flex-row md:items-start">
+         <div className={`flex min-w-0 flex-col gap-8 md:flex-row md:items-start ${flushPlayer ? "movie-detail-info" : ""}`}>
         {item.poster_url && <img src={item.poster_url} alt={`Pôster de ${item.title}`} className="aspect-[2/3] w-32 shrink-0 animate-rise rounded-2xl object-cover shadow-glow ring-1 ring-primary/30 md:w-44" />}
         <div className="flex min-w-0 max-w-3xl animate-rise flex-1 flex-col gap-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">{item.kind === "movie" ? "Filme" : "Série"}</p>
