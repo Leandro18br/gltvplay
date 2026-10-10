@@ -244,7 +244,6 @@ function ManageDialog({ row, onClose, onDone, onStatus }: { row: Row; onClose: (
   const [pass, setPass] = useState("");
   const [newPass, setNewPass] = useState<string>();
   const [amount, setAmount] = useState("1");
-  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [reqId, setReqId] = useState(() => crypto.randomUUID());
@@ -254,7 +253,7 @@ function ManageDialog({ row, onClose, onDone, onStatus }: { row: Row; onClose: (
     queryFn: async () => {
       const id = row.user_id;
       const [acc, tx, ord, cr] = await Promise.all([
-        db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at").eq("reseller_id", id).order("created_at", { ascending: false }).limit(100),
+        db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at,client_name").eq("reseller_id", id).neq("status", "deleted").order("created_at", { ascending: false }).limit(100),
         db.from("credit_transactions").select("*").eq("reseller_id", id).order("created_at", { ascending: false }).limit(100),
         db.from("credit_orders").select("*").eq("reseller_id", id).order("created_at", { ascending: false }).limit(100),
         db.from("content_requests").select("*").eq("reseller_id", id).order("created_at", { ascending: false }).limit(100),
@@ -286,9 +285,9 @@ function ManageDialog({ row, onClose, onDone, onStatus }: { row: Row; onClose: (
     const n = Number(amount);
     if (!Number.isInteger(n) || n < 1 || n > 100000) return void toast.error("Informe uma quantidade inteira positiva.");
     void run(async () => {
-      const { error } = await db.rpc("admin_adjust_credits", { _reseller_id: row.user_id, _delta: n, _note: note.trim() || null, _request_id: reqId });
+      const { error } = await db.rpc("admin_adjust_credits", { _reseller_id: row.user_id, _delta: n, _note: null as unknown as string, _request_id: reqId });
       if (error) throw error;
-      setReqId(crypto.randomUUID()); setNote(""); setAmount("1");
+      setReqId(crypto.randomUUID()); setAmount("1");
     }, "Créditos adicionados");
   };
   const doDelete = () => void run(() => del({ data: { userId: row.user_id } }), "Revendedor excluído").then((ok) => ok && onClose());
@@ -329,15 +328,14 @@ function ManageDialog({ row, onClose, onDone, onStatus }: { row: Row; onClose: (
               </>}
           </TabsContent>
           <TabsContent value="credits" className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
-              <div className="space-y-1.5"><Label htmlFor="ca">Quantidade</Label><Input id="ca" type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor="cn">Observação</Label><Input id="cn" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></div>
-              <Button disabled={busy} onClick={addCredits}>Adicionar créditos</Button>
+            <div className="grid gap-3 sm:grid-cols-[12rem_auto] sm:items-end">
+              <div className="space-y-1.5"><Label htmlFor="ca">Quantidade de créditos</Label><Input id="ca" type="number" inputMode="numeric" min={1} step={1} required value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && addCredits()} /></div>
+              <Button disabled={busy} onClick={addCredits}>{busy && <Loader2 className="animate-spin" />}Adicionar créditos</Button>
             </div>
             {d.isLoading ? <Loader2 className="mx-auto animate-spin" /> : d.data && <Mini rows={d.data.tx} cols={[["Data", (t) => fmtDate(t.created_at)], ["Qtd.", (t) => (t.delta > 0 ? `+${t.delta}` : t.delta)], ["Saldo", (t) => t.balance_after], ["Por", (t) => t.who], ["Motivo", (t) => `${TX_REASON[t.reason] ?? t.reason}${t.note ? ` — ${t.note}` : ""}`]]} />}
           </TabsContent>
           <TabsContent value="acc">
-            {d.isLoading ? <Loader2 className="mx-auto animate-spin" /> : d.data && <Mini rows={d.data.acc} cols={[["Login", (a) => a.login], ["Tipo", (a) => a.kind === "normal" ? "30 dias" : `Teste ${a.duration_hours}h`], ["Status", (a) => a.status], ["Expira", (a) => fmtDate(a.expires_at)]]} />}
+            {d.isLoading ? <Loader2 className="mx-auto animate-spin" /> : d.data && <Mini rows={d.data.acc} cols={[["Login", (a) => a.login], ["Nome", (a) => a.client_name || "Nome não informado"], ["Tipo", (a) => a.kind === "normal" ? "30 dias" : `Teste ${a.duration_hours}h`], ["Status", (a) => a.status], ["Expira", (a) => fmtDate(a.expires_at)]]} />}
           </TabsContent>
           <TabsContent value="req" className="space-y-4">
             {d.data && <>
