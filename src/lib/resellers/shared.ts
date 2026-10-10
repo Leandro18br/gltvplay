@@ -5,6 +5,9 @@ export const fmtDate = (s: string | null | undefined) => (s ? new Date(s).toLoca
 export function resellerErr(e: unknown) {
   const raw = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "";
   if (/insufficient credits/i.test(raw)) return "Saldo insuficiente: a retirada deixaria o saldo negativo.";
+  if (/access not active/i.test(raw)) return "Só acessos ativos podem ser renovados. Desbloqueie antes.";
+  if (/access cancelled/i.test(raw)) return "Acesso cancelado: somente o administrador pode reativá-lo.";
+  if (/reseller not active/i.test(raw)) return "Conta de revendedor bloqueada.";
   if (/order not pending/i.test(raw)) return "Este pedido já foi decidido.";
   if (/reason required/i.test(raw)) return "Informe o motivo (mínimo 3 caracteres).";
   if (/invalid quantity/i.test(raw)) return "Quantidade inválida.";
@@ -14,7 +17,7 @@ export function resellerErr(e: unknown) {
 }
 
 export const TX_REASON: Record<string, string> = {
-  access_created: "Acesso criado", admin_adjust: "Ajuste manual", order_approved: "Pedido aprovado",
+  access_created: "Acesso criado", admin_adjust: "Ajuste manual", order_approved: "Pedido aprovado", access_renewed: "Renovação",
 };
 export const ORDER_STATUS: Record<string, string> = {
   pending: "Pendente", approved: "Aprovado", rejected: "Recusado", cancelled: "Cancelado",

@@ -18,6 +18,7 @@ import { Route as CanaisRouteImport } from './routes/canais'
 import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as FilmesRouteImport } from './routes/filmes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as RevendaRouteImport } from './routes/revenda'
 import { Route as SeriesRouteImport } from './routes/series'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedMinhaListaRouteImport } from './routes/_authenticated/minha-lista'
@@ -39,6 +40,7 @@ import { Route as AdminLoginRouteImport } from './routes/admin_.login'
 import { Route as CanalSlugRouteImport } from './routes/canal.$slug'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as FilmeSlugRouteImport } from './routes/filme.$slug'
+import { Route as RevendaLoginRouteImport } from './routes/revenda_.login'
 import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
 import { Route as AdminSeriesIdRouteImport } from './routes/admin.series_.$id'
 import { Route as HomeSecoesIdRouteImport } from './routes/home.secoes.$id'
@@ -87,6 +89,11 @@ const FilmesRoute = FilmesRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RevendaRoute = RevendaRouteImport.update({
+  id: '/revenda',
+  path: '/revenda',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SeriesRoute = SeriesRouteImport.update({
@@ -194,6 +201,11 @@ const FilmeSlugRoute = FilmeSlugRouteImport.update({
   path: '/filme/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RevendaLoginRoute = RevendaLoginRouteImport.update({
+  id: '/revenda_/login',
+  path: '/revenda/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SerieSlugRoute = SerieSlugRouteImport.update({
   id: '/serie/$slug',
   path: '/serie/$slug',
@@ -231,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/revenda': typeof RevendaRoute
   '/series': typeof SeriesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
@@ -251,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
+  '/revenda/login': typeof RevendaLoginRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/series/$id': typeof AdminSeriesIdRoute
@@ -266,6 +280,7 @@ export interface FileRoutesByTo {
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/revenda': typeof RevendaRoute
   '/series': typeof SeriesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
@@ -286,6 +301,7 @@ export interface FileRoutesByTo {
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
+  '/revenda/login': typeof RevendaLoginRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin': typeof AdminIndexRoute
   '/admin/series/$id': typeof AdminSeriesIdRoute
@@ -304,6 +320,7 @@ export interface FileRoutesById {
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/revenda': typeof RevendaRoute
   '/series': typeof SeriesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/minha-lista': typeof AuthenticatedMinhaListaRoute
@@ -324,6 +341,7 @@ export interface FileRoutesById {
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
+  '/revenda_/login': typeof RevendaLoginRoute
   '/serie/$slug': typeof SerieSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/series_/$id': typeof AdminSeriesIdRoute
@@ -342,6 +360,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/filmes'
     | '/reset-password'
+    | '/revenda'
     | '/series'
     | '/sitemap.xml'
     | '/minha-lista'
@@ -362,6 +381,7 @@ export interface FileRouteTypes {
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
+    | '/revenda/login'
     | '/serie/$slug'
     | '/admin/'
     | '/admin/series/$id'
@@ -377,6 +397,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/filmes'
     | '/reset-password'
+    | '/revenda'
     | '/series'
     | '/sitemap.xml'
     | '/minha-lista'
@@ -397,6 +418,7 @@ export interface FileRouteTypes {
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
+    | '/revenda/login'
     | '/serie/$slug'
     | '/admin'
     | '/admin/series/$id'
@@ -414,6 +436,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/filmes'
     | '/reset-password'
+    | '/revenda'
     | '/series'
     | '/sitemap.xml'
     | '/_authenticated/minha-lista'
@@ -434,6 +457,7 @@ export interface FileRouteTypes {
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
+    | '/revenda_/login'
     | '/serie/$slug'
     | '/admin/'
     | '/admin/series_/$id'
@@ -452,6 +476,7 @@ export interface RootRouteChildren {
   CategoriasRoute: typeof CategoriasRoute
   FilmesRoute: typeof FilmesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  RevendaRoute: typeof RevendaRoute
   SeriesRoute: typeof SeriesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AdminHomePreviewRoute: typeof AdminHomePreviewRoute
@@ -459,6 +484,7 @@ export interface RootRouteChildren {
   CanalSlugRoute: typeof CanalSlugRoute
   CategoriaSlugRoute: typeof CategoriaSlugRoute
   FilmeSlugRoute: typeof FilmeSlugRoute
+  RevendaLoginRoute: typeof RevendaLoginRoute
   SerieSlugRoute: typeof SerieSlugRoute
   HomeSecoesIdRoute: typeof HomeSecoesIdRoute
 }
@@ -526,6 +552,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/revenda': {
+      id: '/revenda'
+      path: '/revenda'
+      fullPath: '/revenda'
+      preLoaderRoute: typeof RevendaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/series': {
@@ -675,6 +708,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilmeSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/revenda_/login': {
+      id: '/revenda_/login'
+      path: '/revenda/login'
+      fullPath: '/revenda/login'
+      preLoaderRoute: typeof RevendaLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/serie/$slug': {
       id: '/serie/$slug'
       path: '/serie/$slug'
@@ -774,6 +814,7 @@ const rootRouteChildren: RootRouteChildren = {
   CategoriasRoute: CategoriasRoute,
   FilmesRoute: FilmesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  RevendaRoute: RevendaRoute,
   SeriesRoute: SeriesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   AdminHomePreviewRoute: AdminHomePreviewRoute,
@@ -781,6 +822,7 @@ const rootRouteChildren: RootRouteChildren = {
   CanalSlugRoute: CanalSlugRoute,
   CategoriaSlugRoute: CategoriaSlugRoute,
   FilmeSlugRoute: FilmeSlugRoute,
+  RevendaLoginRoute: RevendaLoginRoute,
   SerieSlugRoute: SerieSlugRoute,
   HomeSecoesIdRoute: HomeSecoesIdRoute,
 }
