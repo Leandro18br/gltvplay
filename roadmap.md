@@ -1,3 +1,7 @@
+# Client and reseller profiles
+- [ ] Remove client profile password and avatar editing; check reseller profile/menu options without changing ADM recovery or names.
+- [ ] Verify real client and reseller views and responsive layout.
+
 # Series detail visual parity
 - [x] Reuse movie details and 260px faded banner; mount the existing player only for an explicitly selected episode and scroll after mounting.
 - [x] Nine tests pass; authenticated The Rookie flow verified: initial/reload without player, episode 2 then 1 request distinct sources once, post-mount scroll reaches y=0; season change makes no extra source request or top scroll. Widths 320/360/390/412/768/1024/1280 fit with a 260px banner. Actual video playback remains unconfirmed: sampled existing source reports media error 4; no source/data changes.
