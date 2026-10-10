@@ -284,9 +284,8 @@ export const searchQuery = (term: string) =>
     enabled: term.trim().length >= 2,
     queryFn: async () => {
       const t = `%${term.trim().replace(/[%_,()]/g, " ")}%`;
-      const [m, s, e, c] = await Promise.all([
-        sb.from("movies").select(MOVIE_SEL).eq("status", "published").or(`title.ilike.${t},original_title.ilike.${t}`).limit(18),
-        sb.from("series").select(SERIES_SEL).eq("status", "published").or(`title.ilike.${t},original_title.ilike.${t}`).limit(18),
+      // Movies/series come from the ranked paged search (searchTitles); only episodes/channels here.
+      const [e, c] = await Promise.all([
         sb.from("episodes").select("id,title,episode_number,thumbnail_url,seasons!inner(season_number,series!inner(id,slug,title,poster_url,backdrop_url,status))").eq("status", "published").eq("seasons.series.status", "published").ilike("title", t).limit(12),
         sb.from("channels").select(CHANNEL_SEL).eq("status", "published").ilike("name", t).limit(12),
       ]);
@@ -296,8 +295,6 @@ export const searchQuery = (term: string) =>
         series: toSeries({ ...x.seasons.series, series_genres: [] }),
       }));
       return {
-        movies: (m.data ?? []).map(toMovie) as Item[],
-        series: (s.data ?? []).map(toSeries) as Item[],
         episodes,
         channels: (c.data ?? []).map(toChannel) as Item[],
       };
@@ -315,7 +312,22 @@ export const clampPage = (page: number, pages: number) => Math.min(Math.max(1, M
 export const pagedListQuery = (kind: Kind, filter: PagedFilter, page: number) =>
   queryOptions({
     queryKey: ["catalog", "paged", kind, filter.genre ?? "", filter.sort ?? "recent", filter.categoryId ?? "", filter.term ?? "", page],
-    queryFn: async (): Promise<PagedResult> => {
+    queryFn: async ({ signal }): Promise<PagedResult> => {
+      const p0 = Math.max(1, Math.floor(page) || 1);
+      if (filter.term?.trim() && kind !== "channel" && !filter.genre && !filter.categoryId) {
+        // Ranked search in the database (exact > prefix > partial), trigram-indexed.
+        const term = filter.term.trim().replace(/\s+/g, " ").replace(/[%_\\]/g, " ");
+        const r = await sb.rpc("search_titles", { _kind: kind, _term: term, _page: p0, _size: PAGE_SIZE }).abortSignal(signal);
+        if (r.error) throw r.error;
+        const ids = (r.data ?? []).map((x: { id: string }) => x.id);
+        const total = Number(r.data?.[0]?.total ?? 0);
+        if (!ids.length) return { items: [], total, page: p0, pages: pageCount(total) };
+        const rows = await sb.from(kind === "movie" ? "movies" : "series").select(kind === "movie" ? MOVIE_SEL : SERIES_SEL).in("id", ids).abortSignal(signal);
+        if (rows.error) throw rows.error;
+        const byId = new Map(((rows.data ?? []) as Raw[]).map((x) => [x.id, x]));
+        const map = kind === "movie" ? toMovie : toSeries;
+        return { items: ids.filter((i: string) => byId.has(i)).map((i: string) => map(byId.get(i))), total, page: p0, pages: pageCount(total) };
+      }
       const table = kind === "movie" ? "movies" : kind === "series" ? "series" : "channels";
       let sel = kind === "movie" ? MOVIE_SEL : kind === "series" ? SERIES_SEL : CHANNEL_SEL;
       const join = kind === "movie" ? "movie_genres" : "series_genres";
