@@ -59,10 +59,10 @@ export function SiteFooter() {
   );
 }
 
-export function SiteShell({ children, padTop = true }: { children: ReactNode; padTop?: boolean }) {
+export function SiteShell({ children, padTop = true, hideHeader = false }: { children: ReactNode; padTop?: boolean; hideHeader?: boolean }) {
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      {!hideHeader && <SiteHeader />}
       <main className={`${padTop ? "pt-20 md:pt-24" : ""} pb-[calc(1rem+env(safe-area-inset-bottom))]`}>{children}</main>
       <SiteFooter />
       <MobileNav />
