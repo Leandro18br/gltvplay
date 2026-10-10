@@ -18,13 +18,14 @@ export async function checkSiteAccess(force = false): Promise<boolean> {
   const res = !error && !!ok;
   cache = { uid, ok: res, at: Date.now() };
   if (res) await claimSlot("client");
-  else if (typeof window !== "undefined") sessionStorage.setItem("access_denied", "1");
   return res;
 }
 
 /** beforeLoad guard for every catalog page (use with ssr: false). */
 export async function requireSiteAccess({ location }: { location: { href: string } }) {
   if (!(await checkSiteAccess())) {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) sessionStorage.setItem("access_denied", "1");
     throw redirect({ to: "/auth", search: { redirect: location.href, mode: undefined } });
   }
 }
