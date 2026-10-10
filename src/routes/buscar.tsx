@@ -46,10 +46,10 @@ function SearchPage() {
   }, [value, term, navigate]);
   const go = (key: "pf" | "ps") => (n: number) => navigate({ search: (prev) => ({ ...prev, [key]: n > 1 ? n : undefined }), replace: true });
 
-  const res = useQuery({ ...searchQuery(term), placeholderData: keepPreviousData });
+  const res = useQuery(searchQuery(term));
   const d = res.data;
-  const fm = useQuery({ ...pagedListQuery("movie", { term, sort: "title" }, pf ?? 1), enabled: term.trim().length >= 2, placeholderData: keepPreviousData });
-  const fs = useQuery({ ...pagedListQuery("series", { term, sort: "title" }, ps ?? 1), enabled: term.trim().length >= 2, placeholderData: keepPreviousData });
+  const fm = useQuery({ ...pagedListQuery("movie", { term, sort: "title" }, pf ?? 1), enabled: term.trim().length >= 2, placeholderData: (prev, pq) => (pq?.queryKey[6] === term ? prev : undefined) });
+  const fs = useQuery({ ...pagedListQuery("series", { term, sort: "title" }, ps ?? 1), enabled: term.trim().length >= 2, placeholderData: (prev, pq) => (pq?.queryKey[6] === term ? prev : undefined) });
   const total = (d ? d.episodes.length + d.channels.length : 0) + (fm.data?.total ?? 0) + (fs.data?.total ?? 0);
   const pending = res.isPending || fm.isPending || fs.isPending;
   const active = term.trim().length >= 2;
@@ -74,8 +74,8 @@ function SearchPage() {
         <EmptyState title={`Nenhum resultado para “${term}”`} text="Tente outro título ou palavra-chave." />
       ) : (
         <div className="space-y-10">
-          <PagedGridSection title="Filmes" kind="movie" filter={{ term, sort: "title" }} page={pf ?? 1} onChange={go("pf")} />
-          <PagedGridSection title="Séries" kind="series" filter={{ term, sort: "title" }} page={ps ?? 1} onChange={go("ps")} />
+          <PagedGridSection key={`m:${term}`} title="Filmes" kind="movie" filter={{ term, sort: "title" }} page={pf ?? 1} onChange={go("pf")} />
+          <PagedGridSection key={`s:${term}`} title="Séries" kind="series" filter={{ term, sort: "title" }} page={ps ?? 1} onChange={go("ps")} />
           {d && d.episodes.length > 0 && (
             <section className="mx-auto max-w-[1600px] px-4 md:px-10">
               <h2 className="mb-4 text-lg font-semibold">Episódios</h2>
