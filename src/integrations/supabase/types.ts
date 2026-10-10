@@ -1922,6 +1922,13 @@ export type Database = {
         Args: { c: Json; expected_revision: number }
         Returns: number
       }
+      search_titles: {
+        Args: { _kind: string; _page: number; _size: number; _term: string }
+        Returns: {
+          id: string
+          total: number
+        }[]
+      }
       set_primary_playback: { Args: { _source_id: string }; Returns: undefined }
       tmdb_catalog_report: { Args: { _job: string }; Returns: Json }
       validate_home_config: { Args: { c: Json }; Returns: undefined }
