@@ -42,13 +42,13 @@ function AdminLogin() {
     setLoading(true);
     try {
       if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${window.location.origin}/reset-password` });
         if (error) throw error;
         toast.success("Se o e-mail existir, enviaremos um link de recuperação.");
         setMode("login");
         return;
       }
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error) throw new Error("E-mail ou senha inválidos");
       if (!(await isStaff(data.user.id))) {
         await supabase.auth.signOut();
