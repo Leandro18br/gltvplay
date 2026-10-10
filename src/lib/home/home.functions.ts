@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { homeSchema, emptyHome, orderedReferences, type HomeConfig, type HomeSection, type ResolvedHome, type ResolvedSection, type ContentRef } from "./model";
@@ -9,11 +8,6 @@ import { toMovie, toSeries, toChannel, type Item } from "@/lib/catalog";
 const selectors = { movie: "id,slug,title,description,poster_url,backdrop_url,trailer_url,release_year,duration_minutes,age_rating,quality,featured,category_id,created_at,updated_at,movie_genres(genres(id,name,slug))", series: "id,slug,title,description,poster_url,backdrop_url,trailer_url,release_year,age_rating,featured,category_id,created_at,updated_at,series_genres(genres(id,name,slug))", channel: "id,slug,name,logo_url,description,featured,category_id,created_at,updated_at" };
 const tables = { movie: "movies", series: "series", channel: "channels" };
 const converters = { movie: toMovie, series: toSeries, channel: toChannel };
-function publicClient() {
-  const key = process.env['SUPABASE_PUBLISHABLE_KEY']; const url = process.env['SUPABASE_URL'];
-  if (!key || !url) throw new Error("Configuração indisponível");
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (input, init) => { const headers = new Headers(init?.headers); if (headers.get("Authorization") === `Bearer ${key}`) headers.delete("Authorization"); headers.set("apikey", key); return fetch(input, { ...init, headers, signal: AbortSignal.timeout(15000) }); } } });
-}
 async function checked(q: any): Promise<any[]> { const { data, error } = await q; if (error) throw error; return data ?? []; }
 async function refsItems(db: any, refs: ContentRef[]): Promise<Item[]> {
   const results = await Promise.all((Object.keys(tables) as (keyof typeof tables)[]).map(async kind => {
@@ -89,7 +83,7 @@ export const publishHomeDraft = createServerFn({ method:"POST" }).middleware([re
 });
 export const previewHomeDraft = createServerFn({ method:"GET" }).middleware([requireSupabaseAuth]).handler(async ({context}) => {
   await assertStaff(context); const {data,error} = await context.supabase.from("home_layouts").select("config").eq("id","draft").single(); if(error) throw error;
-  return resolveHome(publicClient(),homeSchema.parse(data.config));
+  return resolveHome(context.supabase as any,homeSchema.parse(data.config));
 });
 export const searchHomeContent = createServerFn({ method:"GET" }).middleware([requireSupabaseAuth]).inputValidator(z.object({term:z.string().max(120),kind:z.enum(["movie","series","channel","category","mixed"])})).handler(async ({context,data}) => {
   await assertStaff(context); const kinds = data.kind === "mixed" ? ["movie","series","channel"] as const : [data.kind];
