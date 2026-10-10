@@ -2291,6 +2291,7 @@ export type Database = {
         Returns: Json
       }
       m3u_stats: { Args: { _list: string }; Returns: Json }
+      my_client_name: { Args: never; Returns: string }
       my_credit_balance: { Args: never; Returns: Json }
       my_role: { Args: never; Returns: string }
       norm_genre: { Args: { t: string }; Returns: string }
