@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,7 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
   const [error, setError] = useState<string | null>(null);
   const [sources, setSources] = useState<Src[]>([]);
   const [server, setServer] = useState(0);
+  const autoStartedId = useRef<string | null>(null);
 
   useEffect(() => { setStarted(false); setLoading(false); setError(null); setSources([]); setServer(0); }, [kind, id]);
 
@@ -51,7 +52,11 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
 
   // Explicit episode selection is already the viewer's playback gesture.
   // Movies retain the existing thumbnail/Play gate by default.
-  useEffect(() => { if (autoStart) void start(); }, [autoStart, start]);
+  useEffect(() => {
+    if (!autoStart || autoStartedId.current === id) return;
+    autoStartedId.current = id;
+    void start();
+  }, [autoStart, id, start]);
 
   const source = sources[Math.min(server, sources.length - 1)];
   const isHls = source?.type === "hls" || /\.m3u8(\?|$)/i.test(source?.url ?? "");
