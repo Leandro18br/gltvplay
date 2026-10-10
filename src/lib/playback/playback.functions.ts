@@ -33,3 +33,27 @@ export const savePlayback = createServerFn({method:"POST"}).middleware([requireS
   if(data.value.primary){const p=await context.supabase.rpc("set_primary_playback",{_source_id:r.data.id});if(p.error)throw new Error("Não foi possível definir a fonte principal");}
   return {id:r.data.id};
 });
+/** Classifies a player endpoint (e.g. player.php?...) for signed-in viewers. Reads only headers + first bytes; never relays content. */
+export const probePlayerUrl = createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).inputValidator(z.object({url:z.string().url().max(2000)})).handler(async ({data}) => {
+  const { classifyResponse, isScriptEndpoint } = await import("./script-url");
+  const { isBlockedHost } = await import("@/lib/integrations/engine");
+  if (!isScriptEndpoint(data.url)) throw new Error("Endereço não suportado");
+  let cur = data.url;
+  try {
+    for (let hop = 0; hop < 6; hop++) {
+      const u = new URL(cur);
+      if (!/^https?:$/.test(u.protocol) || u.username || u.password || isBlockedHost(u.hostname)) throw new Error("blocked-host");
+      const res = await fetch(u.href, { redirect: "manual", headers: { Range: "bytes=0-2047", "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(10000) });
+      const loc = res.headers.get("location");
+      if (res.status >= 300 && res.status < 400 && loc) { await res.body?.cancel(); cur = new URL(loc, u).href; continue; }
+      let body = "";
+      const reader = res.body?.getReader();
+      if (reader) { const { value } = await reader.read(); await reader.cancel().catch(() => {}); body = new TextDecoder().decode(value?.slice(0, 2048) ?? new Uint8Array()); }
+      return classifyResponse({ status: res.status, contentType: res.headers.get("content-type"), xfo: res.headers.get("x-frame-options"), csp: res.headers.get("content-security-policy"), body, finalUrl: cur, originalUrl: data.url });
+    }
+    return { kind: "error" as const, status: null, contentType: null, embeddable: false, playUrl: null, message: "Redirecionamentos demais no endereço do player." };
+  } catch (e) {
+    console.error("probePlayerUrl", e);
+    return { kind: "error" as const, status: null, contentType: null, embeddable: false, playUrl: null, message: "Não foi possível conectar ao servidor do player." };
+  }
+});
