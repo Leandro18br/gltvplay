@@ -5,6 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmbedPlayer } from "./EmbedPlayer";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerFrame } from "./VideoPlayerFrame";
+import { useServerFn } from "@tanstack/react-start";
+import { probePlayerUrl } from "@/lib/playback/playback.functions";
+import { isScriptEndpoint, type ProbeResult } from "@/lib/playback/script-url";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
@@ -77,6 +80,8 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
           <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">Não foi possível carregar o player. Tente novamente.</div>
         ) : source.type === "embed" ? (
           <EmbedPlayer url={source.url} title={title} />
+        ) : isScriptEndpoint(source.url) ? (
+          <ScriptSource key={source.id} source={source} title={title} poster={poster} sources={sources} onServerChange={setServer} />
         ) : isHls ? (
           <InlineHls key={source.id} url={source.url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
         ) : (
@@ -133,4 +138,20 @@ function InlineHls({ url, title, servers, selectedServer, onServerChange }: { ur
   return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={failed ? "HLS" : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
     <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player" />
   </VideoPlayerFrame>;
+}
+
+/** player.php-style endpoints: identify the real response before choosing video, HLS or iframe. */
+function ScriptSource({ source, title, poster, sources, onServerChange }: { source: Src; title: string; poster: string | null; sources: Src[]; onServerChange: (index: number) => void }) {
+  const probe = useServerFn(probePlayerUrl);
+  const [r, setR] = useState<ProbeResult | null>(null);
+  useEffect(() => {
+    let off = false;
+    probe({ data: { url: source.url } }).then(v => { if (!off) setR(v as ProbeResult); }).catch(() => { if (!off) setR({ kind: "error", status: null, contentType: null, embeddable: false, playUrl: null, message: "Não foi possível verificar o endereço do player." }); });
+    return () => { off = true; };
+  }, [source.url, probe]);
+  if (!r) return <div className="flex aspect-video items-center justify-center rounded-xl bg-card ring-1 ring-border"><Loader2 className="size-10 animate-spin text-primary" /></div>;
+  if (!r.playUrl) return <div className="flex aspect-video items-center justify-center rounded-xl bg-card px-4 text-center text-sm text-muted-foreground ring-1 ring-border">{r.message ?? "Não foi possível carregar o player."}</div>;
+  if (r.kind === "html") return <EmbedPlayer url={r.playUrl} title={title} />;
+  if (r.kind === "hls") return <InlineHls url={r.playUrl} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={onServerChange} />;
+  return <VideoPlayerFrame title={title} servers={sources} selectedServer={source.id} onServerChange={onServerChange}><video src={r.playUrl} autoPlay playsInline className="h-full w-full bg-player" /></VideoPlayerFrame>;
 }

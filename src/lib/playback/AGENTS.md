@@ -1,1 +1,2 @@
 - Only live channels use mpegts.js for ".ts" and the HTTPS-alternative check (`usesLiveMpegTs`, `resolveSecureUrl`); movie/episode sources always load their stored URL unchanged through the original video/HLS path. Why: probing or rerouting VOD broke playback of HTTP movie/episode files.
+- Script player endpoints (`.php/.asp/.jsp/.cgi`) are classified server-side (`probePlayerUrl`, headers + first 2 KB only, no relaying) and rendered as video/HLS with the stored URL or as an iframe when HTML is embeddable. Why: HTML pages must never reach `<video>`; no proxying.
