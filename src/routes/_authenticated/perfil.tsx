@@ -1,15 +1,15 @@
 import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, LogOut, Camera, Plus, Trash2, Check, Baby, History, Play } from "lucide-react";
+import { Loader2, LogOut, Plus, Trash2, Check, Baby, History, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { continueWatchingQuery, removeHistory, setActiveProfileId, useActiveProfile, useWatchlist } from "@/lib/user-data";
-import { authErrorMessage, fieldErrors, nameSchema, newPasswordSchema } from "@/lib/validation";
+import { nameSchema } from "@/lib/validation";
 import { SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
 import { CardGrid } from "@/components/site/ContentCard";
-import { PasswordInput, PasswordChecklist, FieldError } from "@/components/site/PasswordInput";
+import { FieldError } from "@/components/site/PasswordInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +32,6 @@ export const Route = createFileRoute("/_authenticated/perfil")({
   }),
   component: Page,
 });
-
-const TEN_YEARS = 60 * 60 * 24 * 365 * 10;
 
 function Page() {
   const { user } = useActiveProfile();
@@ -75,7 +73,8 @@ function AccountTab() {
     queryKey: ["me", user?.id, "profile"],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("name,email,avatar_url").eq("id", user!.id).maybeSingle();
+      if (!user) return null;
+      const { data, error } = await supabase.from("profiles").select("name,email").eq("id", user.id).maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -83,76 +82,23 @@ function AccountTab() {
   const [name, setName] = useState("");
   const [nameErr, setNameErr] = useState<string>();
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (profile.data) setName(profile.data.name ?? ""); }, [profile.data]);
 
-  const [pw, setPw] = useState({ current: "", password: "", confirm: "" });
-  const [pwErr, setPwErr] = useState<Partial<Record<"name" | "email" | "password" | "confirm" | "current", string>>>({});
-  const [pwSaving, setPwSaving] = useState(false);
-
   const saveName = async () => {
+    if (!user) return;
     const p = nameSchema.safeParse(name);
     if (!p.success) { setNameErr(p.error.issues[0]?.message); return; }
     setNameErr(undefined);
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({ name: p.data }).eq("id", user!.id);
+    const { error } = await supabase.from("profiles").update({ name: p.data }).eq("id", user.id);
     setSaving(false);
-    if (error) toast.error("Não foi possível salvar"); else { toast.success("Nome atualizado"); qc.invalidateQueries({ queryKey: ["me", user!.id, "profile"] }); }
+    if (error) toast.error("Não foi possível salvar"); else { toast.success("Nome atualizado"); qc.invalidateQueries({ queryKey: ["me", user.id, "profile"] }); }
   };
-
-  const uploadAvatar = async (file: File) => {
-    if (!user) return;
-    if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) { toast.error("Envie uma imagem PNG, JPG, WEBP ou GIF"); return; }
-    if (file.size > 3 * 1024 * 1024) { toast.error("A imagem deve ter até 3MB"); return; }
-    setUploading(true);
-    try {
-      const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
-      const path = `avatars/${user.id}/${crypto.randomUUID()}.${ext}`;
-      const up = await supabase.storage.from("media").upload(path, file, { contentType: file.type });
-      if (up.error) throw up.error;
-      const signed = await supabase.storage.from("media").createSignedUrl(path, TEN_YEARS);
-      if (signed.error || !signed.data) throw signed.error ?? new Error("Falha no link");
-      const { error } = await supabase.from("profiles").update({ avatar_url: signed.data.signedUrl }).eq("id", user.id);
-      if (error) throw error;
-      toast.success("Avatar atualizado");
-      qc.invalidateQueries({ queryKey: ["me", user.id, "profile"] });
-    } catch {
-      toast.error("Não foi possível enviar o avatar");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const changePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pw.current) { setPwErr({ current: "Informe sua senha atual" }); return; }
-    const p = newPasswordSchema.safeParse({ password: pw.password, confirm: pw.confirm });
-    if (!p.success) { setPwErr(fieldErrors(p.error)); return; }
-    setPwErr({});
-    setPwSaving(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.auth.updateUser({ password: p.data.password, current_password: pw.current } as any);
-    setPwSaving(false);
-    if (error) { toast.error(authErrorMessage(error.message)); return; }
-    toast.success("Senha alterada");
-    setPw({ current: "", password: "", confirm: "" });
-  };
-
-  const initial = (profile.data?.name || user?.email || "?").slice(0, 1).toUpperCase();
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="max-w-2xl">
       <section className="space-y-5 rounded-2xl border border-border bg-card p-6">
         <h2 className="text-lg font-semibold">Dados pessoais</h2>
-        <div className="flex items-center gap-4">
-          <button type="button" onClick={() => fileRef.current?.click()} aria-label="Alterar avatar" className="group relative size-20 shrink-0 overflow-hidden rounded-full bg-accent ring-2 ring-primary/40">
-            {profile.data?.avatar_url ? <img src={profile.data.avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center font-display text-2xl text-accent-foreground">{initial}</span>}
-            <span className="absolute inset-0 flex items-center justify-center bg-background/60 opacity-0 transition group-hover:opacity-100">{uploading ? <Loader2 className="animate-spin" /> : <Camera />}</span>
-          </button>
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ""; }} />
-          <div className="text-sm text-muted-foreground">Clique na foto para alterar.<br />PNG, JPG ou WEBP até 3MB.</div>
-        </div>
         <div className="space-y-1.5">
           <Label htmlFor="name">Nome</Label>
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
@@ -165,26 +111,7 @@ function AccountTab() {
         <Button onClick={saveName} disabled={saving || profile.isLoading}>{saving && <Loader2 className="animate-spin" />} Salvar</Button>
       </section>
 
-      <form onSubmit={changePassword} noValidate className="space-y-4 rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold">Alterar senha</h2>
-        <div className="space-y-1.5">
-          <Label htmlFor="cur">Senha atual</Label>
-          <PasswordInput id="cur" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} maxLength={72} />
-          <FieldError msg={pwErr.current} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="new">Nova senha</Label>
-          <PasswordInput id="new" autoComplete="new-password" value={pw.password} onChange={(e) => setPw({ ...pw, password: e.target.value })} maxLength={72} />
-          <FieldError msg={pwErr.password} />
-          {pw.password && <PasswordChecklist value={pw.password} />}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="cf">Confirmar nova senha</Label>
-          <PasswordInput id="cf" autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} maxLength={72} />
-          <FieldError msg={pwErr.confirm} />
-        </div>
-        <Button type="submit" disabled={pwSaving}>{pwSaving && <Loader2 className="animate-spin" />} Alterar senha</Button>
-      </form>
+
     </div>
   );
 }
