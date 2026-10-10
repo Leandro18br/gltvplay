@@ -2,7 +2,8 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Loader2, LogOut, RefreshCw } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
+import { AccessManager, accessState as sharedState, type Created } from "@/components/access/AccessManager";
 import { supabase } from "@/integrations/supabase/client";
 import { db, type Row } from "@/lib/admin/db";
 import { fmtDate, resellerErr, ORDER_STATUS, CONTENT_STATUS, TX_REASON } from "@/lib/resellers/shared";
@@ -10,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/revendedor")({
@@ -36,7 +36,6 @@ export const Route = createFileRoute("/revendedor")({
   component: ResellerPanel,
 });
 
-type Creds = { login: string; password: string; kind: string; expires_at: string };
 const th = "px-3 py-2";
 const head = "border-b border-border text-left text-xs uppercase text-muted-foreground";
 const tr = "border-b border-border/60 last:border-0";
@@ -62,7 +61,7 @@ function ResellerPanel() {
   const accs = useQuery({
     queryKey: ["revenda", "accs"],
     queryFn: async () => {
-      const { data, error } = await db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at").eq("reseller_id", uid).order("created_at", { ascending: false }).limit(500);
+      const { data, error } = await db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at,note,reseller_id").eq("reseller_id", uid).order("created_at", { ascending: false }).limit(500);
       if (error) throw error; return data as Row[];
     },
   });
@@ -80,10 +79,10 @@ function ResellerPanel() {
   });
 
   const [busy, setBusy] = useState(false);
-  const [creds, setCreds] = useState<Creds | null>(null);
+  const [created, setCreated] = useState<Created | null>(null);
   const [trialHours, setTrialHours] = useState("3");
-  const [renewing, setRenewing] = useState<{ acc: Row; requestId: string } | null>(null);
   const [filter, setFilter] = useState("");
+  const [tab, setTab] = useState("dash");
 
   async function generate(kind: "normal" | "trial") {
     if (busy) return;
@@ -91,20 +90,7 @@ function ResellerPanel() {
     const { data, error } = await db.rpc("create_access", { _kind: kind, _hours: kind === "trial" ? Number(trialHours) : null, _reseller_id: null, _note: null });
     setBusy(false);
     if (error) { toast.error(resellerErr(error)); refresh(); return; }
-    setCreds(data as Creds); refresh();
-  }
-  async function setStatus(a: Row, status: string, label: string) {
-    if (status === "revoked" && !window.confirm(`Cancelar o acesso ${a.login}? Só o administrador poderá reativá-lo.`)) return;
-    const { error } = await db.rpc("set_access_status", { _access_id: a.id, _status: status });
-    if (error) toast.error(resellerErr(error)); else { toast.success(label); refresh(); }
-  }
-  async function renew() {
-    if (!renewing || busy) return;
-    setBusy(true);
-    const { data, error } = await db.rpc("renew_access", { _access_id: renewing.acc.id, _request_id: renewing.requestId });
-    setBusy(false);
-    if (error) { toast.error(resellerErr(error)); return; }
-    toast.success(`Renovado até ${fmtDate((data as Row).expires_at)}`); setRenewing(null); refresh();
+    setCreated(data as Created); setTab("list"); refresh();
   }
   async function logout() { qc.clear(); await supabase.auth.signOut(); navigate({ to: "/revendedor/login", replace: true, search: { denied: undefined } }); }
 
@@ -123,7 +109,7 @@ function ResellerPanel() {
           <Button variant="ghost" size="icon" onClick={logout} aria-label="Sair"><LogOut /></Button></div>
       </header>
       <main className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
-        <Tabs defaultValue="dash">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="h-auto flex-wrap">
             <TabsTrigger value="dash">Dashboard</TabsTrigger><TabsTrigger value="new">Gerar acesso</TabsTrigger>
             <TabsTrigger value="list">Meus acessos</TabsTrigger><TabsTrigger value="orders">Pedidos</TabsTrigger>
@@ -163,54 +149,14 @@ function ResellerPanel() {
           </TabsContent>
 
           <TabsContent value="list" className="space-y-3">
-            <Input placeholder="Buscar por login…" inputMode="numeric" value={filter} onChange={(e) => setFilter(e.target.value.replace(/\D/g, ""))} className="max-w-xs" />
-            <div className={`${card} overflow-x-auto`}>
-              {accs.isLoading ? <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div> : !shown.length ? <p className="p-10 text-center text-muted-foreground">Nenhum acesso.</p> : (
-                <table className="w-full text-sm"><thead className={head}><tr><th className={th}>Login</th><th className={th}>Tipo</th><th className={th}>Criação</th><th className={th}>Vencimento</th><th className={th}>Status</th><th className={th}></th></tr></thead>
-                  <tbody>{shown.map((a) => { const st = accessState(a, now); return (
-                    <tr key={a.id} className={tr}>
-                      <td className={`${th} font-mono font-semibold`}>{a.login}</td>
-                      <td className={th}>{a.kind === "normal" ? "30 dias" : `Teste ${a.duration_hours}h`}</td>
-                      <td className={`${th} whitespace-nowrap text-muted-foreground`}>{fmtDate(a.created_at)}</td>
-                      <td className={`${th} whitespace-nowrap`}>{fmtDate(a.expires_at)}</td>
-                      <td className={th}>{st}</td>
-                      <td className={`${th} whitespace-nowrap text-right`}>
-                        {a.kind === "normal" && a.status === "active" && <Button size="sm" variant="ghost" onClick={() => setRenewing({ acc: a, requestId: crypto.randomUUID() })}><RefreshCw />Renovar</Button>}
-                        {a.status === "active" && <Button size="sm" variant="ghost" onClick={() => setStatus(a, "suspended", "Acesso bloqueado")}>Bloquear</Button>}
-                        {a.status === "suspended" && <Button size="sm" variant="ghost" onClick={() => setStatus(a, "active", "Acesso reativado")}>Desbloquear</Button>}
-                        {a.status !== "revoked" && <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setStatus(a, "revoked", "Acesso cancelado")}>Cancelar</Button>}
-                      </td>
-                    </tr>); })}</tbody></table>)}
-            </div>
+            <Input placeholder="Buscar por usuário…" inputMode="numeric" value={filter} onChange={(e) => setFilter(e.target.value.replace(/\D/g, ""))} className="max-w-xs" />
+            <AccessManager rows={shown} loading={accs.isLoading} owner={false} created={created} onChanged={refresh} />
           </TabsContent>
 
           <TabsContent value="orders"><Orders orders={orders.data ?? []} content={content.data ?? []} onDone={refresh} /></TabsContent>
         </Tabs>
       </main>
 
-      <Dialog open={!!creds} onOpenChange={(o) => !o && setCreds(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{creds?.kind === "trial" ? "Teste gerado" : "Acesso gerado"}</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Copie agora: a senha não poderá ser exibida novamente.</p>
-          {creds && <div className="space-y-2">
-            {[["Login", creds.login], ["Senha", creds.password]].map(([l, v]) => (
-              <div key={l} className="flex items-center justify-between rounded-xl border border-border p-3">
-                <div><p className="text-xs text-muted-foreground">{l}</p><p className="font-mono text-2xl font-bold tracking-widest">{v}</p></div>
-                <Button size="icon" variant="ghost" aria-label={`Copiar ${l}`} onClick={() => navigator.clipboard.writeText(v!).then(() => toast.success(`${l} copiado`))}><Copy /></Button>
-              </div>))}
-            <p className="text-sm">Vence em: <b>{fmtDate(creds.expires_at)}</b></p>
-            <Button variant="outline" className="w-full" onClick={() => navigator.clipboard.writeText(`Login: ${creds.login}\nSenha: ${creds.password}\nVence em: ${fmtDate(creds.expires_at)}`).then(() => toast.success("Copiado"))}><Copy />Copiar tudo</Button>
-          </div>}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!renewing} onOpenChange={(o) => !o && setRenewing(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Renovar acesso {renewing?.acc.login}</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Consome 1 crédito e adiciona 30 dias {renewing && new Date(renewing.acc.expires_at).getTime() > now ? "ao vencimento atual" : "a partir de agora"}.</p>
-          <DialogFooter><Button variant="outline" onClick={() => setRenewing(null)}>Cancelar</Button><Button disabled={busy} onClick={renew}>{busy && <Loader2 className="animate-spin" />}Confirmar renovação</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
