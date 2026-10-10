@@ -26,6 +26,7 @@ import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
+import { Route as AdminClientsRouteImport } from './routes/admin.clients'
 import { Route as AdminCreditsRouteImport } from './routes/admin.credits'
 import { Route as AdminGenresRouteImport } from './routes/admin.genres'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
@@ -129,6 +130,11 @@ const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
 const AdminChannelsRoute = AdminChannelsRouteImport.update({
   id: '/channels',
   path: '/channels',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminClientsRoute = AdminClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCreditsRoute = AdminCreditsRouteImport.update({
@@ -250,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
@@ -287,6 +294,7 @@ export interface FileRoutesByTo {
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
+  '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/home': typeof AdminHomeRoute
@@ -367,6 +376,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/clients'
     | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
@@ -404,6 +414,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/clients'
     | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
@@ -443,6 +454,7 @@ export interface FileRouteTypes {
     | '/_authenticated/perfil'
     | '/admin/categories'
     | '/admin/channels'
+    | '/admin/clients'
     | '/admin/credits'
     | '/admin/genres'
     | '/admin/home'
@@ -610,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChannelsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/clients': {
+      id: '/admin/clients'
+      path: '/clients'
+      fullPath: '/admin/clients'
+      preLoaderRoute: typeof AdminClientsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/credits': {
       id: '/admin/credits'
       path: '/credits'
@@ -771,6 +790,7 @@ const AuthenticatedRouteRouteWithChildren =
 interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminChannelsRoute: typeof AdminChannelsRoute
+  AdminClientsRoute: typeof AdminClientsRoute
   AdminCreditsRoute: typeof AdminCreditsRoute
   AdminGenresRoute: typeof AdminGenresRoute
   AdminHomeRoute: typeof AdminHomeRoute
@@ -788,6 +808,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminChannelsRoute: AdminChannelsRoute,
+  AdminClientsRoute: AdminClientsRoute,
   AdminCreditsRoute: AdminCreditsRoute,
   AdminGenresRoute: AdminGenresRoute,
   AdminHomeRoute: AdminHomeRoute,

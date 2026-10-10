@@ -218,6 +218,13 @@
       "when": 1791636644302,
       "tag": "0030_public_site_requires_access",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791637289155,
+      "tag": "0031_my_credit_balance",
+      "breakpoints": true
     }
   ]
 }
