@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, LayoutTemplate, Film, Tv, Radio, Tags, Shapes, Users,
-  UserCircle, LogOut, Menu, ExternalLink, Cable, Coins, Store,
+  UserCircle, LogOut, Menu, ExternalLink, Cable, Coins, Store, UserPlus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ROLE_LABEL, isAdminRole, type StaffRole } from "@/lib/admin/db";
@@ -34,6 +34,7 @@ const NAV = [
   { to: "/admin/genres", label: "Gêneros", icon: Shapes },
   { to: "/admin/users", label: "Usuários", icon: Users, adminOnly: true },
   { to: "/admin/integrations", label: "APIs e Integrações", icon: Cable, adminOnly: true },
+  { to: "/admin/clients", label: "Criar cliente", icon: UserPlus, superOnly: true },
   { to: "/admin/credits", label: "Gerenciar créditos", icon: Coins, superOnly: true },
   { to: "/admin/resellers", label: "Gerenciar revendedores", icon: Store, superOnly: true },
   { to: "/admin/profile", label: "Meu perfil", icon: UserCircle },

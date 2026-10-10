@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { db, type Row } from "@/lib/admin/db";
 import { adminHead } from "@/lib/admin/head";
 import { fmtDate, resellerErr, TX_REASON, ORDER_STATUS } from "@/lib/resellers/shared";
+import { OwnerBalance } from "@/components/admin/OwnerBalance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,7 +86,8 @@ function CreditsPage() {
   return (
     <div className="space-y-5">
       <div><h1 className="text-2xl font-bold md:text-3xl">Gerenciar créditos</h1>
-        <p className="text-sm text-muted-foreground">Seu saldo como administrador principal é ilimitado para os seus próprios acessos.</p></div>
+        <p className="text-sm text-muted-foreground">Saldos e movimentações dos revendedores.</p></div>
+      <div className="max-w-sm"><OwnerBalance /></div>
       <Tabs defaultValue="balances">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="balances">Saldos</TabsTrigger>
