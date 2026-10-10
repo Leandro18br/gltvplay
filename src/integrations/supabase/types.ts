@@ -14,6 +14,82 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_accounts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          duration_hours: number
+          expires_at: string
+          id: string
+          kind: string
+          login: string
+          note: string | null
+          reseller_id: string | null
+          starts_at: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          duration_hours: number
+          expires_at: string
+          id?: string
+          kind: string
+          login: string
+          note?: string | null
+          reseller_id?: string | null
+          starts_at?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          duration_hours?: number
+          expires_at?: string
+          id?: string
+          kind?: string
+          login?: string
+          note?: string | null
+          reseller_id?: string | null
+          starts_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_accounts_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "resellers"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      access_credentials: {
+        Row: {
+          access_id: string
+          password_hash: string
+          updated_at: string
+        }
+        Insert: {
+          access_id: string
+          password_hash: string
+          updated_at?: string
+        }
+        Update: {
+          access_id?: string
+          password_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_credentials_access_id_fkey"
+            columns: ["access_id"]
+            isOneToOne: true
+            referencedRelation: "access_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_credentials: {
         Row: {
           api_key: string | null
@@ -439,6 +515,101 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "categories"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_orders: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          note: string | null
+          quantity: number
+          reseller_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          note?: string | null
+          quantity: number
+          reseller_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          note?: string | null
+          quantity?: number
+          reseller_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_orders_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "resellers"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      credit_transactions: {
+        Row: {
+          access_id: string | null
+          actor_id: string | null
+          balance_after: number
+          created_at: string
+          delta: number
+          id: string
+          note: string | null
+          order_id: string | null
+          reason: string
+          reseller_id: string
+        }
+        Insert: {
+          access_id?: string | null
+          actor_id?: string | null
+          balance_after: number
+          created_at?: string
+          delta: number
+          id?: string
+          note?: string | null
+          order_id?: string | null
+          reason: string
+          reseller_id: string
+        }
+        Update: {
+          access_id?: string | null
+          actor_id?: string | null
+          balance_after?: number
+          created_at?: string
+          delta?: number
+          id?: string
+          note?: string | null
+          order_id?: string | null
+          reason?: string
+          reseller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_transactions_access_id_fkey"
+            columns: ["access_id"]
+            isOneToOne: true
+            referencedRelation: "access_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_transactions_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "resellers"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1225,6 +1396,41 @@ export type Database = {
         }
         Relationships: []
       }
+      resellers: {
+        Row: {
+          created_at: string
+          credits: number
+          display_name: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          display_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          display_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resellers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seasons: {
         Row: {
           air_date: string | null
@@ -1795,6 +2001,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      access_code_ok: { Args: { c: string }; Returns: boolean }
+      admin_adjust_credits: {
+        Args: { _delta: number; _note?: string; _reseller_id: string }
+        Returns: number
+      }
       admin_set_role: {
         Args: {
           _enabled: boolean
@@ -1804,6 +2015,10 @@ export type Database = {
         Returns: undefined
       }
       admin_stats: { Args: never; Returns: Json }
+      admin_upsert_reseller: {
+        Args: { _display_name: string; _status?: string; _user_id: string }
+        Returns: undefined
+      }
       catalog_title_key: { Args: { t: string }; Returns: string }
       complete_tmdb_metadata: {
         Args: {
@@ -1813,6 +2028,19 @@ export type Database = {
           _patch: Json
         }
         Returns: Json
+      }
+      create_access: {
+        Args: {
+          _hours?: number
+          _kind: string
+          _note?: string
+          _reseller_id?: string
+        }
+        Returns: Json
+      }
+      decide_credit_order: {
+        Args: { _approve: boolean; _order_id: string }
+        Returns: undefined
       }
       embed_url_allowed: { Args: { u: string }; Returns: boolean }
       ensure_fixed_genres: { Args: never; Returns: undefined }
@@ -1848,6 +2076,7 @@ export type Database = {
         Args: { _genre_ids: number[]; _patch: Json }
         Returns: Json
       }
+      is_active_reseller: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       m3u_episode_counts: {
@@ -1914,9 +2143,14 @@ export type Database = {
         Args: { expected_revision: number }
         Returns: number
       }
+      random_access_code: { Args: never; Returns: string }
       report_playback_error: {
         Args: { _event: string; _source_id: string }
         Returns: undefined
+      }
+      request_credits: {
+        Args: { _note?: string; _quantity: number }
+        Returns: string
       }
       save_home_draft: {
         Args: { c: Json; expected_revision: number }
@@ -1928,6 +2162,10 @@ export type Database = {
           id: string
           total: number
         }[]
+      }
+      set_access_status: {
+        Args: { _access_id: string; _status: string }
+        Returns: undefined
       }
       set_primary_playback: { Args: { _source_id: string }; Returns: undefined }
       tmdb_catalog_report: { Args: { _job: string }; Returns: Json }
