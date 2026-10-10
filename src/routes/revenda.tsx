@@ -42,7 +42,7 @@ const head = "border-b border-border text-left text-xs uppercase text-muted-fore
 const tr = "border-b border-border/60 last:border-0";
 const card = "rounded-2xl border border-border bg-card";
 
-export function accessState(a: Row, now = Date.now()) {
+function accessState(a: Row, now = Date.now()) {
   if (a.status === "revoked") return "Cancelado";
   if (a.status === "suspended") return "Bloqueado";
   return new Date(a.expires_at).getTime() <= now ? "Vencido" : "Ativo";
