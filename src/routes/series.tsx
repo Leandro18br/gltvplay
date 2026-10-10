@@ -1,8 +1,11 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute } from "@tanstack/react-router";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { CatalogPage, catalogPagedQuery, validateCatalogSearch } from "@/components/site/CatalogPage";
 
 export const Route = createFileRoute("/series")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   validateSearch: validateCatalogSearch,
   loaderDeps: ({ search }) => ({ genero: search.genero, ordem: search.ordem, pagina: search.pagina }),
   loader: ({ context, deps }) => context.queryClient.ensureQueryData(catalogPagedQuery("series", deps)),

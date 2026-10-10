@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       access_accounts: {
         Row: {
+          auth_user_id: string | null
           created_at: string
           created_by: string | null
           duration_hours: number
@@ -29,6 +30,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          auth_user_id?: string | null
           created_at?: string
           created_by?: string | null
           duration_hours: number
@@ -42,6 +44,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          auth_user_id?: string | null
           created_at?: string
           created_by?: string | null
           duration_hours?: number
@@ -55,6 +58,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "access_accounts_auth_user_id_fkey"
+            columns: ["auth_user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "access_accounts_reseller_id_fkey"
             columns: ["reseller_id"]
@@ -89,6 +99,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      access_login_attempts: {
+        Row: {
+          created_at: string
+          id: number
+          ip_hash: string
+          login: string
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          ip_hash: string
+          login: string
+          success: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          ip_hash?: string
+          login?: string
+          success?: boolean
+        }
+        Relationships: []
       }
       api_credentials: {
         Row: {
@@ -2064,6 +2098,10 @@ export type Database = {
     }
     Functions: {
       access_code_ok: { Args: { c: string }; Returns: boolean }
+      access_login_lock: {
+        Args: { _ip_hash: string; _login: string }
+        Returns: number
+      }
       admin_adjust_credits: {
         Args: {
           _delta: number
@@ -2144,6 +2182,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_site_access: { Args: { _user_id: string }; Returns: boolean }
       import_tmdb_movie_metadata: {
         Args: { _genre_ids: number[]; _patch: Json }
         Returns: Json

@@ -211,6 +211,13 @@
       "when": 1791634635785,
       "tag": "0029_reseller_panel_renewals",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791636644302,
+      "tag": "0030_public_site_requires_access",
+      "breakpoints": true
     }
   ]
 }

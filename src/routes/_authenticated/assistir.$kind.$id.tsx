@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { safeImageUrl } from "@/lib/tmdb/completion";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ type PKind = "movie" | "episode" | "channel";
 const sb: any = supabase;
 
 export const Route = createFileRoute("/_authenticated/assistir/$kind/$id")({
+  beforeLoad: requireSiteAccess,
   head: () => ({ meta: [{ title: "Reprodução — GLTV Plus" }, {name:"description",content:"Reprodução autorizada de filmes, episódios e canais."}, {property:"og:title",content:"Reprodução — GLTV Plus"}, {property:"og:description",content:"Assista ao conteúdo autorizado da plataforma."}, {property:"og:type",content:"website"}, {name:"twitter:card",content:"summary"}, { name: "robots", content: "noindex" }] }),
   component: PlayerPage,
 });

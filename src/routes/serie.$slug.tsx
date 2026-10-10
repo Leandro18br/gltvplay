@@ -1,3 +1,4 @@
+import { requireSiteAccess } from "@/lib/access/gate";
 import { safeImageUrl } from "@/lib/tmdb/completion";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -11,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/serie/$slug")({
+  ssr: false,
+  beforeLoad: requireSiteAccess,
   loader: async ({ context, params }) => {
     const data = await context.queryClient.ensureQueryData(seriesDetailQuery(params.slug));
     if (!data) throw notFound();
