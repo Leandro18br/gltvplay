@@ -126,11 +126,11 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
   const [busy, setBusy] = useState(false);
   async function submit() {
     if (busy) return;
-    if (f.name.trim().length < 2) return toast.error("Informe o nome.");
-    if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) return toast.error("E-mail inválido.");
-    if (f.password.length < 8) return toast.error("A senha precisa ter ao menos 8 caracteres.");
+    if (f.name.trim().length < 2) return void toast.error("Informe o nome.");
+    if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) return void toast.error("E-mail inválido.");
+    if (f.password.length < 8) return void toast.error("A senha precisa ter ao menos 8 caracteres.");
     const credits = Number(f.credits || 0);
-    if (!Number.isInteger(credits) || credits < 0) return toast.error("Saldo inicial inválido.");
+    if (!Number.isInteger(credits) || credits < 0) return void toast.error("Saldo inicial inválido.");
     setBusy(true);
     try {
       const r = await create({ data: { name: f.name, email: f.email, password: f.password, credits } });
@@ -157,7 +157,7 @@ function EditDialog({ row, onClose, onDone }: { row: Row; onClose: () => void; o
   const [name, setName] = useState<string>(row.display_name ?? "");
   const [busy, setBusy] = useState(false);
   async function save() {
-    if (name.trim().length < 2) return toast.error("Informe o nome.");
+    if (name.trim().length < 2) return void toast.error("Informe o nome.");
     setBusy(true);
     const { error } = await db.rpc("admin_upsert_reseller", { _user_id: row.user_id, _display_name: name, _status: row.status });
     setBusy(false);
