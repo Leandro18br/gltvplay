@@ -5,6 +5,7 @@ import { Search, User, LogOut, ListVideo, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { siteSettingsQuery } from "@/lib/catalog";
 import { useAuthUser } from "@/lib/user-data";
+import { greetingFor } from "@/lib/access/greeting";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -54,6 +55,22 @@ export function SiteHeader() {
     supabase.rpc("is_staff", { _user_id: user.id }).then(({ data }) => setStaff(!!data));
   }, [user]);
 
+  // Name comes from the authenticated client's own access record (server-side RPC).
+  const nameQ = useQuery({
+    queryKey: ["me", user?.id, "client-name"],
+    enabled: !!user,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("my_client_name");
+      if (error) return null;
+      return (data as string | null) ?? null;
+    },
+  });
+  const clientName = nameQ.data ?? null;
+  const greeting = user && nameQ.isSuccess ? greetingFor(clientName) : null;
+
   const signOut = async () => {
     await qc.cancelQueries();
     qc.removeQueries({ queryKey: ["me"] });
@@ -84,15 +101,16 @@ export function SiteHeader() {
           <Button asChild variant="ghost" size="icon" className="rounded-full" aria-label="Buscar">
             <Link to="/buscar" search={{ q: "" }}><Search className="size-5" /></Link>
           </Button>
+          {user && greeting && <span data-testid="greeting" className="hidden max-w-[14rem] truncate text-sm font-medium sm:inline">{greeting}</span>}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button aria-label="Perfil" className="flex size-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground ring-1 ring-primary/30 transition hover:ring-primary">
-                  {(user.email ?? "?").slice(0, 1).toUpperCase()}
+                  {(clientName ?? user.email ?? "?").slice(0, 1).toUpperCase()}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="truncate font-normal text-muted-foreground">{user.email}</DropdownMenuLabel>
+                <DropdownMenuLabel className="truncate font-normal text-muted-foreground">{greeting ?? user.email}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild><Link to="/perfil"><User /> Meu perfil</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to="/minha-lista"><ListVideo /> Minha lista</Link></DropdownMenuItem>

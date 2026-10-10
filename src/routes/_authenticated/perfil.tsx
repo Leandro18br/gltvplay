@@ -53,12 +53,10 @@ function Page() {
           <TabsList className="mb-6 flex w-full justify-start overflow-x-auto sm:w-fit">
             <TabsTrigger value="conta">Conta</TabsTrigger>
             <TabsTrigger value="perfis">Perfis</TabsTrigger>
-            <TabsTrigger value="historico">Histórico</TabsTrigger>
             <TabsTrigger value="lista">Minha lista</TabsTrigger>
           </TabsList>
           <TabsContent value="conta"><AccountTab /></TabsContent>
           <TabsContent value="perfis"><ProfilesTab /></TabsContent>
-          <TabsContent value="historico"><HistoryTab /></TabsContent>
           <TabsContent value="lista"><ListTab /></TabsContent>
         </Tabs>
       </div>
