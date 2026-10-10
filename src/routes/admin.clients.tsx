@@ -24,28 +24,29 @@ function ClientsPage() {
   const accs = useQuery({
     queryKey: ["admin", "owner-accesses"],
     queryFn: async () => {
-      const { data, error } = await db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at,note,reseller_id")
-        .is("reseller_id", null).order("created_at", { ascending: false }).limit(500);
+      const { data, error } = await db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at,note,client_name,reseller_id")
+        .is("reseller_id", null).neq("status", "deleted").order("created_at", { ascending: false }).limit(500);
       if (error) throw error; return data as Row[];
     },
   });
   const [kind, setKind] = useState<"normal" | "trial">("normal");
   const [hours, setHours] = useState("3");
   const [busy, setBusy] = useState(false);
+  const [clientName, setClientName] = useState("");
   const [created, setCreated] = useState<Created | null>(null);
   const [filter, setFilter] = useState("");
 
   async function create() {
     if (busy) return;
     setBusy(true);
-    const { data, error } = await db.rpc("create_access", { _kind: kind, _hours: kind === "trial" ? Number(hours) : null, _reseller_id: null, _note: null });
+    const { data, error } = await db.rpc("create_client_access", { _kind: kind, _hours: kind === "trial" ? Number(hours) : null, _reseller_id: null as unknown as string, _name: clientName.trim() });
     setBusy(false);
     if (error) { toast.error(resellerErr(error)); return; }
-    setCreated(data as Created); refresh();
+    setCreated(data as unknown as Created); setClientName(""); refresh();
   }
 
   const f = filter.trim();
-  const shown = (accs.data ?? []).filter((a) => !f || a.login.includes(f));
+  const shown = (accs.data ?? []).filter((a) => !f || a.login.includes(f) || (a.client_name ?? "").toLowerCase().includes(f.toLowerCase()));
 
   return (
     <div className="space-y-5">
@@ -54,6 +55,7 @@ function ClientsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <OwnerBalance />
         <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+          <Input aria-label="Nome do cliente" placeholder="Nome do cliente (opcional)" maxLength={120} value={clientName} onChange={(e) => setClientName(e.target.value)} />
           <div className="grid gap-3 sm:grid-cols-2">
             <Select value={kind} onValueChange={(v) => setKind(v as "normal" | "trial")}>
               <SelectTrigger aria-label="Tipo de acesso"><SelectValue /></SelectTrigger>
@@ -68,7 +70,7 @@ function ClientsPage() {
         </div>
       </div>
 
-      <Input placeholder="Buscar por usuário…" inputMode="numeric" value={filter} onChange={(e) => setFilter(e.target.value.replace(/\D/g, ""))} className="max-w-xs" />
+      <Input placeholder="Buscar por usuário ou nome…" value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-xs" />
       {accs.error ? <p className="p-10 text-center text-destructive">{resellerErr(accs.error)}</p> :
         <AccessManager rows={shown} loading={accs.isLoading} owner created={created} onChanged={refresh} />}
     </div>

@@ -246,6 +246,20 @@
       "when": 1791643041271,
       "tag": "0034_access_manage_rpcs",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791645120310,
+      "tag": "0035_access_names_and_soft_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791645242222,
+      "tag": "0036_fix_can_manage_access_null",
+      "breakpoints": true
     }
   ]
 }

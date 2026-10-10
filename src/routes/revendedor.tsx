@@ -61,7 +61,7 @@ function ResellerPanel() {
   const accs = useQuery({
     queryKey: ["revenda", "accs"],
     queryFn: async () => {
-      const { data, error } = await db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at,note,reseller_id").eq("reseller_id", uid).order("created_at", { ascending: false }).limit(500);
+      const { data, error } = await db.from("access_accounts").select("id,login,kind,duration_hours,status,created_at,expires_at,note,client_name,reseller_id").eq("reseller_id", uid).neq("status", "deleted").order("created_at", { ascending: false }).limit(500);
       if (error) throw error; return data as Row[];
     },
   });
@@ -81,16 +81,17 @@ function ResellerPanel() {
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
   const [trialHours, setTrialHours] = useState("3");
+  const [clientName, setClientName] = useState("");
   const [filter, setFilter] = useState("");
   const [tab, setTab] = useState("dash");
 
   async function generate(kind: "normal" | "trial") {
     if (busy) return;
     setBusy(true);
-    const { data, error } = await db.rpc("create_access", { _kind: kind, _hours: kind === "trial" ? Number(trialHours) : null, _reseller_id: null, _note: null });
+    const { data, error } = await db.rpc("create_client_access", { _kind: kind, _hours: kind === "trial" ? Number(trialHours) : null, _reseller_id: null as unknown as string, _name: clientName.trim() });
     setBusy(false);
     if (error) { toast.error(resellerErr(error)); refresh(); return; }
-    setCreated(data as Created); setTab("list"); refresh();
+    setCreated(data as unknown as Created); setClientName(""); setTab("list"); refresh();
   }
   async function logout() { qc.clear(); await supabase.auth.signOut(); navigate({ to: "/revendedor/login", replace: true, search: { denied: undefined } }); }
 
@@ -99,7 +100,7 @@ function ResellerPanel() {
   const active = list.filter((a) => accessState(a, now) === "Ativo");
   const soon = [...active].sort((a, b) => +new Date(a.expires_at) - +new Date(b.expires_at)).slice(0, 5);
   const f = filter.trim();
-  const shown = f ? list.filter((a) => a.login.includes(f)) : list;
+  const shown = f ? list.filter((a) => a.login.includes(f) || (a.client_name ?? "").toLowerCase().includes(f.toLowerCase())) : list;
 
   return (
     <div className="min-h-screen bg-background">
@@ -128,7 +129,11 @@ function ResellerPanel() {
             </div>
           </TabsContent>
 
-          <TabsContent value="new">
+          <TabsContent value="new" className="space-y-4">
+            <div className={`${card} space-y-1.5 p-5`}>
+              <Label htmlFor="cname">Nome do cliente</Label>
+              <Input id="cname" maxLength={120} placeholder="Ex.: Maria Souza (opcional)" value={clientName} onChange={(e) => setClientName(e.target.value)} />
+            </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className={`${card} space-y-3 p-5`}>
                 <h2 className="text-lg font-semibold">Acesso de 30 dias</h2>

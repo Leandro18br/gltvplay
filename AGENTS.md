@@ -12,7 +12,7 @@
 ## Architecture rules
 - All catalog/config data lives in Lovable Cloud tables; public site reads published rows via RLS, never hardcoded content. Why: admin changes must reflect without code changes.
 - Roles live in `user_roles` and are checked with `has_role`/`is_staff` SQL functions; first signup becomes admin. Why: prevent privilege escalation.
-- Playback sources live only in staff-only `playback_sources` and are resolved through `get_playback_source` for signed-in active users; the legacy URL RPC excludes embeds. Why: preserve private playback authorization across source types.
+- Playback sources live only in staff-only `playback_sources` and are resolved through `get_playback_source` for signed-in active users; the legacy URL RPC excludes embeds. Why: one authorization model for all source types.
 - History/watchlist/playback reference content polymorphically via `content_kind` + `content_id`. Why: one structure for movies, series, episodes and channels.
 - Catalog writes are audited by the `audit_trigger` into `audit_logs`. Why: traceable admin actions.
 - Media uploads go to the private `media` storage bucket (public buckets blocked by workspace). Why: workspace policy.
@@ -33,4 +33,4 @@
 
 - Integration, playback and TMDB detail rules live in `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory-scoped detail.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
-- Access/credit writes go only through idempotent security-definer RPCs; hashes in a no-grant table; reseller panel `/revendedor` uses e-mail/password auth accounts managed by owner-only server functions; resellers are soft-deleted (status deleted + auth ban) to keep history. Catalog RLS/playback require `has_site_access`; client 6-digit login (`/auth`) mints a session for a per-access internal account; catalog routes use ssr:false + `requireSiteAccess`. Why: atomic charging, server-enforced lock.
+- Access/credit writes go only through idempotent security-definer RPCs; hashes in a no-grant table; reseller panel `/revendedor` uses e-mail/password auth accounts managed by owner-only server functions; resellers and client accesses are soft-deleted (status deleted; deleted accesses lose their hash and are trigger-locked) to keep history. Catalog RLS/playback require `has_site_access`; client 6-digit login (`/auth`) mints a session for a per-access internal account; catalog routes use ssr:false + `requireSiteAccess`. Why: atomic charging, server-enforced lock.

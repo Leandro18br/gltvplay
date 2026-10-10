@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Copy, ExternalLink, KeyRound, Loader2, RefreshCw, Settings2, Trash2, UserCheck } from "lucide-react";
+import { Copy, ExternalLink, KeyRound, Loader2, RefreshCw, Save, Settings2, Trash2, UserCheck } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { db, type Row } from "@/lib/admin/db";
 import { fmtDate, resellerErr } from "@/lib/resellers/shared";
 import { Button } from "@/components/ui/button";
@@ -11,13 +12,14 @@ import { ConfirmDelete } from "@/components/admin/ConfirmDelete";
 /** Public client login link (6-digit login, then redirects to the requested title). */
 export const CLIENT_LINK = "https://content-sync-stream.lovable.app/auth?redirect=%2Ffilme%2Fsaudades-te-amo";
 
-export type Created = { id: string; login: string; password: string; kind: string; starts_at?: string; expires_at: string };
+export type Created = { id: string; login: string; client_name?: string | null; password: string; kind: string; starts_at?: string; expires_at: string };
 
 export function accessState(a: Row, now = Date.now()) {
   if (a.status === "revoked") return "Cancelado";
   if (a.status === "suspended") return "Bloqueado";
   return new Date(a.expires_at).getTime() <= now ? "Expirado" : "Ativo";
 }
+export const personName = (a: Row) => (a.client_name?.trim() ? a.client_name : "Nome não informado");
 const kindLabel = (a: Row) => (a.kind === "normal" ? "Normal (30 dias)" : `Teste ${a.duration_hours}h`);
 const copy = (t: string, l: string) => navigator.clipboard.writeText(t).then(() => toast.success(`${l} copiado`), () => toast.error("Não foi possível copiar"));
 const th = "px-3 py-2";
@@ -41,15 +43,17 @@ export function AccessManager({ rows, loading, owner, created, onChanged }: {
   const [renewing, setRenewing] = useState<{ acc: Row; requestId: string } | null>(null);
   const [del, setDel] = useState<Row | null>(null);
   const [busy, setBusy] = useState(false);
+  const [nameEdit, setNameEdit] = useState("");
   const now = Date.now();
 
   useEffect(() => {
     if (!created) return;
     setPw((p) => ({ ...p, [created.id]: created.password }));
-    setSel({ id: created.id, login: created.login, kind: created.kind, status: "active", created_at: created.starts_at ?? new Date().toISOString(), expires_at: created.expires_at, duration_hours: created.kind === "normal" ? 720 : Math.round((+new Date(created.expires_at) - Date.now()) / 3600000) });
+    setSel({ id: created.id, login: created.login, client_name: created.client_name ?? null, kind: created.kind, status: "active", created_at: created.starts_at ?? new Date().toISOString(), expires_at: created.expires_at, duration_hours: created.kind === "normal" ? 720 : Math.round((+new Date(created.expires_at) - Date.now()) / 3600000) });
   }, [created]);
 
   // keep the open dialog in sync with refreshed data
+  useEffect(() => { setNameEdit(sel ? (rows.find((r) => r.id === sel.id) ?? sel).client_name ?? "" : ""); }, [sel?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = sel ? rows.find((r) => r.id === sel.id) ?? sel : null;
 
   async function run<T>(fn: () => PromiseLike<{ data: T; error: unknown }>, ok: (d: T) => void) {
@@ -65,12 +69,13 @@ export function AccessManager({ rows, loading, owner, created, onChanged }: {
   const doRenew = () => renewing && run(() => db.rpc("renew_access", { _access_id: renewing.acc.id, _request_id: renewing.requestId }), (d: Row) => {
     toast.success(`Renovado até ${fmtDate(d.expires_at)}`); setRenewing(null);
   });
-  const doDelete = () => del && run(() => db.rpc("delete_trial_access", { _access_id: del.id }), () => {
-    toast.success("Teste excluído"); if (sel?.id === del.id) setSel(null); setDel(null);
+  const doDelete = () => del && run(() => db.rpc("delete_access", { _access_id: del.id }), () => {
+    toast.success(del.kind === "trial" ? "Teste excluído" : "Cliente excluído"); if (sel?.id === del.id) setSel(null); setDel(null);
   });
   const doReset = (a: Row) => run(() => db.rpc("reset_access_password", { _access_id: a.id }), (d: Row) => {
     setPw((p) => ({ ...p, [a.id]: d.password })); toast.success("Nova senha gerada. Copie agora.");
   });
+  const saveName = (a: Row) => run(() => db.rpc("set_access_name", { _access_id: a.id, _name: nameEdit.trim() }), () => toast.success("Nome salvo"));
   const setStatus = (a: Row, status: string, label: string) => {
     if (status === "revoked" && !window.confirm(`Cancelar o acesso ${a.login}?${owner ? "" : " Só o administrador poderá reativá-lo."}`)) return;
     run(() => db.rpc("set_access_status", { _access_id: a.id, _status: status }), () => toast.success(label));
@@ -81,12 +86,12 @@ export function AccessManager({ rows, loading, owner, created, onChanged }: {
       {!inDialog && <Button size="sm" variant="outline" onClick={() => setSel(a)}><Settings2 />Gerenciar</Button>}
       {a.kind === "trial" && a.status !== "revoked" && <Button size="sm" variant="ghost" onClick={() => setConvert({ acc: a, requestId: crypto.randomUUID() })}><UserCheck />Converter em cliente</Button>}
       {a.kind === "normal" && a.status === "active" && <Button size="sm" variant="ghost" onClick={() => setRenewing({ acc: a, requestId: crypto.randomUUID() })}><RefreshCw />Renovar</Button>}
-      {a.kind === "trial" && <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDel(a)}><Trash2 />Excluir teste</Button>}
+      <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDel(a)}><Trash2 />Excluir</Button>
     </>
   );
 
   const a = current; const p = a ? pw[a.id] : undefined;
-  const all = a ? `Acesso ao streaming\nUsuário: ${a.login}${p ? `\nSenha: ${p}` : ""}\nTipo: ${kindLabel(a)}\nVálido até: ${fmtDate(a.expires_at)}\nEntrar: ${CLIENT_LINK}` : "";
+  const all = a ? `Acesso ao streaming${a.client_name ? `\nCliente: ${a.client_name}` : ""}\nUsuário: ${a.login}${p ? `\nSenha: ${p}` : ""}\nTipo: ${kindLabel(a)}\nVálido até: ${fmtDate(a.expires_at)}\nEntrar: ${CLIENT_LINK}` : "";
 
   return (
     <>
@@ -97,16 +102,17 @@ export function AccessManager({ rows, loading, owner, created, onChanged }: {
             <ul className="divide-y divide-border md:hidden">
               {rows.map((r) => (
                 <li key={r.id} className="space-y-2 p-4">
-                  <div className="flex items-center justify-between gap-2"><span className="font-mono text-lg font-semibold">{r.login}</span><StateBadge a={r} now={now} /></div>
+                  <div className="flex items-center justify-between gap-2"><div className="min-w-0"><p className={`truncate font-medium ${r.client_name ? "" : "italic text-muted-foreground"}`}>{personName(r)}</p><span className="font-mono text-lg font-semibold">{r.login}</span></div><StateBadge a={r} now={now} /></div>
                   <p className="text-xs text-muted-foreground">{kindLabel(r)} · criado {fmtDate(r.created_at)}<br />expira {fmtDate(r.expires_at)}</p>
                   <div className="flex flex-wrap gap-1">{actions(r)}</div>
                 </li>))}
             </ul>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
-                <thead className="border-b border-border text-left text-xs uppercase text-muted-foreground"><tr><th className={th}>Usuário</th><th className={th}>Tipo</th><th className={th}>Criação</th><th className={th}>Expiração</th><th className={th}>Status</th><th className={th}></th></tr></thead>
+                <thead className="border-b border-border text-left text-xs uppercase text-muted-foreground"><tr><th className={th}>Nome</th><th className={th}>Usuário</th><th className={th}>Tipo</th><th className={th}>Criação</th><th className={th}>Expiração</th><th className={th}>Status</th><th className={th}></th></tr></thead>
                 <tbody>{rows.map((r) => (
                   <tr key={r.id} className="border-b border-border/60 last:border-0">
+                    <td className={`${th} max-w-[14rem] truncate ${r.client_name ? "font-medium" : "italic text-muted-foreground"}`}>{personName(r)}</td>
                     <td className={`${th} font-mono font-semibold`}>{r.login}</td>
                     <td className={th}>{kindLabel(r)}</td>
                     <td className={`${th} whitespace-nowrap text-muted-foreground`}>{fmtDate(r.created_at)}</td>
@@ -121,12 +127,19 @@ export function AccessManager({ rows, loading, owner, created, onChanged }: {
 
       <Dialog open={!!a} onOpenChange={(o) => !o && setSel(null)}>
         <DialogContent className="max-h-[100dvh] overflow-y-auto sm:max-h-[90dvh]">
-          <DialogHeader><DialogTitle>Gerenciar acesso {a?.login}</DialogTitle>
+          <DialogHeader><DialogTitle>Gerenciar acesso {a?.login}{a ? ` · ${personName(a)}` : ""}</DialogTitle>
             <DialogDescription>{a?.note ? a.note : a?.kind === "trial" ? "Teste gratuito" : "Cliente final"}</DialogDescription></DialogHeader>
           {a && <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2 text-sm">
               <Info l="Tipo" v={kindLabel(a)} /><Info l="Status" v={<StateBadge a={a} now={now} />} />
               <Info l="Criação" v={fmtDate(a.created_at)} /><Info l="Expiração" v={fmtDate(a.expires_at)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="acc-name" className="text-xs text-muted-foreground">Nome do cliente</label>
+              <div className="flex gap-2">
+                <Input id="acc-name" maxLength={120} placeholder="Nome não informado" value={nameEdit} onChange={(e) => setNameEdit(e.target.value)} />
+                <Button variant="secondary" disabled={busy || nameEdit.trim() === (a.client_name ?? "")} onClick={() => saveName(a)}><Save />Salvar</Button>
+              </div>
             </div>
             <Field l="Usuário" v={a.login} onCopy={() => copy(a.login, "Usuário")} />
             {p ? <Field l="Senha (visível só agora)" v={p} onCopy={() => copy(p, "Senha")} /> : (
@@ -169,8 +182,8 @@ export function AccessManager({ rows, loading, owner, created, onChanged }: {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDelete open={!!del} onOpenChange={(o) => !o && setDel(null)} title={`Excluir teste ${del?.login ?? ""}?`}
-        description="O teste será removido e o login deixará de funcionar. Outros clientes e históricos não são afetados." onConfirm={doDelete} />
+      <ConfirmDelete open={!!del} onOpenChange={(o) => !o && setDel(null)} title={`Excluir ${del?.kind === "trial" ? "teste" : "cliente"} ${del ? personName(del) : ""}?`}
+        description={del ? `${personName(del)} · usuário ${del.login} · ${kindLabel(del)}. O acesso será revogado e o login deixará de funcionar no site. Históricos de créditos e auditoria são mantidos.` : ""} onConfirm={doDelete} />
     </>
   );
 }
