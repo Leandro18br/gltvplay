@@ -1,11 +1,11 @@
 import { requireSiteAccess } from "@/lib/access/gate";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, LogOut, Plus, Trash2, Check, Baby, History, Play } from "lucide-react";
+import { Loader2, LogOut, Plus, Trash2, Check, Baby } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { continueWatchingQuery, removeHistory, setActiveProfileId, useActiveProfile, useWatchlist } from "@/lib/user-data";
+import { setActiveProfileId, useActiveProfile, useWatchlist } from "@/lib/user-data";
 import { nameSchema } from "@/lib/validation";
 import { SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
 import { CardGrid } from "@/components/site/ContentCard";
@@ -22,9 +22,9 @@ export const Route = createFileRoute("/_authenticated/perfil")({
   head: () => ({
     meta: [
       { title: "Meu perfil — Streaming" },
-      { name: "description", content: "Gerencie sua conta, perfis, histórico e minha lista." },
+      { name: "description", content: "Gerencie sua conta, perfis e minha lista." },
       { property: "og:title", content: "Meu perfil — Streaming" },
-      { property: "og:description", content: "Gerencie sua conta, perfis, histórico e minha lista." },
+      { property: "og:description", content: "Gerencie sua conta, perfis e minha lista." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
@@ -185,37 +185,6 @@ function ProfilesTab() {
         </div>
       )}
     </div>
-  );
-}
-
-function HistoryTab() {
-  const { user, profileId, loading } = useActiveProfile();
-  const qc = useQueryClient();
-  const q = useQuery({ ...continueWatchingQuery(user?.id ?? "none", profileId, true), enabled: !!user && !loading });
-  if (q.isLoading || loading) return <Loader2 className="animate-spin text-primary" />;
-  if (q.isError) return <EmptyState title="Não foi possível carregar o histórico" />;
-  if (!q.data?.length) return <EmptyState icon={<History />} title="Nenhum histórico ainda" text="O que você assistir neste perfil aparecerá aqui." />;
-  return (
-    <ul className="grid gap-3 md:grid-cols-2">
-      {q.data.map((c) => (
-        <li key={c.contentId} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2">
-          <Link to="/assistir/$kind/$id" params={{ kind: c.kind, id: c.contentId }} className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-lg bg-accent">
-            {c.image && <img src={c.image} alt="" loading="lazy" className="h-full w-full object-cover" />}
-            <span className="absolute inset-0 flex items-center justify-center bg-background/30"><Play className="size-5 fill-current text-primary" /></span>
-            <span className="absolute inset-x-0 bottom-0 h-1 bg-foreground/20"><span className="block h-full bg-primary" style={{ width: `${c.percent}%` }} /></span>
-          </Link>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{c.title}</p>
-            {c.subtitle && <p className="truncate text-xs text-muted-foreground">{c.subtitle}</p>}
-            <p className="text-xs text-muted-foreground">{Math.round(c.percent)}% assistido</p>
-          </div>
-          <Button variant="ghost" size="icon" aria-label="Remover do histórico" onClick={async () => {
-            try { await removeHistory(user!.id, profileId, c.kind, c.contentId); toast.success("Removido do histórico"); qc.invalidateQueries({ queryKey: ["me", user!.id, "continue"] }); }
-            catch { toast.error("Não foi possível remover"); }
-          }}><Trash2 /></Button>
-        </li>
-      ))}
-    </ul>
   );
 }
 
