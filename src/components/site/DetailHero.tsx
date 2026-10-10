@@ -28,7 +28,7 @@ export function DetailHero({ item, extraMeta, player, flushPlayer = false }: { i
         {item.poster_url && <img src={item.poster_url} alt={`Pôster de ${item.title}`} className="aspect-[2/3] w-32 shrink-0 animate-rise rounded-2xl object-cover shadow-glow ring-1 ring-primary/30 md:w-44" />}
         <div className="flex min-w-0 max-w-3xl animate-rise flex-1 flex-col gap-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">{item.kind === "movie" ? "Filme" : "Série"}</p>
-          <h1 className="text-3xl font-bold leading-tight md:text-5xl">{item.title}</h1>
+           <h1 data-title-length={flushPlayer ? (item.title.length <= 22 ? "short" : item.title.length <= 45 ? "medium" : "long") : undefined} className="text-3xl font-bold leading-tight md:text-5xl">{item.title}</h1>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {item.age_rating && <span className="rounded border border-muted-foreground/60 px-1.5 text-xs">{item.age_rating}</span>}
             {meta.map((m, i) => <span key={i}>{i > 0 || item.age_rating ? "· " : ""}{m}</span>)}
