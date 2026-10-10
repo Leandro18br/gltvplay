@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, Plus, Search } from "lucide-react";
+import { Copy, Loader2, Plus, Search } from "lucide-react";
 import { db, type Row } from "@/lib/admin/db";
 import { adminHead } from "@/lib/admin/head";
 import { createResellerAccount, resetResellerLogin } from "@/lib/resellers/resellers.functions";
@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PasswordInput } from "@/components/site/PasswordInput";
 
 export const Route = createFileRoute("/admin/resellers")({
   head: () => adminHead("Gerenciar revendedores", "Cadastro, bloqueio e consulta dos revendedores e seus pedidos."),
@@ -79,7 +78,7 @@ function ResellersPage() {
               <table className="w-full text-sm"><thead className={head}><tr><th className={th}>Revendedor</th><th className={th}>Cadastro</th><th className={th}>Saldo</th><th className={th}>Status</th><th className={th}></th></tr></thead>
                 <tbody>{rows.map((r) => (
                   <tr key={r.user_id} className={tr}>
-                    <td className={th}><p className="font-medium">{r.display_name ?? "—"}</p><p className="text-xs text-muted-foreground">{r.profiles?.email}</p></td>
+                    <td className={th}><p className="font-medium">{r.display_name ?? "—"}</p><p className="text-xs text-muted-foreground">{shownEmail(r.profiles?.email)}</p></td>
                     <td className={`${th} text-muted-foreground`}>{new Date(r.created_at).toLocaleDateString("pt-BR")}</td>
                     <td className={`${th} font-semibold`}>{r.credits}</td>
                     <td className={th}>{r.status === "active" ? "Ativo" : <span className="text-destructive">Bloqueado</span>}</td>
@@ -100,7 +99,7 @@ function ResellersPage() {
                 <tbody>{requests.data.map((c) => (
                   <tr key={c.id} className={tr}>
                     <td className={`${th} whitespace-nowrap text-muted-foreground`}>{fmtDate(c.created_at)}</td>
-                    <td className={th}>{c.resellers?.display_name ?? "—"}<p className="text-xs text-muted-foreground">{c.resellers?.profiles?.email}</p></td>
+                    <td className={th}>{c.resellers?.display_name ?? "—"}<p className="text-xs text-muted-foreground">{shownEmail(c.resellers?.profiles?.email)}</p></td>
                     <td className={th}>{c.kind === "movie" ? "Filme" : "Série"}</td>
                     <td className={th}><p className="font-medium">{c.title}{c.release_year ? ` (${c.release_year})` : ""}</p>{c.note && <p className="text-xs text-muted-foreground">{c.note}</p>}</td>
                     <td className={th}>
@@ -119,6 +118,8 @@ function ResellersPage() {
     </div>
   );
 }
+
+const shownEmail = (e?: string | null) => (e && !e.endsWith(".invalid") ? e : "Login por usuário numérico");
 
 const RESELLER_LOGIN_URL = "https://content-sync-stream.lovable.app/revendedor/login";
 
@@ -198,7 +199,7 @@ function EditDialog({ row, onClose, onDone }: { row: Row; onClose: () => void; o
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader><DialogTitle>Editar revendedor</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground">{row.profiles?.email}</p>
+        <p className="text-sm text-muted-foreground">{shownEmail(row.profiles?.email)}</p>
         <div className="space-y-1.5"><Label htmlFor="en">Nome</Label><Input id="en" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></div>
         {creds ? <CredsView name={name.trim()} {...creds} /> : <Button variant="outline" disabled={busy} onClick={newPassword}>Gerar usuário/nova senha de acesso</Button>}
         <DialogFooter><Button variant="outline" onClick={onClose}>Cancelar</Button><Button disabled={busy} onClick={save}>Salvar</Button></DialogFooter>
