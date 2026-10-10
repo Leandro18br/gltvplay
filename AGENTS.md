@@ -31,7 +31,7 @@
 - TMDB reuses cached metadata, staff-only allowlisted completion and locked import deduplication; year jobs persist bounded discovery/item checkpoints. Episode updates touch existing rows only. Why: preserve manual data, identities and playback.
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
 
-- Integration, playback and TMDB detail rules live in `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory-scoped detail.
+- Detail rules: `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory scope.
 - Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
 - Access/credit writes go only through idempotent security-definer RPCs; hashes in a no-grant table; reseller panel `/revendedor` uses e-mail/password auth accounts managed by owner-only server functions; resellers and client accesses are soft-deleted (status deleted; deleted accesses lose their hash and are trigger-locked) to keep history. Catalog RLS/playback require `has_site_access`; client 6-digit login (`/auth`) mints a session for a per-access internal account; catalog routes use ssr:false + `requireSiteAccess`. Why: atomic charging, server-enforced lock.
-- Owner/reseller/client sessions live in separate per-area slots (`src/lib/auth/session-vault.ts`); guards restore their slot then re-check roles/access server-side. Why: one browser session store; logins must not evict each other.
+- Per-area session slots (`session-vault.ts`): guards restore slot, then re-check server-side. Why: logins must not evict each other.
