@@ -72,8 +72,8 @@ async function resolveHome(db: any, config: HomeConfig): Promise<ResolvedHome> {
   }
   return { config, sections, slides, platformName: settings.data?.platform_name ?? "Streaming" };
 }
-export const getPublishedHome = createServerFn({ method:"GET" }).handler(async () => {
-  const db = publicClient(); const { data,error } = await db.from("home_layouts").select("config").eq("id","published").maybeSingle(); if (error) throw error;
+export const getPublishedHome = createServerFn({ method:"GET" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
+  const db = context.supabase as any; const { data,error } = await db.from("home_layouts").select("config").eq("id","published").maybeSingle(); if (error) throw error;
   return resolveHome(db, data ? homeSchema.parse(data.config) : emptyHome);
 });
 async function assertStaff(context:any) { const { data,error } = await context.supabase.rpc("is_staff",{ _user_id:context.userId }); if (error || !data) throw new Error("Acesso negado"); }
