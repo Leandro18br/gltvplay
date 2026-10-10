@@ -239,6 +239,13 @@
       "when": 1791640345140,
       "tag": "0033_reseller_soft_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791643041271,
+      "tag": "0034_access_manage_rpcs",
+      "breakpoints": true
     }
   ]
 }

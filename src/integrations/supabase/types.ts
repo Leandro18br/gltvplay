@@ -2154,6 +2154,13 @@ export type Database = {
         Args: { _display_name: string; _status?: string; _user_id: string }
         Returns: undefined
       }
+      can_manage_access: {
+        Args: {
+          _me: string
+          acc: Database["public"]["Tables"]["access_accounts"]["Row"]
+        }
+        Returns: boolean
+      }
       catalog_title_key: { Args: { t: string }; Returns: string }
       complete_tmdb_metadata: {
         Args: {
@@ -2162,6 +2169,10 @@ export type Database = {
           _kind: string
           _patch: Json
         }
+        Returns: Json
+      }
+      convert_trial_access: {
+        Args: { _access_id: string; _request_id: string }
         Returns: Json
       }
       create_access: {
@@ -2182,6 +2193,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_trial_access: { Args: { _access_id: string }; Returns: undefined }
       embed_url_allowed: { Args: { u: string }; Returns: boolean }
       ensure_fixed_genres: { Args: never; Returns: undefined }
       get_playback_source: {
@@ -2310,6 +2322,7 @@ export type Database = {
         Args: { _note?: string; _quantity: number }
         Returns: string
       }
+      reset_access_password: { Args: { _access_id: string }; Returns: Json }
       save_home_draft: {
         Args: { c: Json; expected_revision: number }
         Returns: number
