@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
-import { parseBugouName, type BugouSeries } from "./bugoumods";
+import { parseBugouName, parseBugouDetails, type BugouSeries, type BugouDetails } from "./bugoumods";
 
 /**
  * BugouMods VIP series list — METADATA ONLY (id, name/year, cover, category).
@@ -107,4 +107,96 @@ export const bugouImportSeries = createServerFn({ method: "POST" })
       created++;
     }
     return { created, skipped };
+  });
+
+async function loadDetails(id: string): Promise<BugouDetails> {
+  const url = new URL("https://cinema.bugoumods.com/index.php");
+  url.search = new URLSearchParams({ ajax: "1", type: "series_info", series_id: id, vtoken: token() }).toString();
+  let res: Response;
+  try { res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } }); }
+  catch { throw new Error("Não foi possível conectar ao BugouMods."); }
+  if (!res.ok) throw new Error(`BugouMods respondeu HTTP ${res.status} ao buscar episódios.`);
+  let json: any;
+  try { json = await res.json(); } catch { throw new Error("BugouMods não respondeu em JSON ao buscar episódios."); }
+  return parseBugouDetails(id, json);
+}
+
+/** Seasons/episodes preview + what already exists locally for this series. */
+export const bugouSeriesDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().regex(/^\d+$/) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx;
+    await assertStaff(ctx);
+    const details = await loadDetails(data.id);
+    const local = await findLocalSeries(ctx, data.id, details.title, details.year);
+    const existingEpisodes: string[] = [];
+    if (local) {
+      const { data: rows } = await ctx.supabase.from("episodes").select("episode_number, seasons!inner(season_number, series_id)").eq("seasons.series_id", local);
+      (rows ?? []).forEach((r: any) => existingEpisodes.push(`${r.seasons.season_number}x${r.episode_number}`));
+    }
+    return { details, localSeriesId: local, existingEpisodes };
+  });
+
+async function findLocalSeries(ctx: Ctx, id: string, title: string, year: number | null): Promise<string | null> {
+  const { data: ext } = await ctx.supabase.from("series").select("id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+  if (ext) return ext.id;
+  if (!title) return null;
+  let qb = ctx.supabase.from("series").select("id").ilike("title", title.replace(/[%_]/g, "\\$&")).limit(1);
+  if (year) qb = qb.eq("release_year", year);
+  const { data: same } = await qb;
+  return same?.[0]?.id ?? null;
+}
+
+/**
+ * Imports selected seasons: reuses the existing series/seasons/episodes (never overwrites them)
+ * and adds one BugouMods embed source per episode (external_ref bugoumods:<episodeId>), skipped if present.
+ */
+export const bugouImportEpisodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().regex(/^\d+$/), seasons: z.array(z.number().int().min(0).max(500)).min(1).max(100) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx; const db = ctx.supabase;
+    await assertStaff(ctx);
+    const d = await loadDetails(data.id);
+    const want = d.seasons.filter(s => data.seasons.includes(s.season));
+    if (!want.length) throw new Error("A API não retornou episódios para as temporadas escolhidas.");
+    let seriesId = await findLocalSeries(ctx, data.id, d.title, d.year); let seriesCreated = false;
+    if (!seriesId) {
+      const listed = (await loadAll()).find(i => i.id === data.id);
+      const title = d.title || listed?.title; if (!title) throw new Error("Série sem nome na resposta da API.");
+      const year = d.year ?? listed?.year ?? null;
+      const slug = await uniqueSlug(ctx, "series", title, year);
+      const r = await db.from("series").insert({ title, release_year: year, poster_url: d.cover ?? listed?.poster_url ?? null, description: d.plot, slug, status: "published", external_source: SOURCE, external_id: data.id }).select("id").single();
+      if (r.error) throw new Error(r.error.message);
+      seriesId = r.data.id; seriesCreated = true;
+    }
+    const out = { seriesId, seriesCreated, seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0 };
+    for (const s of want) {
+      let { data: season } = await db.from("seasons").select("id").eq("series_id", seriesId).eq("season_number", s.season).maybeSingle();
+      if (!season) {
+        const r = await db.from("seasons").insert({ series_id: seriesId, season_number: s.season, title: `Temporada ${s.season}`, status: "published", sort_order: s.season }).select("id").single();
+        if (r.error) throw new Error(r.error.message);
+        season = r.data; out.seasonsCreated++;
+      }
+      const { data: have } = await db.from("episodes").select("id, episode_number").eq("season_id", season!.id);
+      const byNum = new Map<number, string>((have ?? []).map((e: any) => [e.episode_number, e.id]));
+      for (const e of s.episodes) {
+        let epId = byNum.get(e.episode);
+        if (epId) out.episodesExisting++;
+        else {
+          const r = await db.from("episodes").insert({ season_id: season!.id, episode_number: e.episode, title: e.title, thumbnail_url: e.image, duration_minutes: e.duration_minutes, status: "published" }).select("id").single();
+          if (r.error) throw new Error(r.error.message);
+          epId = r.data.id as string; out.episodesCreated++;
+        }
+        const ref = `bugoumods:${e.id}`;
+        const { data: srcs } = await db.from("playback_sources").select("id, external_ref, url").eq("content_kind", "episode").eq("content_id", epId);
+        if ((srcs ?? []).some((x: any) => x.external_ref === ref || x.url === e.embed_url)) { out.sourcesExisting++; continue; }
+        const n = srcs?.length ?? 0;
+        const r = await db.from("playback_sources").insert({ content_kind: "episode", content_id: epId, url: e.embed_url, source_type: "embed", provider: "BugouMods", label: "BugouMods", external_ref: ref, is_active: true, is_primary: n === 0, sort_order: n, drm: {} });
+        if (r.error) throw new Error(r.error.message);
+        out.sourcesCreated++;
+      }
+    }
+    return out;
   });
