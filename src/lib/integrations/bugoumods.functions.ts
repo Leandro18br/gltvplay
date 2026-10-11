@@ -120,7 +120,7 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[]): P
     seriesId = r.data.id as string; seriesCreated = true;
   } else {
     const { data: cur } = await db.from("series").select("description, poster_url, release_year, external_source, external_id").eq("id", seriesId).single();
-    const patch: Record<string, unknown> = {};
+    const patch: any = {};
     if (cur && !cur.description && d.plot) patch.description = d.plot;
     if (cur && !cur.poster_url && cover) patch.poster_url = cover;
     if (cur && !cur.release_year && year) patch.release_year = year;
