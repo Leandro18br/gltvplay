@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null }[] };
+type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
 
 export function BugouSeriesButton({ label = "Buscar séries pela API", disabled = false }: { label?: string; disabled?: boolean } = {}) {
   const [open, setOpen] = useState(false);
@@ -62,7 +62,12 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
       while (cur.status !== "done" && cur.status !== "paused" && cur.pending > 0) {
         const r = await runJob({ data: { jobId: cur.id } });
         cur = r as Job; setJob(cur);
+        if (!running.current) break;
+        // Wait for the provider's pause / next scheduled retry instead of hammering the server.
+        const until = cur.next_retry_at ? Date.parse(cur.next_retry_at) - Date.now() : 0;
+        const nothingDue = (cur.queued ?? 1) === 0 && (cur.processing ?? 0) === 0;
         if (r.busy) await new Promise(res => setTimeout(res, 4000));
+        else if (until > 0 && (cur.throttled || nothingDue)) await new Promise(res => setTimeout(res, Math.min(until + 500, 15000)));
       }
       if (cur.status === "done") { toast.success(`Importação concluída: ${cur.done} série(s), ${cur.episodes_created} episódio(s) novos${cur.failed ? `, ${cur.failed} com falha` : ""}.`); qc.invalidateQueries({ queryKey: ["admin"] }); }
     } catch (x) { toast.error(`${errMsg(x)} — use "Retomar" para continuar de onde parou.`); }
@@ -98,11 +103,15 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
           <div className="space-y-2 rounded-xl border border-border p-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{job.label}</span>
-              <span className="text-xs text-muted-foreground">{job.done} concluída(s) · {job.pending} pendente(s) · {job.failed} com falha · {job.episodes_created} episódio(s) novos</span>
+              <span className="text-xs text-muted-foreground">{job.queued ?? job.pending} na fila · {job.processing ?? 0} processando · {job.done} concluída(s) · {job.waiting ?? 0} aguardando nova tentativa · {job.failed} com falha</span>
             </div>
+            <p className="text-xs text-muted-foreground">{job.seasons ?? 0} temporada(s) e {job.episodes_created} episódio(s) novos · {job.requests ?? 0} consulta(s) ao provedor · {job.http429 ?? 0} limite(s) HTTP 429</p>
+            {job.next_retry_at && Date.parse(job.next_retry_at) > Date.now() && (
+              <p className="rounded-lg bg-primary/10 px-2 py-1 text-xs">{job.throttled ? "Pausado pelo limite de requisições do provedor. " : ""}Próxima tentativa às {new Date(job.next_retry_at).toLocaleTimeString("pt-BR")}. O progresso está salvo.</p>
+            )}
             <Progress value={job.total ? ((job.done + job.failed) / job.total) * 100 : 0} />
             <div className="flex flex-wrap gap-2">
-              {jobActive && <Button size="sm" variant="outline" onClick={() => pause({ data: { jobId: job.id } }).then(j => setJob(j as Job))}><Pause /> Pausar</Button>}
+              {jobActive && <Button size="sm" variant="outline" onClick={() => { running.current = false; pause({ data: { jobId: job.id } }).then(j => setJob(j as Job)); }}><Pause /> Pausar</Button>}
               {!jobActive && job.pending > 0 && <Button size="sm" onClick={() => drive({ ...job, status: "running" })}><Play /> Retomar</Button>}
               {!jobActive && job.failed > 0 && <Button size="sm" variant="outline" onClick={() => retry({ data: { jobId: job.id } }).then(j => drive(j as Job))}><RotateCcw /> Tentar de novo só as falhas</Button>}
               {jobActive && <Loader2 className="h-4 w-4 animate-spin self-center" />}
