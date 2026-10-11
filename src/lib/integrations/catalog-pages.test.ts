@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { liveVipLink, nextCursor, parseCategoryPage, parseHomeCategories } from "./catalog-pages";
+import { liveVipLink, parseGlobalSearch, nextCursor, parseCategoryPage, parseHomeCategories } from "./catalog-pages";
 
 describe("paginated provider catalog", () => {
   it("walks every page of a category before moving on (no 50-item stop)", () => {
@@ -21,7 +21,6 @@ describe("paginated provider catalog", () => {
   });
 });
 
-import { parseGlobalSearch } from "./catalog-pages";
 describe("parseGlobalSearch", () => {
   const res = { live: [{ name: "Globo AM", stream_id: "2053994543", stream_icon: "https://x/g.png", container_extension: "mp4" }], vod: [{ name: "x", stream_id: "1" }], series: [{ name: "Breaking Bad (2008)", series_id: "33815", cover: "http://i/b.jpg" }, { name: "Breaking Bad (2008)", series_id: "33815" }, { name: "", series_id: "9" }] };
   it("returns only the requested kind, de-duplicated and valid", () => {
