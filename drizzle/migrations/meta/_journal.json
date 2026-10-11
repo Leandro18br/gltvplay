@@ -267,6 +267,13 @@
       "when": 1791651306216,
       "tag": "0037_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791721883736,
+      "tag": "0038_bugou_index_and_jobs",
+      "breakpoints": true
     }
   ]
 }
