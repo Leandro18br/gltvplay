@@ -523,31 +523,55 @@ export type Database = {
       bugou_import_items: {
         Row: {
           attempts: number
+          details: Json | null
+          episodes_imported: number | null
+          episodes_pending: number | null
           error: string | null
           ext_id: string
           job_id: string
+          next_attempt_at: string | null
+          rate_limited: number
           result: Json | null
+          seasons_found: number | null
+          series_id: string | null
           state: string
+          step: string
           title: string | null
           updated_at: string
         }
         Insert: {
           attempts?: number
+          details?: Json | null
+          episodes_imported?: number | null
+          episodes_pending?: number | null
           error?: string | null
           ext_id: string
           job_id: string
+          next_attempt_at?: string | null
+          rate_limited?: number
           result?: Json | null
+          seasons_found?: number | null
+          series_id?: string | null
           state?: string
+          step?: string
           title?: string | null
           updated_at?: string
         }
         Update: {
           attempts?: number
+          details?: Json | null
+          episodes_imported?: number | null
+          episodes_pending?: number | null
           error?: string | null
           ext_id?: string
           job_id?: string
+          next_attempt_at?: string | null
+          rate_limited?: number
           result?: Json | null
+          seasons_found?: number | null
+          series_id?: string | null
           state?: string
+          step?: string
           title?: string | null
           updated_at?: string
         }
@@ -575,6 +599,7 @@ export type Database = {
           lease_until: string | null
           stats: Json
           status: string
+          throttle_until: string | null
           total: number
           updated_at: string
         }
@@ -591,6 +616,7 @@ export type Database = {
           lease_until?: string | null
           stats?: Json
           status?: string
+          throttle_until?: string | null
           total?: number
           updated_at?: string
         }
@@ -607,6 +633,7 @@ export type Database = {
           lease_until?: string | null
           stats?: Json
           status?: string
+          throttle_until?: string | null
           total?: number
           updated_at?: string
         }
