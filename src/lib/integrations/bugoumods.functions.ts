@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
+import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor } from "./ratelimit";
 import { parseBugouName, parseBugouDetails, bugouVipEmbedUrl, normTitle, compactTitle, type BugouSeries, type BugouDetails } from "./bugoumods";
 
 /**
@@ -39,29 +40,20 @@ async function seriesIntegration(): Promise<{ integ: SeriesInteg; tok: string }>
 async function token() { return (await seriesIntegration()).tok; }
 
 /** Records a provider call in api_request_logs + integration status (token never logged). */
-async function logCall(integ: SeriesInteg, label: string, t0: number, err: string | null) {
+async function logCall(integ: SeriesInteg, label: string, t0: number, err: string | null, status: number | null = null) {
   if (!integ) return;
   const db = await admin(); const now = new Date().toISOString();
-  await db.from("api_request_logs").insert({ integration_id: integ.id, content_label: label, http_status: err ? null : 200, duration_ms: Date.now() - t0, success: !err, cached: false, error: err });
+  await db.from("api_request_logs").insert({ integration_id: integ.id, content_label: label, http_status: err ? status : 200, duration_ms: Date.now() - t0, success: !err, cached: false, error: err });
   await db.from("api_integrations").update({ last_tested_at: now, last_status: err ? "error" : "ok", last_error: err, request_count: Number(integ.request_count) + 1 }).eq("id", integ.id);
+  integ.request_count = Number(integ.request_count) + 1;
 }
 
 const scrub = (s: string) => s.replace(/vtoken=[^&\s"]+/g, "vtoken=***");
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-/** GET JSON with up to 3 attempts and progressive wait for network errors / 5xx / 429. */
-async function getJson(url: URL, what: string): Promise<any> {
-  let last = "";
-  for (let i = 0; i < 3; i++) {
-    if (i) await sleep(600 * 2 ** (i - 1));
-    let res: Response;
-    try { res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } }); }
-    catch { last = `Não foi possível conectar ao BugouMods (${what}).`; continue; }
-    if (res.status >= 500 || res.status === 429) { last = `BugouMods respondeu HTTP ${res.status} (${what}).`; continue; }
-    if (!res.ok) throw new Error(`BugouMods respondeu HTTP ${res.status} (${what}).`);
-    try { return await res.json(); } catch { throw new Error(`BugouMods não respondeu em JSON (${what}).`); }
-  }
-  throw new Error(last);
+/** Provider GET via the shared rate-limit helper (timeout from the integration, 429 never retried inline). */
+async function getJson(url: URL, what: string, timeoutSeconds = 25): Promise<any> {
+  return (await fetchProviderJson(url, what, { timeoutMs: Math.max(5, timeoutSeconds) * 1000 })).json;
 }
 
 async function loadAll(label = "Lista de séries"): Promise<BugouSeries[]> {
@@ -110,10 +102,20 @@ async function ensureIndex(ctx: Ctx, force: boolean) {
   return refreshIndex(ctx);
 }
 
-async function loadDetails(id: string): Promise<BugouDetails> {
+/** One series_info call (the provider's only per-series endpoint: seasons + episodes in a single response). */
+async function loadDetails(id: string, label?: string): Promise<BugouDetails> {
+  const { integ, tok } = await seriesIntegration();
   const url = new URL("https://cinema.bugoumods.com/index.php");
-  url.search = new URLSearchParams({ ajax: "1", type: "series_info", series_id: id, vtoken: await token() }).toString();
-  return parseBugouDetails(id, await getJson(url, "episódios"));
+  url.search = new URLSearchParams({ ajax: "1", type: "series_info", series_id: id, vtoken: tok }).toString();
+  const t0 = Date.now();
+  try {
+    const json = await getJson(url, "episódios", integ?.timeout_seconds ?? 25);
+    if (label) await logCall(integ, label, t0, null);
+    return parseBugouDetails(id, json);
+  } catch (e) {
+    if (label) await logCall(integ, label, t0, scrub((e as Error).message).slice(0, 400), e instanceof RateLimitedError ? 429 : null);
+    throw e;
+  }
 }
 
 async function findLocalSeries(ctx: Ctx, id: string, title: string, year: number | null): Promise<string | null> {
@@ -126,15 +128,15 @@ async function findLocalSeries(ctx: Ctx, id: string, title: string, year: number
   return same?.[0]?.id ?? null;
 }
 
-type ImportResult = { seriesId: string; seriesCreated: boolean; seasonsCreated: number; episodesCreated: number; episodesExisting: number; sourcesCreated: number; sourcesExisting: number };
+type ImportResult = { seriesId: string; seriesCreated: boolean; seasonsFound: number; episodesTotal: number; seasonsCreated: number; episodesCreated: number; episodesExisting: number; sourcesCreated: number; sourcesExisting: number };
 
 /**
  * Full idempotent import of one series: metadata, every season, every episode and its VIP player.
  * Existing rows are reused; only empty metadata fields are filled; nothing is deleted.
  */
-async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[]): Promise<ImportResult> {
+async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pre?: BugouDetails): Promise<ImportResult> {
   const db = ctx.supabase;
-  const d = await loadDetails(id);
+  const d = pre ?? await loadDetails(id);
   const want = onlySeasons ? d.seasons.filter(s => onlySeasons.includes(s.season)) : d.seasons;
   let seriesId = await findLocalSeries(ctx, id, d.title, d.year); let seriesCreated = false;
   let listed: any = null;
@@ -155,7 +157,7 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[]): P
     if (cur && !cur.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
     if (Object.keys(patch).length) { const u = await db.from("series").update(patch).eq("id", seriesId); if (u.error) throw new Error(u.error.message); }
   }
-  const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0 };
+  const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsFound: want.length, episodesTotal: want.reduce((n, s) => n + s.episodes.length, 0), seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0 };
   const vtok = await token();
   for (const s of want) {
     let { data: season } = await db.from("seasons").select("id").eq("series_id", seriesId).eq("season_number", s.season).maybeSingle();
@@ -256,7 +258,7 @@ export const bugouSeriesDetails = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx;
     await assertStaff(ctx);
-    const details = await loadDetails(data.id);
+    const details = await loadDetails(data.id, "Prévia de episódios");
     const local = await findLocalSeries(ctx, data.id, details.title, details.year);
     const existingEpisodes: string[] = [];
     if (local) {
@@ -278,19 +280,31 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 
 // ---------- Resumable import jobs ----------
 
+type JobStats = { requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number };
+
 async function jobView(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
   const { data: job, error } = await db.from("bugou_import_jobs").select("*").eq("id", jobId).single();
   if (error) throw new Error(error.message);
-  const { data: failures } = await db.from("bugou_import_items").select("ext_id, title, error, attempts").eq("job_id", jobId).eq("state", "failed").order("updated_at", { ascending: false }).limit(20);
-  return { ...job, pending: Math.max(0, job.total - job.done - job.failed), failures: failures ?? [] };
+  const { data: failures } = await db.from("bugou_import_items").select("ext_id, title, error, attempts, rate_limited, step").eq("job_id", jobId).eq("state", "failed").order("updated_at", { ascending: false }).limit(20);
+  const c = await recount(ctx, jobId);
+  const { data: nxt } = await db.from("bugou_import_items").select("next_attempt_at").eq("job_id", jobId).eq("state", "pending").gt("next_attempt_at", new Date().toISOString()).order("next_attempt_at").limit(1);
+  const st = (job.stats ?? {}) as JobStats;
+  const throttle = job.throttle_until && Date.parse(job.throttle_until) > Date.now() ? job.throttle_until : null;
+  return { ...job, pending: c.pending + c.processing, queued: c.pending - c.waiting, processing: c.processing, waiting: c.waiting, next_retry_at: throttle ?? nxt?.[0]?.next_attempt_at ?? null, throttled: !!throttle, requests: st.requests ?? 0, http429: st.http429 ?? 0, seasons: st.seasons ?? 0, failures: failures ?? [] };
 }
 
 async function recount(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
-  const c = async (state: string) => (await db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("job_id", jobId).eq("state", state)).count ?? 0;
-  const [done, failed, pending] = await Promise.all([c("done"), c("failed"), c("pending")]);
-  return { done, failed, pending };
+  const c = async (state: string, waiting = false) => { let q = db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("job_id", jobId).eq("state", state); if (waiting) q = q.gt("next_attempt_at", new Date().toISOString()); return (await q).count ?? 0; };
+  const [done, failed, pending, processing, waiting] = await Promise.all([c("done"), c("failed"), c("pending"), c("processing"), c("pending", true)]);
+  return { done, failed, pending, processing, waiting };
+}
+
+/** Latest provider throttle across all series jobs: one 429 pauses every series queue. */
+async function globalThrottle(ctx: Ctx): Promise<number> {
+  const { data } = await ctx.supabase.from("bugou_import_jobs").select("throttle_until").neq("kind", "live").not("throttle_until", "is", null).order("throttle_until", { ascending: false }).limit(1);
+  return data?.[0]?.throttle_until ? Date.parse(data[0].throttle_until) : 0;
 }
 
 export const bugouCreateJob = createServerFn({ method: "POST" })
@@ -337,7 +351,12 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
     return jobView(ctx, j.data.id);
   });
 
-/** Processes pending items for ~20s under a lease, then returns progress. Call again until status is done. */
+/**
+ * Processes due items for ~20s under a lease, paced by the integration's requests-per-minute
+ * (adaptive: halves on 429, recovers on success). A 429 defers the item (Retry-After or jittered
+ * backoff), pauses all series queues and ends the run; fetched series_info is cached on the item
+ * so a later DB failure resumes without calling the provider again.
+ */
 export const bugouRunJob = createServerFn({ method: "POST" })
   .middleware([...auth])
   .inputValidator((d) => z.object({ jobId: z.string().uuid() }).parse(d))
@@ -346,35 +365,75 @@ export const bugouRunJob = createServerFn({ method: "POST" })
     await assertStaff(ctx);
     const now = new Date();
     const lease = await db.from("bugou_import_jobs").update({ lease_until: new Date(now.getTime() + 45_000).toISOString(), status: "running" })
-      .eq("id", data.jobId).neq("status", "cancelled").or(`lease_until.is.null,lease_until.lt.${now.toISOString()}`).select("id, episodes_created");
+      .eq("id", data.jobId).not("status", "in", "(cancelled,paused)").or(`lease_until.is.null,lease_until.lt.${now.toISOString()}`).select("id, episodes_created, stats");
     if (lease.error) throw new Error(lease.error.message);
     if (!lease.data?.length) return { ...(await jobView(ctx, data.jobId)), busy: true };
+    // We hold the lease: anything left "processing" by this job is from an interrupted run.
+    await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", data.jobId).eq("state", "processing");
     let episodes = lease.data[0].episodes_created as number;
-    const started = Date.now();
+    const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, ...(lease.data[0].stats ?? {}) };
+    const { integ } = await seriesIntegration();
+    const rpm = Math.max(1, Number((integ as any)?.rate_limit_per_minute ?? 30));
+    let throttleUntil: string | null = null;
+    const started = Date.now(); let lastCall = 0;
     while (Date.now() - started < 20_000) {
-      const { data: next } = await db.from("bugou_import_items").select("ext_id, attempts").eq("job_id", data.jobId).eq("state", "pending").order("attempts").order("ext_id").limit(1);
+      if ((await globalThrottle(ctx)) > Date.now()) break;
+      const nowIso = new Date().toISOString();
+      const { data: next } = await db.from("bugou_import_items").select("ext_id, title, attempts, rate_limited, details, step").eq("job_id", data.jobId).eq("state", "pending").or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`).order("attempts").order("ext_id").limit(1);
       const it = next?.[0]; if (!it) break;
+      // Never process the same series in two jobs at once.
+      const { count: busyElsewhere } = await db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("ext_id", it.ext_id).eq("state", "processing").neq("job_id", data.jobId).gt("updated_at", new Date(Date.now() - 120_000).toISOString());
+      if (busyElsewhere) { await db.from("bugou_import_items").update({ next_attempt_at: new Date(Date.now() + 30_000).toISOString() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id); continue; }
+      const stamp = () => new Date().toISOString();
+      await db.from("bugou_import_items").update({ state: "processing", updated_at: stamp() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id);
+      const upd = (patch: any) => db.from("bugou_import_items").update({ ...patch, updated_at: stamp() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id);
       try {
-        const res = await importSeriesFull(ctx, it.ext_id);
-        episodes += res.episodesCreated;
-        await db.from("bugou_import_items").update({ state: "done", attempts: it.attempts + 1, error: null, result: res, updated_at: new Date().toISOString() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id);
+        let details = it.details as BugouDetails | null;
+        if (!details) {
+          const wait = lastCall + minIntervalMs(rpm, st.rate_factor) - Date.now();
+          if (wait > 0) { if (Date.now() + wait - started > 20_000) { await upd({ state: "pending" }); break; } await sleep(wait); }
+          lastCall = Date.now(); st.requests = (st.requests ?? 0) + 1;
+          details = await loadDetails(it.ext_id, `Importação: ${it.title ?? it.ext_id}`);
+          st.rate_factor = adaptFactor(st.rate_factor ?? 1, "ok");
+          await upd({ details, step: "episodes", seasons_found: details.seasons.length, error: null });
+        }
+        const res = await importSeriesFull(ctx, it.ext_id, undefined, details);
+        episodes += res.episodesCreated; st.seasons = (st.seasons ?? 0) + res.seasonsCreated;
+        const pendingEp = Math.max(0, res.episodesTotal - res.episodesCreated - res.episodesExisting);
+        await upd({ state: "done", step: "done", attempts: it.attempts + 1, error: res.episodesTotal ? null : "A API não retornou episódios para esta série.", result: { ...res, note: res.episodesCreated ? null : res.episodesTotal ? "Já sincronizada: nenhum episódio novo." : "Sem episódios no provedor." }, details: null, next_attempt_at: null, series_id: res.seriesId, seasons_found: res.seasonsFound, episodes_imported: res.episodesCreated + res.episodesExisting, episodes_pending: pendingEp });
       } catch (e) {
+        const msg = scrub(e instanceof Error ? e.message : String(e)).slice(0, 500);
+        if (e instanceof RateLimitedError) {
+          st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429");
+          const rl = it.rate_limited + 1;
+          const waitMs = e.retryAfterMs ?? backoffMs(rl, 30_000);
+          throttleUntil = new Date(Date.now() + waitMs).toISOString();
+          await upd(rl >= MAX_RATE_LIMITED
+            ? { state: "failed", rate_limited: rl, error: `${msg} Tentativas automáticas esgotadas — use "Tentar de novo só as falhas" mais tarde.`, next_attempt_at: null }
+            : { state: "pending", rate_limited: rl, error: `${msg} Nova tentativa programada.`, next_attempt_at: throttleUntil });
+          break; // stop calling the provider until the wait ends
+        }
         const attempts = it.attempts + 1;
-        await db.from("bugou_import_items").update({ state: attempts >= 3 ? "failed" : "pending", attempts, error: scrub(e instanceof Error ? e.message : String(e)).slice(0, 500), updated_at: new Date().toISOString() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id);
+        await upd(attempts >= MAX_ERRORS ? { state: "failed", attempts, error: msg, next_attempt_at: null } : { state: "pending", attempts, error: msg, next_attempt_at: new Date(Date.now() + backoffMs(attempts, 10_000)).toISOString() });
       }
     }
     const c = await recount(ctx, data.jobId);
-    await db.from("bugou_import_jobs").update({ done: c.done, failed: c.failed, episodes_created: episodes, status: c.pending ? "running" : "done", lease_until: null, updated_at: new Date().toISOString() }).eq("id", data.jobId);
+    const left = c.pending + c.processing;
+    const patch: any = { done: c.done, failed: c.failed, episodes_created: episodes, stats: st, status: left ? "running" : "done", lease_until: null, updated_at: new Date().toISOString() };
+    if (throttleUntil) patch.throttle_until = throttleUntil;
+    await db.from("bugou_import_jobs").update(patch).eq("id", data.jobId);
     return { ...(await jobView(ctx, data.jobId)), busy: false };
   });
 
+/** Re-queues only failed items; keeps cached details/progress and respects any active provider wait. */
 export const bugouRetryFailed = createServerFn({ method: "POST" })
   .middleware([...auth])
   .inputValidator((d) => z.object({ jobId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
-    const r = await db.from("bugou_import_items").update({ state: "pending", attempts: 0 }).eq("job_id", data.jobId).eq("state", "failed");
+    const until = await globalThrottle(ctx);
+    const r = await db.from("bugou_import_items").update({ state: "pending", attempts: 0, rate_limited: 0, next_attempt_at: until > Date.now() ? new Date(until).toISOString() : null }).eq("job_id", data.jobId).eq("state", "failed");
     if (r.error) throw new Error(r.error.message);
     const c = await recount(ctx, data.jobId);
     await db.from("bugou_import_jobs").update({ failed: c.failed, status: "running" }).eq("id", data.jobId);
@@ -414,7 +473,7 @@ export const bugouSeriesTest = createServerFn({ method: "POST" })
     const ms = Date.now() - t0;
     const cats = [...new Set(all.map(s => s.category))];
     let sample: { title: string; seasons: number; episodes: number; hasPlot: boolean } | null = null;
-    if (all[0]) { const d = await loadDetails(all[0].id); sample = { title: d.title || all[0].title, seasons: d.seasons.length, episodes: d.seasons.reduce((n, s) => n + s.episodes.length, 0), hasPlot: !!d.plot }; }
+    if (all[0]) { const d = await loadDetails(all[0].id, "Teste de conexão (episódios)"); sample = { title: d.title || all[0].title, seasons: d.seasons.length, episodes: d.seasons.reduce((n, s) => n + s.episodes.length, 0), hasPlot: !!d.plot }; }
     return { ms, series: all.length, categories: cats.length, sampleCategories: cats.slice(0, 10), sample };
   });
 
