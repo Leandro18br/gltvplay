@@ -48,7 +48,7 @@ function SeriesIntegration({ i }: { i: SeriesInteg }) {
         <p className="text-xs font-medium text-muted-foreground">Histórico de importações</p>
         {o.jobs.map(j => <div key={j.id} className="rounded-lg bg-muted/30 px-3 py-1.5 text-xs">
           <b>{j.label}</b> · {j.status} · {j.done}/{j.total} concluídas · {j.failed} falhas · {j.episodes_created} episódios criados
-          {!!j.failures?.length && <ul className="mt-1 text-destructive">{j.failures.slice(0, 5).map(f => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
+          {!!j.failures?.length && <ul className="mt-1 text-destructive">{j.failures.slice(0, 5).map((f: { ext_id: string; title: string | null; error: string | null }) => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
         </div>)}
       </div>}
     </div>
