@@ -91,6 +91,9 @@ async function refreshIndex(ctx: Ctx, label?: string) {
     const r = await ctx.supabase.from("bugou_catalog").upsert(rows, { onConflict: "kind,ext_id" });
     if (r.error) throw new Error(r.error.message);
   }
+  // Rows not in the current provider list (old token / removed series) have IDs series_info no longer knows: drop them from the staff index (catalog untouched).
+  const del = await (await admin()).from("bugou_catalog").delete().eq("kind", "series").lt("seen_at", now);
+  if (del.error) throw new Error(del.error.message);
   const r = await ctx.supabase.from("bugou_sync").upsert({ kind: "series", synced_at: now, total: all.length });
   if (r.error) throw new Error(r.error.message);
   return { total: all.length, synced_at: now };
@@ -128,7 +131,9 @@ async function findLocalSeries(ctx: Ctx, id: string, title: string, year: number
   return same?.[0]?.id ?? null;
 }
 
-type ImportResult = { seriesId: string; seriesCreated: boolean; seasonsFound: number; episodesTotal: number; seasonsCreated: number; episodesCreated: number; episodesExisting: number; sourcesCreated: number; sourcesExisting: number };
+type ImportResult = { seriesId: string | null; seriesCreated: boolean; seasonsFound: number; episodesTotal: number; seasonsCreated: number; episodesCreated: number; episodesExisting: number; sourcesCreated: number; sourcesExisting: number; episodesSaved: number; withPlayer: number; withoutPlayer: number; complete: boolean; skipped?: string };
+/** Not retryable: the provider does not know this series id. */
+class PermanentError extends Error {}
 
 /**
  * Full idempotent import of one series: metadata, every season, every episode and its VIP player.
@@ -138,10 +143,15 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
   const db = ctx.supabase;
   const d = pre ?? await loadDetails(id);
   const want = onlySeasons ? d.seasons.filter(s => onlySeasons.includes(s.season)) : d.seasons;
+  const apiEpisodes = want.reduce((n, s) => n + s.episodes.length, 0);
+  if (!apiEpisodes && !d.title) throw new PermanentError(`A API não reconhece a série ID ${id} (resposta vazia). O índice pode estar desatualizado ou o token foi trocado — clique em "Atualizar índice".`);
   let seriesId = await findLocalSeries(ctx, id, d.title, d.year); let seriesCreated = false;
   let listed: any = null;
   if (!d.title || !d.cover || !d.year) { const { data } = await db.from("bugou_catalog").select("title, year, poster_url").eq("kind", "series").eq("ext_id", id).maybeSingle(); listed = data; }
   const title = d.title || listed?.title; const year = d.year ?? listed?.year ?? null; const cover = d.cover ?? listed?.poster_url ?? null;
+  if (!seriesId && !apiEpisodes) {
+    return { seriesId: null, seriesCreated: false, seasonsFound: 0, episodesTotal: 0, seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0, episodesSaved: 0, withPlayer: 0, withoutPlayer: 0, complete: false, skipped: "A API não disponibiliza episódios para esta série; ela não foi adicionada ao catálogo." };
+  }
   if (!seriesId) {
     if (!title) throw new Error("Série sem nome na resposta da API.");
     const slug = await uniqueSlug(ctx, "series", title, year);
@@ -157,7 +167,7 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
     if (cur && !cur.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
     if (Object.keys(patch).length) { const u = await db.from("series").update(patch).eq("id", seriesId); if (u.error) throw new Error(u.error.message); }
   }
-  const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsFound: want.length, episodesTotal: want.reduce((n, s) => n + s.episodes.length, 0), seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0 };
+  const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsFound: want.length, episodesTotal: want.reduce((n, s) => n + s.episodes.length, 0), seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0, episodesSaved: 0, withPlayer: 0, withoutPlayer: 0, complete: false };
   const vtok = await token();
   for (const s of want) {
     let { data: season } = await db.from("seasons").select("id").eq("series_id", seriesId).eq("season_number", s.season).maybeSingle();
@@ -197,6 +207,22 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
     }
     if (inserts.length) { const r = await db.from("playback_sources").insert(inserts); if (r.error) throw new Error(r.error.message); out.sourcesCreated += inserts.length; }
   }
+  // Verify by re-reading: every API episode must exist under the right series/season and carry its VIP source (matched by provider episode id).
+  for (const s of want) {
+    const { data: season } = await db.from("seasons").select("id").eq("series_id", seriesId).eq("season_number", s.season).maybeSingle();
+    if (!season) { out.withoutPlayer += s.episodes.length; continue; }
+    const { data: eps } = await db.from("episodes").select("id, episode_number").eq("season_id", season.id);
+    const byNum = new Map<number, string>((eps ?? []).map((e: any) => [e.episode_number, e.id]));
+    const ids = s.episodes.map(e => byNum.get(e.episode)).filter(Boolean) as string[];
+    out.episodesSaved += ids.length;
+    const refs = new Set<string>();
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data } = await db.from("playback_sources").select("content_id, external_ref").eq("content_kind", "episode").eq("is_active", true).in("content_id", ids.slice(i, i + 150)).like("external_ref", "bugoumods:%");
+      (data ?? []).forEach((x: any) => refs.add(`${x.content_id}|${x.external_ref}`));
+    }
+    for (const e of s.episodes) { const epId = byNum.get(e.episode); if (epId && refs.has(`${epId}|bugoumods:${e.id}`)) out.withPlayer++; else out.withoutPlayer++; }
+  }
+  out.complete = apiEpisodes > 0 && out.episodesSaved === apiEpisodes && out.withPlayer === apiEpisodes;
   return out;
 }
 
@@ -280,7 +306,7 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 
 // ---------- Resumable import jobs ----------
 
-type JobStats = { requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number };
+type JobStats = { requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number };
 
 async function jobView(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
@@ -291,7 +317,7 @@ async function jobView(ctx: Ctx, jobId: string) {
   const { data: nxt } = await db.from("bugou_import_items").select("next_attempt_at").eq("job_id", jobId).eq("state", "pending").gt("next_attempt_at", new Date().toISOString()).order("next_attempt_at").limit(1);
   const st = (job.stats ?? {}) as JobStats;
   const throttle = job.throttle_until && Date.parse(job.throttle_until) > Date.now() ? job.throttle_until : null;
-  return { ...job, pending: c.pending + c.processing, queued: c.pending - c.waiting, processing: c.processing, waiting: c.waiting, next_retry_at: throttle ?? nxt?.[0]?.next_attempt_at ?? null, throttled: !!throttle, requests: st.requests ?? 0, http429: st.http429 ?? 0, seasons: st.seasons ?? 0, failures: failures ?? [] };
+  return { ...job, pending: c.pending + c.processing, queued: c.pending - c.waiting, processing: c.processing, waiting: c.waiting, next_retry_at: throttle ?? nxt?.[0]?.next_attempt_at ?? null, throttled: !!throttle, requests: st.requests ?? 0, http429: st.http429 ?? 0, seasons: st.seasons ?? 0, with_player: st.with_player ?? 0, no_episodes: st.no_episodes ?? 0, failures: failures ?? [] };
 }
 
 async function recount(ctx: Ctx, jobId: string) {
@@ -309,12 +335,35 @@ async function globalThrottle(ctx: Ctx): Promise<number> {
 
 export const bugouCreateJob = createServerFn({ method: "POST" })
   .middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).max(500).default([]), allMissing: z.boolean().default(false), category: z.string().max(200).optional() }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).max(500).default([]), allMissing: z.boolean().default(false), category: z.string().max(200).optional(), repairEmpty: z.boolean().default(false) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
     let items: { ext_id: string; title: string | null }[] = [];
-    if (data.allMissing) {
+    let unmatched: string[] = [];
+    if (data.repairEmpty) {
+      // Existing BugouMods series without seasons: locate the current provider id (same id, else unique exact title+year) and queue them.
+      await ensureIndex(ctx, true);
+      const empty: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data: s, error } = await db.from("series").select("id, title, release_year, external_id, seasons(id)").eq("external_source", SOURCE).range(from, from + 999);
+        if (error) throw new Error(error.message);
+        empty.push(...(s ?? []).filter((x: any) => !x.seasons?.length));
+        if (!s || s.length < 1000) break;
+      }
+      for (const s of empty) {
+        const { data: same } = await db.from("bugou_catalog").select("ext_id, title").eq("kind", "series").eq("ext_id", s.external_id).maybeSingle();
+        if (same) { items.push(same); continue; }
+        const { data: cands } = await db.from("bugou_catalog").select("ext_id, title, year").eq("kind", "series").eq("title_norm", normTitle(s.title));
+        const ok = (cands ?? []).filter((c: any) => !c.year || !s.release_year || c.year === s.release_year);
+        const ids = [...new Set(ok.map((c: any) => c.ext_id))];
+        if (ids.length !== 1) { unmatched.push(s.title); continue; }
+        const u = await db.from("series").update({ external_id: ids[0] }).eq("id", s.id);
+        if (u.error) { unmatched.push(s.title); continue; }
+        items.push({ ext_id: ids[0] as string, title: s.title });
+      }
+      if (!items.length) throw new Error(empty.length ? `${empty.length} série(s) sem episódios, mas nenhuma existe na lista atual da API VIP (ex.: ${unmatched.slice(0, 3).join(", ")}).` : "Nenhuma série importada está sem episódios.");
+    } else if (data.allMissing) {
       await ensureIndex(ctx, false);
       const imported = new Set<string>();
       for (let from = 0; ; from += 1000) {
@@ -342,13 +391,13 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
       items = data.ids.map(id => ({ ext_id: id, title: (t.get(id) as string) ?? null }));
     }
     if (!items.length) throw new Error("Nada para importar.");
-    const j = await db.from("bugou_import_jobs").insert({ label: data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
+    const j = await db.from("bugou_import_jobs").insert({ label: data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
     if (j.error) throw new Error(j.error.message);
     for (let i = 0; i < items.length; i += 500) {
       const r = await db.from("bugou_import_items").insert(items.slice(i, i + 500).map(x => ({ job_id: j.data.id, ext_id: x.ext_id, title: x.title })));
       if (r.error) throw new Error(r.error.message);
     }
-    return jobView(ctx, j.data.id);
+    return { ...(await jobView(ctx, j.data.id)), unmatched };
   });
 
 /**
@@ -400,8 +449,15 @@ export const bugouRunJob = createServerFn({ method: "POST" })
         }
         const res = await importSeriesFull(ctx, it.ext_id, undefined, details);
         episodes += res.episodesCreated; st.seasons = (st.seasons ?? 0) + res.seasonsCreated;
-        const pendingEp = Math.max(0, res.episodesTotal - res.episodesCreated - res.episodesExisting);
-        await upd({ state: "done", step: "done", attempts: it.attempts + 1, error: res.episodesTotal ? null : "A API não retornou episódios para esta série.", result: { ...res, note: res.episodesCreated ? null : res.episodesTotal ? "Já sincronizada: nenhum episódio novo." : "Sem episódios no provedor." }, details: null, next_attempt_at: null, series_id: res.seriesId, seasons_found: res.seasonsFound, episodes_imported: res.episodesCreated + res.episodesExisting, episodes_pending: pendingEp });
+        st.with_player = (st.with_player ?? 0) + res.withPlayer; st.no_episodes = (st.no_episodes ?? 0) + (res.episodesTotal ? 0 : 1);
+        const pendingEp = Math.max(0, res.episodesTotal - res.episodesSaved);
+        const base = { result: res, series_id: res.seriesId, seasons_found: res.seasonsFound, episodes_imported: res.episodesSaved, episodes_pending: pendingEp };
+        if (res.complete || !res.episodesTotal) {
+          await upd({ ...base, state: "done", step: "done", attempts: it.attempts + 1, error: res.episodesTotal ? null : (res.skipped ?? "A API não disponibiliza episódios para esta série."), details: null, next_attempt_at: null });
+        } else {
+          // Verification failed: keep cached details and retry only what is missing (never "done" while episodes/players are missing).
+          throw new Error(`Verificação incompleta: ${res.episodesSaved}/${res.episodesTotal} episódios salvos, ${res.withPlayer} com player VIP.`);
+        }
       } catch (e) {
         const msg = scrub(e instanceof Error ? e.message : String(e)).slice(0, 500);
         if (e instanceof RateLimitedError) {
@@ -414,7 +470,7 @@ export const bugouRunJob = createServerFn({ method: "POST" })
             : { state: "pending", rate_limited: rl, error: `${msg} Nova tentativa programada.`, next_attempt_at: throttleUntil });
           break; // stop calling the provider until the wait ends
         }
-        const attempts = it.attempts + 1;
+        const attempts = e instanceof PermanentError ? MAX_ERRORS : it.attempts + 1;
         await upd(attempts >= MAX_ERRORS ? { state: "failed", attempts, error: msg, next_attempt_at: null } : { state: "pending", attempts, error: msg, next_attempt_at: new Date(Date.now() + backoffMs(attempts, 10_000)).toISOString() });
       }
     }
