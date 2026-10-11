@@ -389,7 +389,7 @@ export const bugouJobsOverview = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
-    const { data: jobs } = await db.from("bugou_import_jobs").select("id").order("created_at", { ascending: false }).limit(5);
+    const { data: jobs } = await db.from("bugou_import_jobs").select("id").neq("kind", "live").order("created_at", { ascending: false }).limit(5);
     const views = await Promise.all((jobs ?? []).map((j: any) => jobView(ctx, j.id)));
     const sync = await db.from("bugou_sync").select("total, synced_at").eq("kind", "series").maybeSingle();
     const imported = (await db.from("series").select("id", { count: "exact", head: true }).eq("external_source", SOURCE)).count ?? 0;
