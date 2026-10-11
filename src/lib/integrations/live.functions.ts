@@ -128,11 +128,15 @@ export const liveCategories = createServerFn({ method: "POST" }).middleware([...
   });
 
 export const liveChannels = createServerFn({ method: "POST" }).middleware([...auth])
-  .inputValidator(d => z.object({ integrationId: z.string().uuid(), category: z.string().min(1).max(200), page: z.number().int().min(0).default(0) }).parse(d))
+  .inputValidator(d => z.object({ integrationId: z.string().uuid(), category: z.string().max(200).optional(), query: z.string().trim().max(100).optional(), page: z.number().int().min(0).default(0) }).refine(x => !!x.category || !!x.query, "Informe uma categoria ou um termo de busca").parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; await assertStaff(ctx);
     const PAGE = 60;
-    const { data: rows, count, error } = await ctx.supabase.from("live_catalog").select("ext_id, name, logo_url, category, has_play", { count: "exact" }).eq("integration_id", data.integrationId).eq("category", data.category).order("name").range(data.page * PAGE, data.page * PAGE + PAGE - 1);
+    let qb = ctx.supabase.from("live_catalog").select("ext_id, name, logo_url, category, has_play", { count: "exact" }).eq("integration_id", data.integrationId);
+    if (data.category) qb = qb.eq("category", data.category);
+    // Case-insensitive, every word must match; accents are tolerated by matching words without their accented letters as wildcards.
+    if (data.query) for (const t of data.query.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[%_,()]/g, " ").split(/\s+/).filter(Boolean)) qb = qb.ilike("name", `%${t.replace(/[aeiouc]/gi, "_")}%`);
+    const { data: rows, count, error } = await qb.order("name").range(data.page * PAGE, data.page * PAGE + PAGE - 1);
     if (error) throw new Error(error.message);
     const ids = (rows ?? []).map((r: any) => r.ext_id);
     const { data: ch } = ids.length ? await ctx.supabase.from("channels").select("external_id").eq("api_integration_id", data.integrationId).in("external_id", ids) : { data: [] };
