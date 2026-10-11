@@ -4,6 +4,6 @@ export type BugouSeries = { id: string; title: string; year: number | null; post
 export function parseBugouName(nome: string): { title: string; year: number | null } {
   const s = nome.trim();
   const m = s.match(/^(.*?)\s*\((\d{4})\)\s*$/);
-  if (m && m[1].trim()) return { title: m[1].trim(), year: Number(m[2]) };
+  if (m?.[1]?.trim() && m[2]) return { title: m[1].trim(), year: Number(m[2]) };
   return { title: s, year: null };
 }

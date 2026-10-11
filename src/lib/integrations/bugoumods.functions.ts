@@ -16,7 +16,7 @@ const SOURCE = "bugoumods";
 function token() {
   const raw = (process.env["BUGOUMODS_VTOKEN"] ?? "").trim().replace(/^"|"$/g, "");
   const m = raw.match(/vtoken=([^&"\s]+)/);
-  const t = m ? decodeURIComponent(m[1]) : raw;
+  const t = m?.[1] ? decodeURIComponent(m[1]) : raw;
   if (!t) throw new Error("Token do BugouMods não configurado.");
   return t;
 }
