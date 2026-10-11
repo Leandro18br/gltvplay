@@ -58,9 +58,9 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
   const drive = useCallback(async (j: Job) => {
     if (running.current) return; running.current = true; setJob(j);
     try {
-      let cur = j;
+      let cur = j; let first = true;
       while (cur.status !== "done" && cur.status !== "paused" && cur.pending > 0) {
-        const r = await runJob({ data: { jobId: cur.id } });
+        const r = await runJob({ data: { jobId: cur.id, resume: first } }); first = false;
         cur = r as Job; setJob(cur);
         if (!running.current) break;
         // Wait for the provider's pause / next scheduled retry instead of hammering the server.

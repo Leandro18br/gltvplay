@@ -359,10 +359,11 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
  */
 export const bugouRunJob = createServerFn({ method: "POST" })
   .middleware([...auth])
-  .inputValidator((d) => z.object({ jobId: z.string().uuid() }).parse(d))
+  .inputValidator((d) => z.object({ jobId: z.string().uuid(), resume: z.boolean().default(false) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
+    if (data.resume) await db.from("bugou_import_jobs").update({ status: "running" }).eq("id", data.jobId).eq("status", "paused");
     const now = new Date();
     const lease = await db.from("bugou_import_jobs").update({ lease_until: new Date(now.getTime() + 45_000).toISOString(), status: "running" })
       .eq("id", data.jobId).not("status", "in", "(cancelled,paused)").or(`lease_until.is.null,lease_until.lt.${now.toISOString()}`).select("id, episodes_created, stats");
