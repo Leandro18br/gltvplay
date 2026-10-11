@@ -18,12 +18,12 @@ const INDEX_TTL_MS = 6 * 3600_000;
 const PAGE = 40;
 
 const admin = async () => (await import("@/integrations/supabase/client.server")).supabaseAdmin as any;
-type SeriesInteg = { id: string; is_active: boolean; request_count: number; timeout_seconds: number } | null;
+type SeriesInteg = { id: string; is_active: boolean; request_count: number; timeout_seconds: number; rate_limit_per_minute: number } | null;
 
 /** Token comes from the "BugouMods VIP — Séries" integration (service-role api_credentials); env secret is the legacy fallback. */
 async function seriesIntegration(): Promise<{ integ: SeriesInteg; tok: string }> {
   const db = await admin();
-  const { data: integ } = await db.from("api_integrations").select("id, is_active, request_count, timeout_seconds").eq("kind", "series").eq("provider", "bugoumods_series").order("priority").limit(1).maybeSingle();
+  const { data: integ } = await db.from("api_integrations").select("id, is_active, request_count, timeout_seconds, rate_limit_per_minute").eq("kind", "series").eq("provider", "bugoumods_series").order("priority").limit(1).maybeSingle();
   let raw = "";
   if (integ) {
     if (!integ.is_active) throw new Error("A integração BugouMods VIP — Séries está desativada.");
@@ -373,7 +373,7 @@ export const bugouRunJob = createServerFn({ method: "POST" })
     let episodes = lease.data[0].episodes_created as number;
     const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, ...(lease.data[0].stats ?? {}) };
     const { integ } = await seriesIntegration();
-    const rpm = Math.max(1, Number((integ as any)?.rate_limit_per_minute ?? 30));
+    const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
     let throttleUntil: string | null = null;
     const started = Date.now(); let lastCall = 0;
     while (Date.now() - started < 20_000) {
@@ -421,6 +421,8 @@ export const bugouRunJob = createServerFn({ method: "POST" })
     const left = c.pending + c.processing;
     const patch: any = { done: c.done, failed: c.failed, episodes_created: episodes, stats: st, status: left ? "running" : "done", lease_until: null, updated_at: new Date().toISOString() };
     if (throttleUntil) patch.throttle_until = throttleUntil;
+    const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", data.jobId).single();
+    if (cur?.status === "paused" && left) delete patch.status; // keep a pause requested mid-run
     await db.from("bugou_import_jobs").update(patch).eq("id", data.jobId);
     return { ...(await jobView(ctx, data.jobId)), busy: false };
   });
