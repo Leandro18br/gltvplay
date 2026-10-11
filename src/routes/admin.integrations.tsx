@@ -17,6 +17,7 @@ import { TmdbIntegrationCard } from "@/components/admin/tmdb/TmdbTools";
 import { MegaEmbedCard } from "@/components/admin/integrations/MegaEmbedCard";
 import { M3uListsCard } from "@/components/admin/integrations/M3uListsCard";
 import { LiveChannelsCard } from "@/components/admin/integrations/LiveChannelsCard";
+import { SeriesApiCard } from "@/components/admin/integrations/SeriesApiCard";
 import { StatusBadge, fmtDate, type Integration } from "@/components/admin/integrations/shared";
 
 export const Route = createFileRoute("/admin/integrations")({
@@ -55,6 +56,7 @@ function IntegrationsPage() {
         <TabsList><TabsTrigger value="apis"><Cable className="mr-1 size-4" />APIs</TabsTrigger><TabsTrigger value="logs"><Activity className="mr-1 size-4" />Histórico de requisições</TabsTrigger></TabsList>
         <TabsContent value="apis" className="space-y-3">
           <LiveChannelsCard />
+          <SeriesApiCard />
           <TmdbIntegrationCard />
           <MegaEmbedCard />
           <M3uListsCard />
