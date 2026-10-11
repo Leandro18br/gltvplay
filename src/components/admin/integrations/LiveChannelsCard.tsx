@@ -7,7 +7,6 @@ import { db, errMsg } from "@/lib/admin/db";
 import { liveCategories, liveChannels, liveCreateJob, liveOverview, livePauseJob, liveRetryFailed, liveRunJob, liveSync, liveTest } from "@/lib/integrations/live.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { fmtDate } from "./shared";
