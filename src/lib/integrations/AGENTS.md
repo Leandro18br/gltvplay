@@ -4,4 +4,4 @@
 - M3U finalize refreshes imported links in small keyset chunks (adaptive size, cursor in index_flags); never one UPDATE over all sources. Why: a single statement exceeded the 8s database limit on ~98k links.
 
 - Sync-failure AI diagnosis runs server-side in `src/lib/integrations/diagnose.functions.ts` (staff-only, URLs/credentials redacted before sending, read-only advice). Why: secrets never reach the model and AI never changes data.
-- BugouMods (`bugoumods*.ts`): staff-only server fetch of the VIP series JSON; vtoken (or full VIP link) only in BUGOUMODS_VTOKEN; imports create metadata-only series (external_source bugoumods) and skip existing ids/title+year; provider links (contain the token) are never returned or stored. Why: token secrecy and no catalog overwrite.
+- BugouMods (`bugoumods*.ts`): staff-only server fetch of the VIP series list and `series_info`; vtoken only in BUGOUMODS_VTOKEN and never returned or stored; episodes get the provider-documented tokenless "Embed Free" player URL as an embed source (external_ref bugoumods:<id>), reusing existing series/seasons/episodes without overwriting. Why: token secrecy, no duplicates, no catalog overwrite.
