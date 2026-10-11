@@ -24,7 +24,7 @@ export function LiveChannelsButton() {
   const [open, setOpen] = useState<LiveInteg | null>(null);
   const hint = list.isPending ? "Carregando…" : !list.data?.length ? "Cadastre uma API de canais em APIs e Integrações" : !usable.length ? "Ative e sincronize a API de canais em APIs e Integrações" : undefined;
   return <>
-    <Button size="sm" variant="outline" className="rounded-full" title={hint} disabled={!usable.length} onClick={() => setOpen(usable[0])}><Search /> Buscar canais pela API</Button>
+    <Button size="sm" variant="outline" className="rounded-full" title={hint} disabled={!usable.length} onClick={() => setOpen(usable[0] ?? null)}><Search /> Buscar canais pela API</Button>
     {usable.length > 1 && open && <select aria-label="API" className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={open.id} onChange={e => setOpen(usable.find(i => i.id === e.target.value) ?? null)}>{usable.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select>}
     {open && <ImportDialog key={open.id} open onOpenChange={o => !o && setOpen(null)} integ={open} onDone={() => qc.invalidateQueries({ queryKey: ["admin"] })} />}
   </>;
