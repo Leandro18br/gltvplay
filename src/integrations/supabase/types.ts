@@ -2366,6 +2366,10 @@ export type Database = {
         }
         Returns: number
       }
+      admin_bulk_content: {
+        Args: { _action: string; _ids: string[]; _kind: string }
+        Returns: Json
+      }
       admin_delete_reseller: { Args: { _user_id: string }; Returns: undefined }
       admin_set_role: {
         Args: {

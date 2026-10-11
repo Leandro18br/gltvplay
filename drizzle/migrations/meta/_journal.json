@@ -288,6 +288,13 @@
       "when": 1791733278627,
       "tag": "0040_series_integration_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791735105037,
+      "tag": "0041_bulk_content_actions",
+      "breakpoints": true
     }
   ]
 }
