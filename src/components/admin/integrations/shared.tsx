@@ -1,11 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 
 export type Integration = {
-  id: string; name: string; description: string | null; kind: "catalog" | "movie_player" | "episode_player"; base_url: string;
+  id: string; name: string; description: string | null; kind: "catalog" | "movie_player" | "episode_player" | "live"; base_url: string;
   auth_method: "none" | "query_key" | "header_key" | "bearer" | "custom_header"; auth_param: string | null;
   headers: Record<string, string>; params: Record<string, string>; default_method: "GET" | "POST"; priority: number; is_active: boolean;
   rate_limit_per_minute: number; cache_ttl_seconds: number; auto_fetch_player: boolean; key_hint: string | null; token_hint: string | null;
-  last_tested_at: string | null; last_status: "never" | "ok" | "error"; last_error: string | null; request_count: number;
+  last_tested_at: string | null; last_status: "never" | "ok" | "error"; last_error: string | null; request_count: number; batch_size?: number; timeout_seconds?: number;
 };
 export type Endpoint = {
   id: string; integration_id: string; name: string; description: string | null; kind: string; method: "GET" | "POST"; path: string;
