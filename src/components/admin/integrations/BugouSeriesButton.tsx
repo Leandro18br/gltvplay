@@ -90,7 +90,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={o => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Séries do BugouMods (VIP)</DialogTitle>
+          <DialogTitle>Buscar séries pela API — BugouMods VIP</DialogTitle>
           <DialogDescription>"Importar série completa" traz a série com todas as temporadas, episódios e players VIP. Reimportar só adiciona o que falta; nada é apagado.</DialogDescription>
         </DialogHeader>
 
