@@ -1,3 +1,4 @@
+import { Wrench } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
+type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; with_player?: number; no_episodes?: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
 
 export function BugouSeriesButton({ label = "Buscar séries pela API", disabled = false }: { label?: string; disabled?: boolean } = {}) {
   const [open, setOpen] = useState(false);
@@ -82,9 +83,9 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
 
   if (detailId) return <EpisodesDialog id={detailId} onBack={() => setDetailId(null)} onClose={onClose} />;
 
-  async function start(data: { ids?: string[]; allMissing?: boolean; category?: string }) {
+  async function start(data: { ids?: string[]; allMissing?: boolean; category?: string; repairEmpty?: boolean }) {
     setBusy("import");
-    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category } }); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); }
+    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); }
     catch (x) { toast.error(errMsg(x)); setBusy(null); }
   }
   const missing = ov ? Math.max(0, ov.indexTotal - ov.imported) : null;
@@ -106,6 +107,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
               <span className="text-xs text-muted-foreground">{job.queued ?? job.pending} na fila · {job.processing ?? 0} processando · {job.done} concluída(s) · {job.waiting ?? 0} aguardando nova tentativa · {job.failed} com falha</span>
             </div>
             <p className="text-xs text-muted-foreground">{job.seasons ?? 0} temporada(s) e {job.episodes_created} episódio(s) novos · {job.requests ?? 0} consulta(s) ao provedor · {job.http429 ?? 0} limite(s) HTTP 429</p>
+            <p className="text-xs text-muted-foreground">{job.with_player ?? 0} episódio(s) verificados com player VIP · {job.no_episodes ?? 0} série(s) sem episódios no provedor · uma série só conta como concluída depois de conferir no banco todos os episódios e players.</p>
             {job.next_retry_at && Date.parse(job.next_retry_at) > Date.now() && (
               <p className="rounded-lg bg-primary/10 px-2 py-1 text-xs">{job.throttled ? "Pausado pelo limite de requisições do provedor. " : ""}Próxima tentativa às {new Date(job.next_retry_at).toLocaleTimeString("pt-BR")}. O progresso está salvo.</p>
             )}
@@ -129,6 +131,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
             </select>
           )}
           <Button disabled={!!busy}>{busy === "search" ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
+          <Button type="button" variant="outline" disabled={!!busy || jobActive} onClick={() => start({ repairEmpty: true })} title="Busca na API VIP as temporadas, episódios e players das séries já importadas que estão vazias"><Wrench /> Completar séries sem episódios</Button>
           <Button type="button" variant="outline" disabled={!!busy} onClick={() => run(0, { refresh: true, withCategories: true })} title="Baixar a lista atual do provedor"><RefreshCw /> Atualizar índice</Button>
         </form>
 
