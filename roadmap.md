@@ -1,7 +1,8 @@
 # Player advertising and unauthorized buttons
 - [x] Identified the app-owned retry/report/fullscreen row; no app-owned ad integration. Existing BugouMods episode sources use provider Embed Free URLs, whose external page contains advertising code and provider-owned actions; no BugouMods movie sources exist.
 - [x] Removed the auxiliary EmbedPlayer row and wrapper while preserving iframe permissions, URL, loading and safety checks; native controls, source selection and existing page actions remain unchanged.
-- [ ] Run playback regressions and verify a movie and an episode on the published site; report provider or publishing blockers honestly.
+- [x] Seven regression tests pass and build OK. Authenticated published/local Jesse James and #blackAF episode 1 resolve sources; local embed auxiliary row is absent, published retains old row. No API/token/catalog/auth changes.
+- [ ] Confirm actual movie/episode playback and working media controls: both tested sources remain at time 0 with media error 4, including after provider Play. Provider must supply a documented ad-free VIP playback option; its current Embed Free response enables advertising and owns Voltar/Embed/Recarregar actions. Confirm cleanup on published site after user-authorized publication; no deployment requested.
 
 # Client and reseller profiles
 - [x] Remove client profile password and avatar editing; reseller has no self-service profile or upload/password settings. ADM profile, administrative recovery and account names unchanged.
