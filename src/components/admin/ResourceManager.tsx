@@ -165,6 +165,8 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
       let q = applyFilters(db.from(config.table).select(config.select ?? "*", { count: "exact" }));
       q = q.order(col, { ascending: dir === "asc" }).range(page * PAGE, page * PAGE + PAGE - 1);
       const { data, error, count } = await q;
+      // After deleting, the current page may no longer exist: jump back to the last valid one.
+      if (error?.code === "PGRST103" || (error && /range/i.test(error.message))) { setPage(0); return { rows: [], count: 0 }; }
       if (error) throw error;
       return { rows: data as Row[], count: count ?? 0 };
     },
