@@ -8,15 +8,21 @@ export function parseBugouName(nome: string): { title: string; year: number | nu
   return { title: s, year: null };
 }
 
-export type BugouEpisode = { id: string; season: number; episode: number; title: string; image: string | null; duration_minutes: number | null; embed_url: string };
+export type BugouEpisode = { id: string; season: number; episode: number; title: string; image: string | null; duration_minutes: number | null; embed_url: string; ext: string };
 export type BugouDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; seasons: { season: number; episodes: BugouEpisode[] }[] };
 
 const https = (u: unknown) => typeof u === "string" && /^https?:\/\//.test(u) ? u.replace(/^http:\/\//, "https://") : null;
 
-/** Provider-documented "Embed Free" player URL (no vtoken; never a direct video link). */
+/** Provider "Embed Free" player URL (tokenless; shown in admin previews only, never stored). */
 export function bugouEmbedUrl(episodeId: string, ext: string) {
   const e = /^[a-z0-9]{2,5}$/i.test(ext) ? ext : "mp4";
   return `https://cinema.bugoumods.com/player.php?type=vod_streams&id=${encodeURIComponent(episodeId)}&ext=${e}&embed=free`;
+}
+
+/** Provider "Embed VIP" player URL, same format the provider's own "Embed VIP" button generates. Server-side only. */
+export function bugouVipEmbedUrl(episodeId: string, ext: string, vtoken: string) {
+  const e = /^[a-z0-9]{2,5}$/i.test(ext) ? ext : "mp4";
+  return `https://cinema.bugoumods.com/player.php?type=vod_streams&id=${encodeURIComponent(episodeId)}&ext=${e}&vtoken=${encodeURIComponent(vtoken)}&embed=vip`;
 }
 
 /** Parses index.php?ajax=1&type=series_info JSON; drops anything without a numeric id/number. */
@@ -34,7 +40,7 @@ export function parseBugouDetails(id: string, j: any): BugouDetails {
       const eid = String(e?.id ?? ""); const n = Number(e?.episode_num);
       if (!/^\d+$/.test(eid) || !Number.isInteger(n) || n < 1 || eps.some(x => x.episode === n)) continue;
       const secs = Number(e?.info?.duration_secs);
-      eps.push({ id: eid, season, episode: n, title: String(e?.title || e?.info?.name || `Episódio ${n}`).trim().slice(0, 300), image: https(e?.info?.movie_image ?? e?.info?.cover_big), duration_minutes: secs > 0 ? Math.round(secs / 60) : null, embed_url: bugouEmbedUrl(eid, String(e?.container_extension ?? "mp4")) });
+      eps.push({ id: eid, season, episode: n, title: String(e?.title || e?.info?.name || `Episódio ${n}`).trim().slice(0, 300), image: https(e?.info?.movie_image ?? e?.info?.cover_big), duration_minutes: secs > 0 ? Math.round(secs / 60) : null, embed_url: bugouEmbedUrl(eid, String(e?.container_extension ?? "mp4")), ext: String(e?.container_extension ?? "mp4") });
     }
     eps.sort((a, b) => a.episode - b.episode);
     if (eps.length) seasons.push({ season, episodes: eps });

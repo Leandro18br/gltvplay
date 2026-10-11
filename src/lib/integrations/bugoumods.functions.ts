@@ -191,9 +191,15 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
         }
         const ref = `bugoumods:${e.id}`;
         const { data: srcs } = await db.from("playback_sources").select("id, external_ref, url").eq("content_kind", "episode").eq("content_id", epId);
-        if ((srcs ?? []).some((x: any) => x.external_ref === ref || x.url === e.embed_url)) { out.sourcesExisting++; continue; }
+        const vipUrl = bugouVipEmbedUrl(e.id, e.ext, token());
+        const prev = (srcs ?? []).find((x: any) => x.external_ref === ref);
+        if (prev) {
+          // Upgrade sources saved earlier with the Free player to the VIP player.
+          if (prev.url !== vipUrl) { const u = await db.from("playback_sources").update({ url: vipUrl }).eq("id", prev.id); if (u.error) throw new Error(u.error.message); }
+          out.sourcesExisting++; continue;
+        }
         const n = srcs?.length ?? 0;
-        const r = await db.from("playback_sources").insert({ content_kind: "episode", content_id: epId, url: e.embed_url, source_type: "embed", provider: "BugouMods", label: "BugouMods", external_ref: ref, is_active: true, is_primary: n === 0, sort_order: n, drm: {} });
+        const r = await db.from("playback_sources").insert({ content_kind: "episode", content_id: epId, url: vipUrl, source_type: "embed", provider: "BugouMods", label: "BugouMods", external_ref: ref, is_active: true, is_primary: n === 0, sort_order: n, drm: {} });
         if (r.error) throw new Error(r.error.message);
         out.sourcesCreated++;
       }
