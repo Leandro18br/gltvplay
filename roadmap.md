@@ -1,3 +1,8 @@
+# Player advertising and unauthorized buttons
+- [ ] Identify app-owned vs external ads and real below-player actions; verify VIP source usage without changing token or imported URLs.
+- [ ] Remove unauthorized app-owned below-player actions while preserving native controls and source access.
+- [ ] Run playback regressions and verify a movie and an episode on the published site; report provider or publishing blockers honestly.
+
 # Client and reseller profiles
 - [x] Remove client profile password and avatar editing; reseller has no self-service profile or upload/password settings. ADM profile, administrative recovery and account names unchanged.
 - [x] Verified actual client profile at 320/390/1280 with no overflow, password/file inputs or runtime errors; viewer profiles intact. Actual reseller dashboard and access-list tab verified at those widths; no profile password/file inputs. ADM password field remains. Routing test passes; build OK. No account values or passwords changed.
