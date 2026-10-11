@@ -20,3 +20,17 @@ describe("paginated provider catalog", () => {
     expect(liveVipLink("https://cinema.bugoumods.com", { id: "1", name: "PT - A Bola", ext: "ts", image: "https://i/a.png" }, "T")).toBe("https://cinema.bugoumods.com/?play=1&type=live_streams&id=1&ext=ts&name=PT%20-%20A%20Bola&img=https%3A%2F%2Fi%2Fa.png&vtoken=T&embed=vip");
   });
 });
+
+import { parseGlobalSearch } from "./catalog-pages";
+describe("parseGlobalSearch", () => {
+  const res = { live: [{ name: "Globo AM", stream_id: "2053994543", stream_icon: "https://x/g.png", container_extension: "mp4" }], vod: [{ name: "x", stream_id: "1" }], series: [{ name: "Breaking Bad (2008)", series_id: "33815", cover: "http://i/b.jpg" }, { name: "Breaking Bad (2008)", series_id: "33815" }, { name: "", series_id: "9" }] };
+  it("returns only the requested kind, de-duplicated and valid", () => {
+    expect(parseGlobalSearch(res, "series")).toEqual([{ id: "33815", name: "Breaking Bad (2008)", image: "http://i/b.jpg", ext: null }]);
+    expect(parseGlobalSearch(res, "live")).toEqual([{ id: "2053994543", name: "Globo AM", image: "https://x/g.png", ext: "mp4" }]);
+  });
+  it("empty kind is an empty result, garbage is an error", () => {
+    expect(parseGlobalSearch({ live: [] }, "series")).toEqual([]);
+    expect(() => parseGlobalSearch("<html>", "series")).toThrow();
+    expect(() => parseGlobalSearch({ success: false, msg: "token" }, "live")).toThrow(/token/);
+  });
+});

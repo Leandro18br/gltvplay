@@ -58,3 +58,18 @@ export function liveVipLink(base: string, c: { id: string; name: string; ext: st
   const e = encodeURIComponent;
   return `${base.replace(/\/$/, "")}/?play=1&type=live_streams&id=${c.id}&ext=${c.ext || "mp4"}&name=${e(c.name)}&img=${e(c.image ?? "")}&vtoken=${e(tok)}&embed=${e(embed)}`;
 }
+
+/**
+ * Provider title search, exactly as its own site calls it: `index.php?ajax=1&type=global_search&q=…`
+ * → `{ live: [...], vod: [...], series: [...] }` (partial names, case-insensitive; no pagination offered).
+ */
+export function parseGlobalSearch(json: unknown, kind: PagedKind): PagedItem[] {
+  const o = json as any;
+  if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("Formato inesperado na busca da API.");
+  if (o.success === false) throw new Error(`A API recusou a busca${o.msg ? `: ${String(o.msg).slice(0, 120)}` : ""}.`);
+  const list = o[kind];
+  if (list == null) return [];
+  if (!Array.isArray(list)) throw new Error("Formato inesperado na busca da API.");
+  return parseCategoryPage({ success: true, items: list, total: list.length }, kind).items
+    .filter((x, i, a) => a.findIndex(y => y.id === x.id) === i);
+}
