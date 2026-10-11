@@ -1,6 +1,6 @@
 # Player advertising and unauthorized buttons
-- [ ] Identify app-owned vs external ads and real below-player actions; verify VIP source usage without changing token or imported URLs.
-- [ ] Remove unauthorized app-owned below-player actions while preserving native controls and source access.
+- [x] Identified the app-owned retry/report/fullscreen row; no app-owned ad integration. Existing BugouMods episode sources use provider Embed Free URLs, whose external page contains advertising code and provider-owned actions; no BugouMods movie sources exist.
+- [x] Removed the auxiliary EmbedPlayer row and wrapper while preserving iframe permissions, URL, loading and safety checks; native controls, source selection and existing page actions remain unchanged.
 - [ ] Run playback regressions and verify a movie and an episode on the published site; report provider or publishing blockers honestly.
 
 # Client and reseller profiles
