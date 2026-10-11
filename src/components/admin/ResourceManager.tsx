@@ -137,22 +137,83 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
 
   const scopeRows = useRelation(config.scope?.table, config.scope?.select);
   const key = ["admin", config.table, debounced, status, scope, sort, page];
+  const bulkKind = BULK_TABLES[config.table];
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [allMode, setAllMode] = useState(false);
+  const [bulkAsk, setBulkAsk] = useState<BulkAction | null>(null);
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+  const busyRef = useRef(false);
+
+  function applyFilters(q: any) {
+    if (debounced) q = q.ilike(config.searchCol, `%${debounced}%`);
+    if (config.hasStatus && status !== "all") q = q.eq("status", status);
+    if (config.hasActive && status !== "all") q = q.eq("is_active", status === "active");
+    if (config.scope && scope !== "all") q = q.eq(config.scope.col, scope);
+    return q;
+  }
+
+  // Filters changed: drop the selection so it never targets rows the user no longer sees.
+  useEffect(() => { setSelected(new Set()); setAllMode(false); }, [debounced, status, scope]);
 
   const list = useQuery({
     queryKey: key,
     queryFn: async () => {
       const [col, dir] = sort.split(":");
-      let q = db.from(config.table).select(config.select ?? "*", { count: "exact" });
-      if (debounced) q = q.ilike(config.searchCol, `%${debounced}%`);
-      if (config.hasStatus && status !== "all") q = q.eq("status", status);
-      if (config.hasActive && status !== "all") q = q.eq("is_active", status === "active");
-      if (config.scope && scope !== "all") q = q.eq(config.scope.col, scope);
+      let q = applyFilters(db.from(config.table).select(config.select ?? "*", { count: "exact" }));
       q = q.order(col, { ascending: dir === "asc" }).range(page * PAGE, page * PAGE + PAGE - 1);
       const { data, error, count } = await q;
       if (error) throw error;
       return { rows: data as Row[], count: count ?? 0 };
     },
   });
+
+  const total = list.data?.count ?? 0;
+  const selCount = allMode ? total : selected.size;
+  const pageIds = (list.data?.rows ?? []).map((r) => r.id as string);
+  const pageAllOn = pageIds.length > 0 && (allMode || pageIds.every((id) => selected.has(id)));
+
+  function togglePage() {
+    if (allMode) { setAllMode(false); setSelected(new Set()); return; }
+    setSelected((s) => { const n = new Set(s); pageIds.forEach((id) => (pageAllOn ? n.delete(id) : n.add(id))); return n; });
+  }
+  function toggleOne(id: string) {
+    if (allMode) { setAllMode(false); setSelected(new Set(allModeIdsFallback(id))); return; }
+    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  // Leaving "all results" mode by unchecking a row keeps the rest of the current page selected.
+  function allModeIdsFallback(id: string) { return pageIds.filter((x) => x !== id); }
+
+  async function collectIds(): Promise<string[]> {
+    if (!allMode) return [...selected];
+    const ids: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await applyFilters(db.from(config.table).select("id")).order("id").range(from, from + 999);
+      if (error) throw error;
+      ids.push(...(data as Row[]).map((r) => r.id as string));
+      if ((data as Row[]).length < 1000) break;
+    }
+    return ids;
+  }
+
+  async function runBulkAction(action: BulkAction) {
+    if (!bulkKind || busyRef.current) return;
+    busyRef.current = true;
+    setBulkAsk(null); setTyped("");
+    try {
+      setBulkBusy("Preparando seleção…");
+      const ids = await collectIds();
+      const res = await runBulk(bulkKind, action, ids, (d) => setBulkBusy(`Processando ${d} de ${ids.length}…`));
+      const s = summarize(res, action, config.title.toLowerCase());
+      (s.ok ? toast.success : toast.error)(s.text, { duration: 10000 });
+      setSelected(new Set(res.failed)); setAllMode(false);
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      busyRef.current = false; setBulkBusy(null); refresh(); qc.invalidateQueries({ queryKey: ["admin"] });
+    }
+  }
+  const bigDelete = selCount > 50;
 
   // Opens a record directly (e.g. "Editar série" from the series page).
   useEffect(() => {
