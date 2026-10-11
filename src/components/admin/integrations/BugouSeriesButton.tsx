@@ -104,7 +104,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
 
   async function start(data: { ids?: string[]; allMissing?: boolean; category?: string; repairEmpty?: boolean }) {
     setBusy("import");
-    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); loadCats(); }
+    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); if (apiTerm != null) searchApi(apiTerm); else run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); loadCats(); }
     catch (x) { toast.error(errMsg(x)); setBusy(null); }
   }
   const missing = ov ? Math.max(0, ov.indexTotal - ov.imported) : null;
@@ -181,6 +181,10 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
         )}
         {searchErr && <p role="alert" className="rounded-lg border border-destructive/40 p-2 text-sm text-destructive">{searchErr}</p>}
         {apiTerm != null && <p className="text-xs text-muted-foreground" aria-live="polite">{busy === "search" ? `Pesquisando "${apiTerm}" na API BugouMods VIP…` : searchErr ? "" : items.length ? `${items.length} série(s) encontrada(s) na API para "${apiTerm}"` : `Nenhuma série encontrada na API para "${apiTerm}". Tente outra parte do nome.`}</p>}
+        {apiTerm != null && items.length > 0 && <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setSel(s => { const all = items.every(i => s.has(i.id)); const x = new Set(s); items.forEach(i => (all ? x.delete(i.id) : x.add(i.id))); return x; })}>{items.every(i => sel.has(i.id)) ? "Desmarcar resultados" : `Selecionar os ${items.length} resultados`}</Button>
+          {sel.size > 0 && <Button size="sm" disabled={!!busy || jobActive} onClick={() => start({ ids: [...sel] })}><DownloadCloud /> Importar série completa ({sel.size})</Button>}
+        </div>}
         {meta && apiTerm == null && <p className="text-xs text-muted-foreground">Navegando pelo índice da API: {meta.matches} resultado(s) de {meta.total} séries no índice · atualizado {new Date(meta.synced_at).toLocaleString("pt-BR")}{ov ? ` · ${ov.imported} já importadas` : ""}</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {items.map(r => { const has = !!existing[r.id]; const on = sel.has(r.id); return (
