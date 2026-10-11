@@ -16,13 +16,36 @@ const SOURCE = "bugoumods";
 const INDEX_TTL_MS = 6 * 3600_000;
 const PAGE = 40;
 
-function token() {
-  const raw = (process.env["BUGOUMODS_VTOKEN"] ?? "").trim().replace(/^"|"$/g, "");
+const admin = async () => (await import("@/integrations/supabase/client.server")).supabaseAdmin as any;
+type SeriesInteg = { id: string; is_active: boolean; request_count: number; timeout_seconds: number } | null;
+
+/** Token comes from the "BugouMods VIP — Séries" integration (service-role api_credentials); env secret is the legacy fallback. */
+async function seriesIntegration(): Promise<{ integ: SeriesInteg; tok: string }> {
+  const db = await admin();
+  const { data: integ } = await db.from("api_integrations").select("id, is_active, request_count, timeout_seconds").eq("kind", "series").eq("provider", "bugoumods_series").order("priority").limit(1).maybeSingle();
+  let raw = "";
+  if (integ) {
+    if (!integ.is_active) throw new Error("A integração BugouMods VIP — Séries está desativada.");
+    const { data: cred } = await db.from("api_credentials").select("api_key, token").eq("integration_id", integ.id).maybeSingle();
+    raw = String(cred?.token || cred?.api_key || "");
+  }
+  if (!raw) raw = process.env["BUGOUMODS_VTOKEN"] ?? "";
+  raw = raw.trim().replace(/^"|"$/g, "");
   const m = raw.match(/vtoken=([^&"\s]+)/);
   const t = m?.[1] ? decodeURIComponent(m[1]) : raw;
-  if (!t) throw new Error("Token do BugouMods não configurado.");
-  return t;
+  if (!t) throw new Error("Token do BugouMods não configurado. Atualize a credencial da integração de séries.");
+  return { integ, tok: t };
 }
+async function token() { return (await seriesIntegration()).tok; }
+
+/** Records a provider call in api_request_logs + integration status (token never logged). */
+async function logCall(integ: SeriesInteg, label: string, t0: number, err: string | null) {
+  if (!integ) return;
+  const db = await admin(); const now = new Date().toISOString();
+  await db.from("api_request_logs").insert({ integration_id: integ.id, content_label: label, http_status: err ? null : 200, duration_ms: Date.now() - t0, success: !err, cached: false, error: err });
+  await db.from("api_integrations").update({ last_tested_at: now, last_status: err ? "error" : "ok", last_error: err, request_count: Number(integ.request_count) + 1 }).eq("id", integ.id);
+}
+
 const scrub = (s: string) => s.replace(/vtoken=[^&\s"]+/g, "vtoken=***");
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -41,12 +64,17 @@ async function getJson(url: URL, what: string): Promise<any> {
   throw new Error(last);
 }
 
-async function loadAll(): Promise<BugouSeries[]> {
+async function loadAll(label = "Lista de séries"): Promise<BugouSeries[]> {
+  const { integ, tok } = await seriesIntegration();
   const url = new URL("https://cinema.bugoumods.com/");
-  url.search = new URLSearchParams({ api: "1", t: "series", c: "all", vtoken: token() }).toString();
-  const json = await getJson(url, "lista de séries");
-  if (!json || typeof json !== "object") throw new Error("Resposta inesperada do BugouMods.");
-  if (json.Aviso) throw new Error(`BugouMods: ${scrub(String(json.Aviso?.[0]?.nome ?? "aviso do provedor"))}`);
+  url.search = new URLSearchParams({ api: "1", t: "series", c: "all", vtoken: tok }).toString();
+  const t0 = Date.now(); let json: any;
+  try {
+    json = await getJson(url, "lista de séries");
+    if (!json || typeof json !== "object" || Array.isArray(json)) throw new Error("Formato inesperado: a API não devolveu categorias.");
+    if (json.Aviso) throw new Error(`BugouMods: ${scrub(String(json.Aviso?.[0]?.nome ?? "aviso do provedor"))} (token inválido ou vencido — atualize a credencial).`);
+  } catch (e) { const msg = scrub((e as Error).message).slice(0, 400); await logCall(integ, label, t0, msg); throw new Error(msg); }
+  await logCall(integ, label, t0, null);
   const seen = new Set<number>(); const items: BugouSeries[] = [];
   for (const [cat, list] of Object.entries(json)) {
     if (!Array.isArray(list)) continue;
@@ -63,8 +91,8 @@ async function loadAll(): Promise<BugouSeries[]> {
   return items;
 }
 
-async function refreshIndex(ctx: Ctx) {
-  const all = await loadAll();
+async function refreshIndex(ctx: Ctx, label?: string) {
+  const all = await loadAll(label);
   const now = new Date().toISOString();
   for (let i = 0; i < all.length; i += 500) {
     const rows = all.slice(i, i + 500).map(s => ({ kind: "series", ext_id: s.id, title: s.title, title_norm: normTitle(s.title), title_compact: compactTitle(s.title), year: s.year, poster_url: s.poster_url, category: s.category, seen_at: now }));
@@ -84,7 +112,7 @@ async function ensureIndex(ctx: Ctx, force: boolean) {
 
 async function loadDetails(id: string): Promise<BugouDetails> {
   const url = new URL("https://cinema.bugoumods.com/index.php");
-  url.search = new URLSearchParams({ ajax: "1", type: "series_info", series_id: id, vtoken: token() }).toString();
+  url.search = new URLSearchParams({ ajax: "1", type: "series_info", series_id: id, vtoken: await token() }).toString();
   return parseBugouDetails(id, await getJson(url, "episódios"));
 }
 
@@ -128,7 +156,7 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[]): P
     if (Object.keys(patch).length) { const u = await db.from("series").update(patch).eq("id", seriesId); if (u.error) throw new Error(u.error.message); }
   }
   const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0 };
-  const vtok = token();
+  const vtok = await token();
   for (const s of want) {
     let { data: season } = await db.from("seasons").select("id").eq("series_id", seriesId).eq("season_number", s.season).maybeSingle();
     if (!season) {
@@ -366,4 +394,29 @@ export const bugouJobsOverview = createServerFn({ method: "POST" })
     const sync = await db.from("bugou_sync").select("total, synced_at").eq("kind", "series").maybeSingle();
     const imported = (await db.from("series").select("id", { count: "exact", head: true }).eq("external_source", SOURCE)).count ?? 0;
     return { jobs: views, indexTotal: sync.data?.total ?? 0, synced_at: sync.data?.synced_at ?? null, imported };
+  });
+
+/** Connection test for the series integration: real list request + one real series_info sample. */
+export const bugouSeriesTest = createServerFn({ method: "POST" })
+  .middleware([...auth])
+  .handler(async ({ context }) => {
+    const ctx = context as Ctx; await assertStaff(ctx);
+    const t0 = Date.now();
+    const all = await loadAll("Teste de conexão (séries)");
+    const ms = Date.now() - t0;
+    const cats = [...new Set(all.map(s => s.category))];
+    let sample: { title: string; seasons: number; episodes: number; hasPlot: boolean } | null = null;
+    if (all[0]) { const d = await loadDetails(all[0].id); sample = { title: d.title || all[0].title, seasons: d.seasons.length, episodes: d.seasons.reduce((n, s) => n + s.episodes.length, 0), hasPlot: !!d.plot }; }
+    return { ms, series: all.length, categories: cats.length, sampleCategories: cats.slice(0, 10), sample };
+  });
+
+/** Manual sync of the series index (never deletes rows). */
+export const bugouSeriesSync = createServerFn({ method: "POST" })
+  .middleware([...auth])
+  .handler(async ({ context }) => {
+    const ctx = context as Ctx; await assertStaff(ctx);
+    const r = await refreshIndex(ctx, "Sincronização (séries)");
+    const { integ } = await seriesIntegration();
+    if (integ) await (await admin()).from("api_integrations").update({ last_synced_at: r.synced_at }).eq("id", integ.id);
+    return r;
   });
