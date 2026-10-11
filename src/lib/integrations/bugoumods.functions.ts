@@ -436,17 +436,25 @@ export const bugouCategoryStats = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
-    const ids: string[] = [];
+    const rows: { ext_id: string; title: string; year: number | null }[] = [];
     for (let from = 0; ; from += 1000) {
-      const { data: c, error } = await db.from("bugou_catalog").select("ext_id").eq("kind", "series").eq("category", data.category).range(from, from + 999);
+      const { data: c, error } = await db.from("bugou_catalog").select("ext_id, title, year").eq("kind", "series").eq("category", data.category).range(from, from + 999);
       if (error) throw new Error(error.message);
-      (c ?? []).forEach((x: any) => ids.push(x.ext_id));
+      rows.push(...((c ?? []) as any[]));
       if (!c || c.length < 1000) break;
     }
+    // Same matching the importer uses: provider id first, then title (+year) of an existing series.
     let imported = 0;
-    for (let i = 0; i < ids.length; i += 300) {
-      const { count } = await db.from("series").select("id", { count: "exact", head: true }).eq("external_source", SOURCE).in("external_id", ids.slice(i, i + 300));
-      imported += count ?? 0;
+    for (let i = 0; i < rows.length; i += 200) {
+      const chunk = rows.slice(i, i + 200);
+      const { data: byExt } = await db.from("series").select("external_id").eq("external_source", SOURCE).in("external_id", chunk.map(x => x.ext_id));
+      const have = new Set((byExt ?? []).map((x: any) => x.external_id));
+      const rest = chunk.filter(x => !have.has(x.ext_id));
+      imported += have.size;
+      if (rest.length) {
+        const { data: byTitle } = await db.from("series").select("title, release_year").in("title", [...new Set(rest.map(x => x.title))]);
+        imported += rest.filter(x => (byTitle ?? []).some((s: any) => normTitle(s.title) === normTitle(x.title) && (!x.year || !s.release_year || s.release_year === x.year))).length;
+      }
     }
-    return { total: ids.length, imported, missing: Math.max(0, ids.length - imported) };
+    return { total: rows.length, imported, missing: Math.max(0, rows.length - imported) };
   });
