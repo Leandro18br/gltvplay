@@ -520,6 +520,35 @@ export type Database = {
         }
         Relationships: []
       }
+      bugou_catalog_categories: {
+        Row: {
+          category: string
+          ext_id: string
+          kind: string
+          seen_at: string
+        }
+        Insert: {
+          category: string
+          ext_id: string
+          kind: string
+          seen_at?: string
+        }
+        Update: {
+          category?: string
+          ext_id?: string
+          kind?: string
+          seen_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bugou_catalog_categories_kind_ext_id_fkey"
+            columns: ["kind", "ext_id"]
+            isOneToOne: false
+            referencedRelation: "bugou_catalog"
+            referencedColumns: ["kind", "ext_id"]
+          },
+        ]
+      }
       bugou_import_items: {
         Row: {
           attempts: number
@@ -1061,6 +1090,7 @@ export type Database = {
       live_catalog: {
         Row: {
           category: string
+          ext: string | null
           ext_id: string
           has_play: boolean
           integration_id: string
@@ -1070,6 +1100,7 @@ export type Database = {
         }
         Insert: {
           category: string
+          ext?: string | null
           ext_id: string
           has_play?: boolean
           integration_id: string
@@ -1079,6 +1110,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          ext?: string | null
           ext_id?: string
           has_play?: boolean
           integration_id?: string
@@ -1093,6 +1125,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "api_integrations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_catalog_categories: {
+        Row: {
+          category: string
+          ext_id: string
+          integration_id: string
+          seen_at: string
+        }
+        Insert: {
+          category: string
+          ext_id: string
+          integration_id: string
+          seen_at?: string
+        }
+        Update: {
+          category?: string
+          ext_id?: string
+          integration_id?: string
+          seen_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_catalog_categories_integration_id_ext_id_fkey"
+            columns: ["integration_id", "ext_id"]
+            isOneToOne: false
+            referencedRelation: "live_catalog"
+            referencedColumns: ["integration_id", "ext_id"]
           },
         ]
       }
