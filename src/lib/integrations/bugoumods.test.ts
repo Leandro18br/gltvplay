@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseBugouName } from "./bugoumods";
+import { parseBugouName, parseBugouDetails, bugouEmbedUrl } from "./bugoumods";
 
 describe("parseBugouName", () => {
   it("separa título e ano", () => expect(parseBugouName("1883 (2021)")).toEqual({ title: "1883", year: 2021 }));
   it("sem ano mantém título", () => expect(parseBugouName("Dark")).toEqual({ title: "Dark", year: null }));
 });
 
-import { parseBugouDetails, bugouEmbedUrl } from "./bugoumods";
 describe("parseBugouDetails", () => {
   it("maps seasons/episodes to tokenless embed URLs", () => {
     const d = parseBugouDetails("4453", { info: { name: "#blackAF (2020)", title: "#blackAF", year: "2020" }, episodes: { "1": [{ id: "21204888", episode_num: "1", title: "Episódio 1", container_extension: "mp4", info: { duration_secs: 2100 } }, { id: "x", episode_num: "2" }] } });
