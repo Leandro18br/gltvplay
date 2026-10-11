@@ -1,7 +1,7 @@
 /** Pure helpers for configurable API integrations (shared by server, admin UI and tests). */
 import { z } from "zod";
 
-export const INTEGRATION_KINDS = { catalog: "API de Catálogo", movie_player: "API de Player", episode_player: "API de Player de Série" } as const;
+export const INTEGRATION_KINDS = { live: "Canais ao vivo", catalog: "API de Catálogo (filmes/séries)", movie_player: "API de Player", episode_player: "API de Player de Série" } as const;
 export const AUTH_METHODS = { none: "Sem autenticação", query_key: "API Key na URL", header_key: "API Key no Header", bearer: "Bearer Token", custom_header: "Header personalizado" } as const;
 export const ENDPOINT_KINDS = {
   search_movies: "Buscar filmes", search_series: "Buscar séries", movie_by_id: "Buscar filme por ID", series_by_id: "Buscar série por ID",

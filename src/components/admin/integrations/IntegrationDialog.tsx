@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { kvToText, textToKv, type Integration } from "./shared";
 
-const blank = { name: "", description: "", kind: "movie_player", base_url: "https://", auth_method: "none", auth_param: "", headers: "", params: "", default_method: "GET", priority: 1, is_active: true, rate_limit_per_minute: 30, cache_ttl_seconds: 3600, auto_fetch_player: false };
+const blank = { name: "", description: "", kind: "movie_player", base_url: "https://", auth_method: "none", auth_param: "", headers: "", params: "", default_method: "GET", priority: 1, is_active: true, rate_limit_per_minute: 30, cache_ttl_seconds: 3600, auto_fetch_player: false, batch_size: 40, timeout_seconds: 25 };
 
 export function IntegrationDialog({ open, onOpenChange, row, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; row: Integration | null; onSaved: () => void }) {
   const [v, setV] = useState(blank);
@@ -24,7 +24,7 @@ export function IntegrationDialog({ open, onOpenChange, row, onSaved }: { open: 
   useEffect(() => {
     if (!open) return;
     setApiKey(""); setToken("");
-    setV(row ? { name: row.name, description: row.description ?? "", kind: row.kind, base_url: row.base_url, auth_method: row.auth_method, auth_param: row.auth_param ?? "", headers: kvToText(row.headers), params: kvToText(row.params), default_method: row.default_method, priority: row.priority, is_active: row.is_active, rate_limit_per_minute: row.rate_limit_per_minute, cache_ttl_seconds: row.cache_ttl_seconds, auto_fetch_player: row.auto_fetch_player } : blank);
+    setV(row ? { name: row.name, description: row.description ?? "", kind: row.kind, base_url: row.base_url, auth_method: row.auth_method, auth_param: row.auth_param ?? "", headers: kvToText(row.headers), params: kvToText(row.params), default_method: row.default_method, priority: row.priority, is_active: row.is_active, rate_limit_per_minute: row.rate_limit_per_minute, cache_ttl_seconds: row.cache_ttl_seconds, auto_fetch_player: row.auto_fetch_player, batch_size: row.batch_size ?? 40, timeout_seconds: row.timeout_seconds ?? 25 } : blank);
   }, [open, row]);
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) => setV(p => ({ ...p, [k]: val }));
 
@@ -33,7 +33,7 @@ export function IntegrationDialog({ open, onOpenChange, row, onSaved }: { open: 
     try {
       const u = new URL(v.base_url.trim());
       if (u.protocol !== "https:") throw new Error("A URL base precisa começar com https://");
-      const payload = { name: v.name.trim(), description: v.description.trim() || null, kind: v.kind, base_url: u.href.replace(/\/$/, ""), auth_method: v.auth_method, auth_param: v.auth_param.trim() || null, headers: textToKv(v.headers), params: textToKv(v.params), default_method: v.default_method, priority: Number(v.priority), is_active: v.is_active, rate_limit_per_minute: Number(v.rate_limit_per_minute), cache_ttl_seconds: Number(v.cache_ttl_seconds), auto_fetch_player: v.auto_fetch_player };
+      const payload = { name: v.name.trim(), description: v.description.trim() || null, kind: v.kind, base_url: u.href.replace(/\/$/, ""), auth_method: v.auth_method, auth_param: v.auth_param.trim() || null, headers: textToKv(v.headers), params: textToKv(v.params), default_method: v.default_method, priority: Number(v.priority), is_active: v.is_active, rate_limit_per_minute: Number(v.rate_limit_per_minute), cache_ttl_seconds: Number(v.cache_ttl_seconds), auto_fetch_player: v.auto_fetch_player, batch_size: Number(v.batch_size), timeout_seconds: Number(v.timeout_seconds) };
       const r = row ? await db.from("api_integrations").update(payload).eq("id", row.id).select("id").single() : await db.from("api_integrations").insert(payload).select("id").single();
       if (r.error) throw r.error;
       if (apiKey.trim() || token.trim()) await saveCred({ data: { integrationId: r.data.id, apiKey, token } });
@@ -65,6 +65,8 @@ export function IntegrationDialog({ open, onOpenChange, row, onSaved }: { open: 
           <div className="space-y-1.5"><Label htmlFor="i-pr">Prioridade (1 = principal)</Label><Input id="i-pr" type="number" min={1} max={100} value={v.priority} onChange={e => set("priority", Number(e.target.value))} /></div>
           <div className="space-y-1.5"><Label>Tempo de cache</Label><Select value={String(v.cache_ttl_seconds)} onValueChange={x => set("cache_ttl_seconds", Number(x))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CACHE_OPTIONS.map(([s, l]) => <SelectItem key={s} value={String(s)}>{l}</SelectItem>)}</SelectContent></Select></div>
           <div className="space-y-1.5"><Label htmlFor="i-rl">Limite de requisições por minuto</Label><Input id="i-rl" type="number" min={1} max={600} value={v.rate_limit_per_minute} onChange={e => set("rate_limit_per_minute", Number(e.target.value))} /></div>
+          <div className="space-y-1.5"><Label htmlFor="i-bs">Itens por lote na importação</Label><Input id="i-bs" type="number" min={1} max={200} value={v.batch_size} onChange={e => set("batch_size", Number(e.target.value))} /></div>
+          <div className="space-y-1.5"><Label htmlFor="i-to">Tempo limite da requisição (s)</Label><Input id="i-to" type="number" min={5} max={60} value={v.timeout_seconds} onChange={e => set("timeout_seconds", Number(e.target.value))} /></div>
           <div className="flex flex-wrap gap-5 md:col-span-2">
             <label className="flex items-center gap-2 text-sm"><Switch checked={v.is_active} onCheckedChange={x => set("is_active", x)} /> Ativa</label>
             {v.kind === "catalog" && <label className="flex items-center gap-2 text-sm"><Switch checked={v.auto_fetch_player} onCheckedChange={x => set("auto_fetch_player", x)} /> Buscar player automaticamente ao importar</label>}

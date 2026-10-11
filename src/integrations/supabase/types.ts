@@ -227,6 +227,7 @@ export type Database = {
           auth_param: string | null
           auto_fetch_player: boolean
           base_url: string
+          batch_size: number
           cache_ttl_seconds: number
           created_at: string
           default_method: string
@@ -238,12 +239,15 @@ export type Database = {
           kind: string
           last_error: string | null
           last_status: string
+          last_synced_at: string | null
           last_tested_at: string | null
           name: string
           params: Json
           priority: number
+          provider: string | null
           rate_limit_per_minute: number
           request_count: number
+          timeout_seconds: number
           token_hint: string | null
           updated_at: string
         }
@@ -252,6 +256,7 @@ export type Database = {
           auth_param?: string | null
           auto_fetch_player?: boolean
           base_url: string
+          batch_size?: number
           cache_ttl_seconds?: number
           created_at?: string
           default_method?: string
@@ -263,12 +268,15 @@ export type Database = {
           kind: string
           last_error?: string | null
           last_status?: string
+          last_synced_at?: string | null
           last_tested_at?: string | null
           name: string
           params?: Json
           priority?: number
+          provider?: string | null
           rate_limit_per_minute?: number
           request_count?: number
+          timeout_seconds?: number
           token_hint?: string | null
           updated_at?: string
         }
@@ -277,6 +285,7 @@ export type Database = {
           auth_param?: string | null
           auto_fetch_player?: boolean
           base_url?: string
+          batch_size?: number
           cache_ttl_seconds?: number
           created_at?: string
           default_method?: string
@@ -288,12 +297,15 @@ export type Database = {
           kind?: string
           last_error?: string | null
           last_status?: string
+          last_synced_at?: string | null
           last_tested_at?: string | null
           name?: string
           params?: Json
           priority?: number
+          provider?: string | null
           rate_limit_per_minute?: number
           request_count?: number
+          timeout_seconds?: number
           token_hint?: string | null
           updated_at?: string
         }
@@ -557,8 +569,11 @@ export type Database = {
           episodes_created: number
           failed: number
           id: string
+          integration_id: string | null
+          kind: string
           label: string
           lease_until: string | null
+          stats: Json
           status: string
           total: number
           updated_at: string
@@ -570,8 +585,11 @@ export type Database = {
           episodes_created?: number
           failed?: number
           id?: string
+          integration_id?: string | null
+          kind?: string
           label?: string
           lease_until?: string | null
+          stats?: Json
           status?: string
           total?: number
           updated_at?: string
@@ -583,13 +601,24 @@ export type Database = {
           episodes_created?: number
           failed?: number
           id?: string
+          integration_id?: string | null
+          kind?: string
           label?: string
           lease_until?: string | null
+          stats?: Json
           status?: string
           total?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bugou_import_jobs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bugou_sync: {
         Row: {
@@ -647,9 +676,12 @@ export type Database = {
       }
       channels: {
         Row: {
+          api_integration_id: string | null
           category_id: string | null
           created_at: string
           description: string | null
+          external_id: string | null
+          external_source: string | null
           featured: boolean
           id: string
           logo_url: string | null
@@ -660,9 +692,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          api_integration_id?: string | null
           category_id?: string | null
           created_at?: string
           description?: string | null
+          external_id?: string | null
+          external_source?: string | null
           featured?: boolean
           id?: string
           logo_url?: string | null
@@ -673,9 +708,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          api_integration_id?: string | null
           category_id?: string | null
           created_at?: string
           description?: string | null
+          external_id?: string | null
+          external_source?: string | null
           featured?: boolean
           id?: string
           logo_url?: string | null
@@ -686,6 +724,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "channels_api_integration_id_fkey"
+            columns: ["api_integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "channels_category_id_fkey"
             columns: ["category_id"]
@@ -985,6 +1030,44 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      live_catalog: {
+        Row: {
+          category: string
+          ext_id: string
+          has_play: boolean
+          integration_id: string
+          logo_url: string | null
+          name: string
+          seen_at: string
+        }
+        Insert: {
+          category: string
+          ext_id: string
+          has_play?: boolean
+          integration_id: string
+          logo_url?: string | null
+          name: string
+          seen_at?: string
+        }
+        Update: {
+          category?: string
+          ext_id?: string
+          has_play?: boolean
+          integration_id?: string
+          logo_url?: string | null
+          name?: string
+          seen_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_catalog_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       m3u_entities: {
         Row: {

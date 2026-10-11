@@ -16,6 +16,7 @@ import { EmbedSettings } from "@/components/admin/EmbedSettings";
 import { TmdbIntegrationCard } from "@/components/admin/tmdb/TmdbTools";
 import { MegaEmbedCard } from "@/components/admin/integrations/MegaEmbedCard";
 import { M3uListsCard } from "@/components/admin/integrations/M3uListsCard";
+import { LiveChannelsCard } from "@/components/admin/integrations/LiveChannelsCard";
 import { StatusBadge, fmtDate, type Integration } from "@/components/admin/integrations/shared";
 
 export const Route = createFileRoute("/admin/integrations")({
@@ -40,7 +41,7 @@ function IntegrationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="font-display text-2xl font-bold md:text-3xl">APIs e Integrações</h1><p className="text-sm text-muted-foreground">Catálogo, players de filmes e players de episódios, configurados sem mexer no código.</p></div>
+        <div><h1 className="font-display text-2xl font-bold md:text-3xl">APIs e Integrações</h1><p className="text-sm text-muted-foreground">Canais ao vivo, catálogo de filmes e séries e players, configurados sem mexer no código.</p></div>
         <Button className="rounded-full" onClick={() => setForm({ open: true, row: null })}><Plus /> Adicionar API</Button>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -53,6 +54,7 @@ function IntegrationsPage() {
       <Tabs defaultValue="apis">
         <TabsList><TabsTrigger value="apis"><Cable className="mr-1 size-4" />APIs</TabsTrigger><TabsTrigger value="logs"><Activity className="mr-1 size-4" />Histórico de requisições</TabsTrigger></TabsList>
         <TabsContent value="apis" className="space-y-3">
+          <LiveChannelsCard />
           <TmdbIntegrationCard />
           <MegaEmbedCard />
           <M3uListsCard />
