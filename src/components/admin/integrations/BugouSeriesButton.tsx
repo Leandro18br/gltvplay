@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, DownloadCloud, ListVideo, Loader2, Search } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, DownloadCloud, ListVideo, Loader2, Pause, Play, RefreshCw, RotateCcw, Search } from "lucide-react";
 import { errMsg } from "@/lib/admin/db";
-import { bugouImportSeries, bugouSearchSeries, bugouSeriesDetails, bugouImportEpisodes } from "@/lib/integrations/bugoumods.functions";
+import { bugouSearchSeries, bugouSeriesDetails, bugouImportEpisodes, bugouCreateJob, bugouRunJob, bugouRetryFailed, bugouCancelJob, bugouJobsOverview } from "@/lib/integrations/bugoumods.functions";
 import type { BugouSeries, BugouDetails } from "@/lib/integrations/bugoumods";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null }[] };
 
 export function BugouSeriesButton() {
   const [open, setOpen] = useState(false);
@@ -23,41 +26,85 @@ export function BugouSeriesButton() {
 
 function BugouDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
-  const search = useServerFn(bugouSearchSeries); const doImport = useServerFn(bugouImportSeries);
-  const [q, setQ] = useState(""); const [cat, setCat] = useState("");
-  const [cats, setCats] = useState<string[]>([]); const [total, setTotal] = useState<number | null>(null);
+  const search = useServerFn(bugouSearchSeries); const createJob = useServerFn(bugouCreateJob); const runJob = useServerFn(bugouRunJob);
+  const retry = useServerFn(bugouRetryFailed); const pause = useServerFn(bugouCancelJob); const overview = useServerFn(bugouJobsOverview);
+  const [q, setQ] = useState(""); const [cat, setCat] = useState(""); const [page, setPage] = useState(0);
+  const [cats, setCats] = useState<string[]>([]); const [meta, setMeta] = useState<{ total: number; matches: number; pageSize: number; synced_at: string } | null>(null);
   const [items, setItems] = useState<BugouSeries[]>([]); const [existing, setExisting] = useState<Record<string, string>>({});
   const [sel, setSel] = useState<Set<string>>(new Set()); const [busy, setBusy] = useState<"search" | "import" | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [job, setJob] = useState<Job | null>(null); const [ov, setOv] = useState<{ indexTotal: number; imported: number } | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const running = useRef(false);
+
+  const run = useCallback(async (p = 0, opts: { refresh?: boolean; withCategories?: boolean } = {}) => {
+    setBusy("search");
+    try {
+      const r = await search({ data: { query: q, category: cat, page: p, refresh: !!opts.refresh, withCategories: !!opts.withCategories } });
+      setItems(r.results); setExisting(r.existing); setMeta(r); setPage(p);
+      if (opts.withCategories) setCats(r.categories);
+      if (opts.refresh) toast.success(`Índice atualizado: ${r.total} séries.`);
+    } catch (x) { toast.error(errMsg(x)); } finally { setBusy(null); }
+  }, [search, q, cat]);
+
+  const drive = useCallback(async (j: Job) => {
+    if (running.current) return; running.current = true; setJob(j);
+    try {
+      let cur = j;
+      while (cur.status !== "done" && cur.status !== "paused" && cur.pending > 0) {
+        const r = await runJob({ data: { jobId: cur.id } });
+        cur = r as Job; setJob(cur);
+        if (r.busy) await new Promise(res => setTimeout(res, 4000));
+      }
+      if (cur.status === "done") { toast.success(`Importação concluída: ${cur.done} série(s), ${cur.episodes_created} episódio(s) novos${cur.failed ? `, ${cur.failed} com falha` : ""}.`); qc.invalidateQueries({ queryKey: ["admin"] }); }
+    } catch (x) { toast.error(`${errMsg(x)} — use "Retomar" para continuar de onde parou.`); }
+    finally { running.current = false; }
+  }, [runJob, qc]);
+
+  useEffect(() => {
+    run(0, { withCategories: true });
+    overview().then(o => { setOv(o); const open = (o.jobs as Job[]).find(j => j.status !== "done" || j.failed > 0); if (open) setJob(open); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (detailId) return <EpisodesDialog id={detailId} onBack={() => setDetailId(null)} onClose={onClose} />;
 
-  async function run(e?: React.FormEvent) {
-    e?.preventDefault(); setBusy("search");
-    try {
-      const r = await search({ data: { query: q, category: cat } });
-      setItems(r.results); setExisting(r.existing); setCats(r.categories); setTotal(r.total); setSel(new Set());
-      if (!r.results.length) toast.message("Nenhuma série encontrada.");
-    } catch (x) { toast.error(errMsg(x)); } finally { setBusy(null); }
-  }
-  async function importSel() {
+  async function start(data: { ids?: string[]; allMissing?: boolean }) {
     setBusy("import");
-    try {
-      const r = await doImport({ data: { ids: [...sel] } });
-      toast.success(`${r.created} série(s) importada(s)${r.skipped ? `, ${r.skipped} já existiam` : ""}.`);
-      setExisting(s => { const x = { ...s }; sel.forEach(id => { x[id] = x[id] ?? "new"; }); return x; });
-      setSel(new Set()); qc.invalidateQueries({ queryKey: ["admin"] });
-    } catch (x) { toast.error(errMsg(x)); } finally { setBusy(null); }
+    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing } }); setSel(new Set()); setConfirmAll(false); setBusy(null); await drive(j as Job); run(page); overview().then(setOv).catch(() => {}); }
+    catch (x) { toast.error(errMsg(x)); setBusy(null); }
   }
+  const missing = ov ? Math.max(0, ov.indexTotal - ov.imported) : null;
+  const pages = meta ? Math.max(1, Math.ceil(meta.matches / meta.pageSize)) : 1;
+  const jobActive = !!job && running.current;
 
   return (
     <Dialog open onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Buscar séries no BugouMods</DialogTitle>
-          <DialogDescription>"Importar" traz só nome, ano e capa. Use "Episódios" para ver temporadas, episódios e players e importá-los. Dados existentes não são alterados.</DialogDescription>
+          <DialogTitle>Séries do BugouMods (VIP)</DialogTitle>
+          <DialogDescription>"Importar série completa" traz a série com todas as temporadas, episódios e players VIP. Reimportar só adiciona o que falta; nada é apagado.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={run} className="flex flex-wrap gap-2">
-          <Input className="min-w-0 flex-1" placeholder="Título (vazio = todas)" value={q} onChange={e => setQ(e.target.value)} />
+
+        {job && (
+          <div className="space-y-2 rounded-xl border border-border p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">{job.label}</span>
+              <span className="text-xs text-muted-foreground">{job.done} concluída(s) · {job.pending} pendente(s) · {job.failed} com falha · {job.episodes_created} episódio(s) novos</span>
+            </div>
+            <Progress value={job.total ? ((job.done + job.failed) / job.total) * 100 : 0} />
+            <div className="flex flex-wrap gap-2">
+              {jobActive && <Button size="sm" variant="outline" onClick={() => pause({ data: { jobId: job.id } }).then(j => setJob(j as Job))}><Pause /> Pausar</Button>}
+              {!jobActive && job.pending > 0 && <Button size="sm" onClick={() => drive({ ...job, status: "running" })}><Play /> Retomar</Button>}
+              {!jobActive && job.failed > 0 && <Button size="sm" variant="outline" onClick={() => retry({ data: { jobId: job.id } }).then(j => drive(j as Job))}><RotateCcw /> Tentar de novo só as falhas</Button>}
+              {jobActive && <Loader2 className="h-4 w-4 animate-spin self-center" />}
+            </div>
+            {job.failures.length > 0 && <ul className="max-h-28 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">{job.failures.map(f => <li key={f.ext_id}><span className="text-destructive">✕</span> {f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
+          </div>
+        )}
+
+        <form onSubmit={e => { e.preventDefault(); run(0); }} className="flex flex-wrap gap-2">
+          <Input className="min-w-0 flex-1" placeholder="Título (sem acento, maiúsculas ou pontuação também funciona)" value={q} onChange={e => setQ(e.target.value)} />
           {cats.length > 0 && (
             <select aria-label="Categoria" className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={cat} onChange={e => setCat(e.target.value)}>
               <option value="">Todas as categorias</option>
@@ -65,20 +112,38 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
             </select>
           )}
           <Button disabled={!!busy}>{busy === "search" ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
-          <Button type="button" disabled={!sel.size || !!busy} onClick={importSel}>{busy === "import" ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Importar {sel.size || ""}</Button>
+          <Button type="button" variant="outline" disabled={!!busy} onClick={() => run(0, { refresh: true, withCategories: true })} title="Baixar a lista atual do provedor"><RefreshCw /> Atualizar índice</Button>
         </form>
-        {total != null && <p className="text-xs text-muted-foreground">{total} séries na lista do provedor · mostrando até 60 resultados</p>}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" disabled={!sel.size || !!busy || jobActive} onClick={() => start({ ids: [...sel] })}>{busy === "import" ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Importar série completa {sel.size ? `(${sel.size})` : ""}</Button>
+          {missing != null && missing > 0 && !confirmAll && <Button size="sm" variant="outline" disabled={!!busy || jobActive} onClick={() => setConfirmAll(true)}>Importar todas as não importadas…</Button>}
+          {confirmAll && <span className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2 text-xs">
+            Isso vai importar cerca de {missing} séries com todos os episódios (1 consulta ao provedor por série, em sequência — pode levar horas; pode pausar e retomar). Confirmar?
+            <Button size="sm" onClick={() => start({ allMissing: true })}>Sim, importar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmAll(false)}>Cancelar</Button>
+          </span>}
+        </div>
+
+        {meta && <p className="text-xs text-muted-foreground">{meta.matches} resultado(s) de {meta.total} séries no índice · atualizado {new Date(meta.synced_at).toLocaleString("pt-BR")}{ov ? ` · ${ov.imported} já importadas` : ""}</p>}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {items.map(r => { const has = !!existing[r.id]; const on = sel.has(r.id); return (
-            <button key={r.id} type="button" onClick={() => !has && setSel(s => { const x = new Set(s); if (x.has(r.id)) x.delete(r.id); else if (x.size < 50) x.add(r.id); return x; })}
-              className={`relative overflow-hidden rounded-xl border text-left transition disabled:opacity-60 ${on ? "border-primary shadow-glow" : "border-border"}`}>
+            <button key={r.id} type="button" onClick={() => setSel(s => { const x = new Set(s); if (x.has(r.id)) x.delete(r.id); else if (x.size < 500) x.add(r.id); return x; })}
+              className={`relative overflow-hidden rounded-xl border text-left transition ${on ? "border-primary shadow-glow" : "border-border"}`}>
               <div className="aspect-[2/3] bg-muted">{r.poster_url && <img src={r.poster_url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
               <div className="p-2"><p className="truncate text-sm font-medium">{r.title}</p><p className="truncate text-xs text-muted-foreground">{r.year ?? "—"} · {r.category}</p></div>
-              {has && <Badge variant="secondary" className="absolute left-2 top-2">Já existe</Badge>}
-              {<span role="button" tabIndex={0} onClick={ev => { ev.stopPropagation(); setDetailId(r.id); }} onKeyDown={ev => { if (ev.key === "Enter") { ev.stopPropagation(); setDetailId(r.id); } }} className="absolute bottom-14 right-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-xs font-medium ring-1 ring-border"><ListVideo className="h-3 w-3" /> Episódios</span>}
+              <Badge variant={has ? "secondary" : "outline"} className="absolute left-2 top-2 bg-background/90">{has ? "Importada · atualizar" : "Não importada"}</Badge>
+              <span role="button" tabIndex={0} onClick={ev => { ev.stopPropagation(); setDetailId(r.id); }} onKeyDown={ev => { if (ev.key === "Enter") { ev.stopPropagation(); setDetailId(r.id); } }} className="absolute bottom-14 right-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-xs font-medium ring-1 ring-border"><ListVideo className="h-3 w-3" /> Episódios</span>
               {on && <span className="absolute right-2 top-2 rounded-full bg-primary p-1 text-primary-foreground"><Check className="h-3 w-3" /></span>}
             </button>); })}
         </div>
+        {meta && pages > 1 && (
+          <div className="flex items-center justify-center gap-2">
+            <Button size="sm" variant="outline" disabled={page === 0 || !!busy} onClick={() => run(page - 1)}><ChevronLeft /></Button>
+            <span className="text-sm">Página {page + 1} de {pages}</span>
+            <Button size="sm" variant="outline" disabled={page + 1 >= pages || !!busy} onClick={() => run(page + 1)}><ChevronRight /></Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -101,23 +166,19 @@ function EpisodesDialog({ id, onBack, onClose }: { id: string; onBack: () => voi
     } catch (x) { toast.error(errMsg(x)); } finally { setBusy(false); }
   }
   const det = d?.details; const have = new Set(d?.existingEpisodes ?? []);
-  const yes = (b: boolean) => (b ? "Disponível" : "Não fornecido");
+  const total = det?.seasons.reduce((n, s) => n + s.episodes.length, 0) ?? 0;
   return (
     <Dialog open onOpenChange={o => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{det?.title ?? "Carregando…"}{det?.year ? ` (${det.year})` : ""}</DialogTitle>
-          <DialogDescription>Prévia do BugouMods. Dados e players existentes não são alterados; episódios já cadastrados só recebem o player se ainda não o tiverem.</DialogDescription>
+          <DialogDescription>{det ? `${det.seasons.length} temporada(s) · ${total} episódio(s) na API · ${have.size} já no catálogo.` : "Consultando o BugouMods…"} Dados existentes não são apagados.</DialogDescription>
         </DialogHeader>
         <Button size="sm" variant="ghost" className="self-start" onClick={onBack}>← Voltar à lista</Button>
         {err && <p className="text-sm text-destructive">{err}</p>}
         {!det && !err && <Loader2 className="mx-auto animate-spin" />}
         {det && <>
-          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
-            {[["Sinopse", !!det.plot], ["Capa", !!det.cover], ["Temporadas", det.seasons.length > 0], ["Episódios", det.seasons.some(s => s.episodes.length)], ["Player (embed do provedor)", det.seasons.some(s => s.episodes.length)], ["Link direto de vídeo", false]].map(([k, v]) => (
-              <div key={String(k)} className="rounded-lg border border-border p-2"><span className="text-muted-foreground">{k}: </span><span className={v ? "text-primary" : "text-muted-foreground"}>{yes(!!v)}</span></div>))}
-          </div>
-          <p className="text-xs text-muted-foreground">{d?.localSeriesId ? "Série já existe no catálogo — será reaproveitada." : "Série ainda não existe — será criada."}</p>
+          <p className="text-xs text-muted-foreground">{d?.localSeriesId ? "Série já existe no catálogo — será reaproveitada e só o que falta será importado." : "Série ainda não existe — será criada."}</p>
           {det.seasons.length === 0 && <p className="text-sm text-muted-foreground">A API não retornou temporadas para esta série.</p>}
           {det.seasons.map(s => (
             <div key={s.season} className="rounded-xl border border-border p-3">

@@ -1,5 +1,11 @@
 export type BugouSeries = { id: string; title: string; year: number | null; poster_url: string | null; category: string };
 
+/** Search key: no accents, lowercase, punctuation -> space, collapsed spaces. "#blackAF: Série" -> "blackaf serie". */
+export function normTitle(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+export const compactTitle = (s: string) => normTitle(s).replace(/ /g, "");
+
 /** "1883 (2021)" -> { title: "1883", year: 2021 }. */
 export function parseBugouName(nome: string): { title: string; year: number | null } {
   const s = nome.trim();

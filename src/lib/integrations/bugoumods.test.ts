@@ -16,3 +16,13 @@ describe("parseBugouDetails", () => {
     expect(bugouEmbedUrl("1", "bad ext")).not.toContain("vtoken");
   });
 });
+
+import { normTitle as nt, compactTitle as ct } from "./bugoumods";
+import { describe as d2, it as i2, expect as e2 } from "vitest";
+d2("normTitle", () => {
+  i2("ignores accents, case, punctuation and extra spaces", () => {
+    e2(nt("  #blackAF:  Série ")).toBe("blackaf serie");
+    e2(nt("Ação")).toBe(nt("acao"));
+    e2(ct("Black AF")).toBe(ct("#blackAF"));
+  });
+});

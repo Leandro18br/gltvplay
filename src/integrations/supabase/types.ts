@@ -472,6 +472,143 @@ export type Database = {
         }
         Relationships: []
       }
+      bugou_catalog: {
+        Row: {
+          category: string | null
+          ext_id: string
+          kind: string
+          poster_url: string | null
+          seen_at: string
+          title: string
+          title_compact: string
+          title_norm: string
+          year: number | null
+        }
+        Insert: {
+          category?: string | null
+          ext_id: string
+          kind?: string
+          poster_url?: string | null
+          seen_at?: string
+          title: string
+          title_compact: string
+          title_norm: string
+          year?: number | null
+        }
+        Update: {
+          category?: string | null
+          ext_id?: string
+          kind?: string
+          poster_url?: string | null
+          seen_at?: string
+          title?: string
+          title_compact?: string
+          title_norm?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
+      bugou_import_items: {
+        Row: {
+          attempts: number
+          error: string | null
+          ext_id: string
+          job_id: string
+          result: Json | null
+          state: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          error?: string | null
+          ext_id: string
+          job_id: string
+          result?: Json | null
+          state?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          error?: string | null
+          ext_id?: string
+          job_id?: string
+          result?: Json | null
+          state?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bugou_import_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "bugou_import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bugou_import_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          done: number
+          episodes_created: number
+          failed: number
+          id: string
+          label: string
+          lease_until: string | null
+          status: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          done?: number
+          episodes_created?: number
+          failed?: number
+          id?: string
+          label?: string
+          lease_until?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          done?: number
+          episodes_created?: number
+          failed?: number
+          id?: string
+          label?: string
+          lease_until?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bugou_sync: {
+        Row: {
+          kind: string
+          synced_at: string
+          total: number
+        }
+        Insert: {
+          kind: string
+          synced_at?: string
+          total?: number
+        }
+        Update: {
+          kind?: string
+          synced_at?: string
+          total?: number
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
