@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 
 export type Integration = {
-  id: string; name: string; description: string | null; kind: "catalog" | "movie_player" | "episode_player" | "live"; base_url: string;
+  id: string; name: string; description: string | null; kind: "catalog" | "movie_player" | "episode_player" | "live" | "series"; base_url: string;
   auth_method: "none" | "query_key" | "header_key" | "bearer" | "custom_header"; auth_param: string | null;
   headers: Record<string, string>; params: Record<string, string>; default_method: "GET" | "POST"; priority: number; is_active: boolean;
   rate_limit_per_minute: number; cache_ttl_seconds: number; auto_fetch_player: boolean; key_hint: string | null; token_hint: string | null;

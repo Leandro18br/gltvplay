@@ -14,11 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 
 type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null }[] };
 
-export function BugouSeriesButton() {
+export function BugouSeriesButton({ label = "Buscar séries no BugouMods", disabled = false }: { label?: string; disabled?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Search /> Buscar séries no BugouMods</Button>
+      <Button size="sm" variant="outline" className="rounded-full" disabled={disabled} onClick={() => setOpen(true)}><Search /> {label}</Button>
       {open && <BugouDialog onClose={() => setOpen(false)} />}
     </>
   );
