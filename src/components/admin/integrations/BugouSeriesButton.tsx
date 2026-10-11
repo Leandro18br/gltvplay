@@ -36,7 +36,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
   const [catList, setCatList] = useState<Awaited<ReturnType<typeof bugouCategoryList>> | null>(null);
   const loadCats = useCallback(() => { catListFn().then(setCatList).catch(x => toast.error(errMsg(x))); }, [catListFn]); const [confirmCat, setConfirmCat] = useState(false);
   const apiSearchFn = useServerFn(apiSearch);
-  const seq = useRef(0); const [apiTerm, setApiTerm] = useState<string | null>(null); const [searchErr, setSearchErr] = useState<string | null>(null);
+  const seq = useRef(0); const resultsRef = useRef<HTMLParagraphElement>(null); const [apiTerm, setApiTerm] = useState<string | null>(null); const [searchErr, setSearchErr] = useState<string | null>(null);
   const [cat, setCat] = useState(""); const [page, setPage] = useState(0);
   const [cats, setCats] = useState<string[]>([]); const [meta, setMeta] = useState<{ total: number; matches: number; pageSize: number; synced_at: string } | null>(null);
   const [items, setItems] = useState<BugouSeries[]>([]); const [existing, setExisting] = useState<Record<string, string>>({});
@@ -66,6 +66,8 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
       const r = await apiSearchFn({ data: { kind: "series", query: term } });
       if (my !== seq.current) return;
       setItems(r.series); setExisting(r.existing); setPage(0);
+      // On phones the results sit below the job/progress panels: bring them into view (the field keeps focus).
+      requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
     } catch (x) { if (my === seq.current) setSearchErr(errMsg(x)); } finally { if (my === seq.current) setBusy(null); }
   }
 
@@ -180,7 +182,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
           </div>
         )}
         {searchErr && <p role="alert" className="rounded-lg border border-destructive/40 p-2 text-sm text-destructive">{searchErr}</p>}
-        {apiTerm != null && <p className="text-xs text-muted-foreground" aria-live="polite">{busy === "search" ? `Pesquisando "${apiTerm}" na API BugouMods VIP…` : searchErr ? "" : items.length ? `${items.length} série(s) encontrada(s) na API para "${apiTerm}"` : `Nenhuma série encontrada na API para "${apiTerm}". Tente outra parte do nome.`}</p>}
+        {apiTerm != null && <p ref={resultsRef} className="scroll-mt-44 text-xs text-muted-foreground sm:scroll-mt-4" aria-live="polite">{busy === "search" ? `Pesquisando "${apiTerm}" na API BugouMods VIP…` : searchErr ? "" : items.length ? `${items.length} série(s) encontrada(s) na API para "${apiTerm}"` : `Nenhuma série encontrada na API para "${apiTerm}". Tente outra parte do nome.`}</p>}
         {apiTerm != null && items.length > 0 && <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => setSel(s => { const all = items.every(i => s.has(i.id)); const x = new Set(s); items.forEach(i => (all ? x.delete(i.id) : x.add(i.id))); return x; })}>{items.every(i => sel.has(i.id)) ? "Desmarcar resultados" : `Selecionar os ${items.length} resultados`}</Button>
           {sel.size > 0 && <Button size="sm" disabled={!!busy || jobActive} onClick={() => start({ ids: [...sel] })}><DownloadCloud /> Importar série completa ({sel.size})</Button>}
