@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /** Pure helpers for live-channel API integrations (BugouMods VIP format). Shared by server and tests. */
 
 export type LiveChannel = { id: string; name: string; logo: string | null; category: string; playUrl: string | null; problem: string | null };
@@ -17,7 +18,7 @@ export function parseLiveList(json: unknown, host = "cinema.bugoumods.com"): Liv
   for (const [cat, list] of Object.entries(o)) {
     if (!Array.isArray(list)) continue;
     categories.push(cat);
-    for (const it of list as Record<string, unknown>[]) {
+    for (const it of list as any[]) {
       received++;
       const id = String(it?.id ?? "").trim();
       const name = String(it?.nome ?? "").trim().slice(0, 200);

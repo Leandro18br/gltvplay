@@ -9,9 +9,9 @@ describe("parseLiveList", () => {
     expect(r.categories).toEqual(["⚽ ESPN", "▶️ SBT"]);
     expect(r.channels).toHaveLength(2);
     expect(r.duplicates).toBe(1);
-    expect(r.channels[0].playUrl).toBe(link(1));
-    expect(r.channels[0].playUrl).toContain("embed=vip");
-    expect(r.channels[1].playUrl).toBeNull();
+    expect(r.channels[0]!.playUrl).toBe(link(1));
+    expect(r.channels[0]!.playUrl).toContain("embed=vip");
+    expect(r.channels[1]!.playUrl).toBeNull();
     expect(r.missingLink).toBe(1);
   });
   it("rejects changed formats and provider warnings", () => {

@@ -42,7 +42,7 @@ async function fetchList(id: string, label: string): Promise<Fetched> {
   for (const [k, v] of Object.entries(integ.params ?? {})) url.searchParams.set(k, String(v));
   if (integ.auth_method === "query_key") url.searchParams.set(integ.auth_param || "vtoken", tok);
   const headers: Record<string, string> = { "User-Agent": "Mozilla/5.0", Accept: "application/json", ...(integ.headers ?? {}) };
-  if (integ.auth_method === "bearer") headers.Authorization = `Bearer ${tok}`;
+  if (integ.auth_method === "bearer") headers["Authorization"] = `Bearer ${tok}`;
   if (integ.auth_method === "header_key" || integ.auth_method === "custom_header") headers[integ.auth_param || "X-API-Key"] = tok;
   const t0 = Date.now(); let last = ""; let status = 0;
   try {
@@ -228,7 +228,7 @@ export const liveRunJob = createServerFn({ method: "POST" }).middleware([...auth
       .eq("id", data.jobId).eq("kind", "live").not("status", "in", "(cancelled,paused)").or(`lease_until.is.null,lease_until.lt.${now.toISOString()}`).select("id, integration_id, stats");
     if (lease.error) throw new Error(lease.error.message);
     if (!lease.data?.length) return { ...(await jobView(ctx, data.jobId)), busy: true };
-    const job = lease.data[0]; const stats = { created: 0, updated: 0, skipped: 0, ...(job.stats ?? {}) } as Record<string, number>;
+    const job = lease.data[0]; const stats: any = { created: 0, updated: 0, skipped: 0, ...(job.stats ?? {}) };
     const { integ } = await loadIntegration(job.integration_id);
     const started = Date.now();
     let list: Fetched | null = null;
