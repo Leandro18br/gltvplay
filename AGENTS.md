@@ -32,6 +32,6 @@
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
 
 - Detail rules: `src/lib/{integrations,playback,tmdb}/AGENTS.md`. Why: directory scope.
-- Movie/episode native videos share VideoPlayerFrame controls around their existing media elements and HLS attachments; channels and cross-origin embeds retain their own players. Why: modern controls without changing playback behavior.
+- Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
 - Access/credit writes go only through idempotent security-definer RPCs; hashes in a no-grant table; reseller panel `/revendedor` uses e-mail/password auth accounts managed by owner-only server functions; resellers and client accesses are soft-deleted (status deleted; deleted accesses lose their hash and are trigger-locked) to keep history. Catalog RLS/playback require `has_site_access`; client 6-digit login (`/auth`) mints a session for a per-access internal account; catalog routes use ssr:false + `requireSiteAccess`. Why: atomic charging, server-enforced lock.
 - Per-area session slots (`session-vault.ts`): guards restore slot, then re-check server-side. Why: logins must not evict each other.
