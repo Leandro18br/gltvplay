@@ -1,0 +1,1 @@
+- Bulk draft/delete of movies/series/channels goes only through the `admin_bulk_content` RPC (staff=draft, admin=delete, ≤1000 ids/call, client batches, one summary audit row via `app.bulk_op`); series drafts hide episodes through the episodes public policy. Why: server-enforced, atomic per batch, honest partial-failure reporting.
