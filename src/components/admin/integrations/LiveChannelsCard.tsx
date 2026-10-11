@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { fmtDate } from "./shared";
 import { CatalogSyncBar } from "./CatalogSync";
+import { ApiSearchBar } from "./ApiSearchBar";
+import { apiSearch } from "@/lib/integrations/api-search.functions";
 
 type Job = Awaited<ReturnType<typeof liveOverview>>["jobs"][number] & { busy?: boolean };
 type Item = { ext_id: string; name: string; logo_url: string | null; category: string; has_play: boolean; imported: boolean };
@@ -118,14 +120,22 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
   const [cat, setCat] = useState<string | null>(null); const [page, setPage] = useState(0);
   const [items, setItems] = useState<Item[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [input, setInput] = useState(""); const [term, setTerm] = useState(""); const [err, setErr] = useState<string | null>(null);
+  const [term, setTerm] = useState(""); const [err, setErr] = useState<string | null>(null);
+  const searchFn = useServerFn(apiSearch); const seq = useRef(0);
   const r = useJobRunner(() => { onDone(); cats.refetch(); if (cat || term) load(cat, 0, true); });
+  // Category pages come from the synced index; name searches go straight to the provider (searchApi). Newer requests supersede older ones.
   async function load(c: string | null, p: number, reset: boolean, q = term) {
-    setLoading(true); setErr(null);
-    try { const res = await chFn({ data: { integrationId: integ.id, category: c ?? undefined, query: c ? undefined : q, page: p } }); setItems((prev: Item[]) => reset ? res.items as Item[] : [...prev, ...(res.items as Item[])]); setTotal(res.total); setPage(p); } catch (e) { setErr(errMsg(e)); toast.error(errMsg(e)); } finally { setLoading(false); }
+    if (!c && q) return searchApi(q);
+    if (!c) return;
+    const my = ++seq.current; setLoading(true); setErr(null);
+    try { const res = await chFn({ data: { integrationId: integ.id, category: c, page: p } }); if (my !== seq.current) return; setItems((prev: Item[]) => reset ? res.items as Item[] : [...prev, ...(res.items as Item[])]); setTotal(res.total); setPage(p); } catch (e) { if (my === seq.current) setErr(errMsg(e)); } finally { if (my === seq.current) setLoading(false); }
+  }
+  async function searchApi(q: string) {
+    const my = ++seq.current; setLoading(true); setErr(null); setItems([]); setTotal(0);
+    try { const res = await searchFn({ data: { kind: "live", integrationId: integ.id, query: q } }); if (my !== seq.current) return; setItems(res.channels); setTotal(res.channels.length); setPage(0); } catch (e) { if (my === seq.current) setErr(errMsg(e)); } finally { if (my === seq.current) setLoading(false); }
   }
   useEffect(() => { if (cat) { setSel(new Set()); setTerm(""); load(cat, 0, true, ""); } }, [cat]);
-  function doSearch() { const q = input.trim(); if (!q) return; setCat(null); setTerm(q); setSel(new Set()); setItems([]); load(null, 0, true, q); } // eslint-disable-line react-hooks/exhaustive-deps
+  function doSearch(q: string) { setCat(null); setTerm(q); setSel(new Set()); searchApi(q); }
   const info = cats.data?.find(c => c.name === cat);
   async function start(all: boolean) {
     if (!cat && !(term && !all)) return;
@@ -136,12 +146,10 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
   const job = r.job; const running = job && job.status !== "done" && job.status !== "paused";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92vh] max-w-5xl flex-col overflow-hidden">
+      <DialogContent className="flex h-[100dvh] max-h-[100dvh] max-w-none flex-col gap-3 overflow-hidden rounded-none p-4 sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:rounded-lg sm:p-6">
         <DialogHeader><DialogTitle>Buscar canais pela API — {integ.name}</DialogTitle></DialogHeader>
-        <form className="flex gap-2" onSubmit={e => { e.preventDefault(); doSearch(); }}>
-          <Input type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Nome do canal" className="min-w-0 flex-1" placeholder="Nome do canal (maiúsculas e acentos não importam)" value={input} onChange={e => setInput(e.target.value)} />
-          <Button disabled={loading || !input.trim()}>{loading && term ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
-        </form>
+        <ApiSearchBar label="Nome do canal" placeholder="Nome do canal (completo ou parte)" busy={loading && !cat && !!term} onSearch={doSearch}
+          source={`Pesquisa direto na API ${integ.name} (busca oficial do provedor), inclusive canais ainda não importados. As categorias abaixo mostram o catálogo completo sincronizado.`} />
         <CatalogSyncBar kind="live" integrationId={integ.id} onDone={() => { cats.refetch(); onDone(); if (cat) load(cat, 0, true, ""); }} />
         <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[240px_1fr]">
           <div className="max-h-48 min-h-0 overflow-y-auto rounded-xl border border-border p-1 md:max-h-none">
@@ -152,7 +160,7 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
             {err && <p className="p-3 text-sm text-destructive">{err}</p>}
             {!cat && !term ? <p className="p-6 text-sm text-muted-foreground">Escolha uma categoria ou pesquise um canal pelo nome.</p> : <>
               <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                {cat ? <><b>{cat}</b><span className="flex flex-wrap gap-2 text-xs"><span className="rounded-lg bg-muted px-2 py-1">Disponíveis na API: <b>{info?.total ?? total}</b></span><span className="rounded-lg bg-muted px-2 py-1">Importados: <b>{info?.imported ?? 0}</b></span><span className="rounded-lg bg-muted px-2 py-1">Pendentes: <b>{info?.missing ?? 0}</b></span><span className="self-center text-muted-foreground">{items.length} de {total} exibidos</span></span></> : <><b>Busca: “{term}”</b><span className="text-muted-foreground">{loading ? "Pesquisando…" : `${total} resultado(s)`}</span></>}
+                {cat ? <><b>{cat}</b><span className="flex flex-wrap gap-2 text-xs"><span className="rounded-lg bg-muted px-2 py-1">Disponíveis na API: <b>{info?.total ?? total}</b></span><span className="rounded-lg bg-muted px-2 py-1">Importados: <b>{info?.imported ?? 0}</b></span><span className="rounded-lg bg-muted px-2 py-1">Pendentes: <b>{info?.missing ?? 0}</b></span><span className="self-center text-muted-foreground">{items.length} de {total} exibidos</span></span></> : <><b>Busca na API: “{term}”</b><span className="text-muted-foreground" aria-live="polite">{loading ? "Pesquisando na API…" : err ? "" : `${total} canal(is) encontrado(s)`}</span></>}
                 <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSel(s => s.size === items.length ? new Set() : new Set(items.map(i => i.ext_id)))}>{sel.size === items.length && items.length ? "Limpar seleção" : "Selecionar todos (carregados)"}</Button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
@@ -165,7 +173,7 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
                       {on && <span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground"><Check className="size-3" /></span>}
                     </button>); })}
                 </div>
-                {!loading && !err && !items.length && <p className="p-6 text-sm text-muted-foreground">Nenhum canal encontrado.</p>}
+                {!loading && !err && !items.length && <p className="p-6 text-sm text-muted-foreground">{cat ? "Nenhum canal nesta categoria." : `Nenhum canal encontrado na API para "${term}". Tente outra parte do nome.`}</p>}
                 {items.length < total && <Button variant="ghost" className="mt-2 w-full" disabled={loading} onClick={() => load(cat, page + 1, false)}>{loading && <Loader2 className="animate-spin" />} Carregar mais ({total - items.length} restantes)</Button>}
                 {loading && !items.length && <Loader2 className="m-3 animate-spin text-primary" />}
               </div>
