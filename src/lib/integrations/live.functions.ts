@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff } from "@/lib/tmdb/tmdb.functions";
 import { isBlockedHost } from "./engine";
+import { liveVipLink } from "./catalog-pages";
 import { parseLiveList, liveRef, isPermanent, type LiveChannel, type LiveParse } from "./live";
 
 /**
@@ -19,7 +20,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const slugify = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 80) || "canal";
 const admin = async () => (await import("@/integrations/supabase/client.server")).supabaseAdmin as any;
 
-async function loadIntegration(id: string) {
+export async function loadIntegration(id: string) {
   const db = await admin();
   const { data: integ } = await db.from("api_integrations").select("*").eq("id", id).maybeSingle();
   if (!integ || integ.kind !== "live") throw new Error("Integração de canais não encontrada.");
@@ -91,6 +92,8 @@ export const liveSync = createServerFn({ method: "POST" }).middleware([...auth])
       const rows = r.channels.slice(i, i + 500).map(c => ({ integration_id: data.integrationId, ext_id: c.id, name: c.name, logo_url: c.logo, category: c.category, has_play: !!c.playUrl, seen_at: now }));
       const u = await ctx.supabase.from("live_catalog").upsert(rows, { onConflict: "integration_id,ext_id" });
       if (u.error) throw new Error(u.error.message);
+      const m = await ctx.supabase.from("live_catalog_categories").upsert(rows.map(x => ({ integration_id: x.integration_id, ext_id: x.ext_id, category: x.category, seen_at: now })), { onConflict: "integration_id,ext_id,category" });
+      if (m.error) throw new Error(m.error.message);
     }
     await (await admin()).from("api_integrations").update({ last_synced_at: now }).eq("id", data.integrationId);
     return { synced_at: now, categories: r.categories.length, channels: r.channels.length, missingLink: r.missingLink, ms: r.ms };
@@ -109,8 +112,8 @@ async function importedSet(ctx: Ctx, integrationId: string) {
 async function indexRows(ctx: Ctx, integrationId: string, category?: string) {
   const out: any[] = [];
   for (let from = 0; ; from += 1000) {
-    let q = ctx.supabase.from("live_catalog").select("ext_id, name, logo_url, category, has_play, seen_at").eq("integration_id", integrationId).order("name").range(from, from + 999);
-    if (category) q = q.eq("category", category);
+    let q = ctx.supabase.from("live_catalog").select(category ? "ext_id, name, logo_url, category, has_play, seen_at, live_catalog_categories!inner(category)" : "ext_id, name, logo_url, category, has_play, seen_at").eq("integration_id", integrationId).order("name").order("ext_id").range(from, from + 999);
+    if (category) q = q.eq("live_catalog_categories.category", category);
     const { data, error } = await q; if (error) throw new Error(error.message);
     out.push(...(data ?? [])); if (!data || data.length < 1000) break;
   }
@@ -122,9 +125,15 @@ export const liveCategories = createServerFn({ method: "POST" }).middleware([...
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; await assertStaff(ctx);
     const [rows, imp] = await Promise.all([indexRows(ctx, data.integrationId), importedSet(ctx, data.integrationId)]);
+    const info = new Map(rows.map((r: any) => [r.ext_id, r]));
+    const mem: any[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: d, error } = await ctx.supabase.from("live_catalog_categories").select("ext_id, category").eq("integration_id", data.integrationId).order("category").order("ext_id").range(from, from + 999);
+      if (error) throw new Error(error.message); mem.push(...(d ?? [])); if (!d || d.length < 1000) break;
+    }
     const m = new Map<string, { total: number; imported: number; noLink: number }>();
-    for (const r of rows) { const c = m.get(r.category) ?? { total: 0, imported: 0, noLink: 0 }; c.total++; if (imp.has(r.ext_id)) c.imported++; if (!r.has_play) c.noLink++; m.set(r.category, c); }
-    return [...m.entries()].map(([name, c]) => ({ name, ...c }));
+    for (const r of mem) { const c = m.get(r.category) ?? { total: 0, imported: 0, noLink: 0 }; c.total++; if (imp.has(r.ext_id)) c.imported++; if (!info.get(r.ext_id)?.has_play) c.noLink++; m.set(r.category, c); }
+    return [...m.entries()].map(([name, c]) => ({ name, ...c, missing: c.total - c.imported })).sort((x, y) => x.name.localeCompare(y.name, "pt-BR"));
   });
 
 export const liveChannels = createServerFn({ method: "POST" }).middleware([...auth])
@@ -132,16 +141,16 @@ export const liveChannels = createServerFn({ method: "POST" }).middleware([...au
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; await assertStaff(ctx);
     const PAGE = 60;
-    let qb = ctx.supabase.from("live_catalog").select("ext_id, name, logo_url, category, has_play", { count: "exact" }).eq("integration_id", data.integrationId);
-    if (data.category) qb = qb.eq("category", data.category);
+    let qb = ctx.supabase.from("live_catalog").select(data.category ? "ext_id, name, logo_url, category, has_play, live_catalog_categories!inner(category)" : "ext_id, name, logo_url, category, has_play", { count: "exact" }).eq("integration_id", data.integrationId);
+    if (data.category) qb = qb.eq("live_catalog_categories.category", data.category);
     // Case-insensitive, every word must match; accents are tolerated by matching words without their accented letters as wildcards.
     if (data.query) for (const t of data.query.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[%_,()]/g, " ").split(/\s+/).filter(Boolean)) qb = qb.ilike("name", `%${t.replace(/[aeiouc]/gi, "_")}%`);
-    const { data: rows, count, error } = await qb.order("name").range(data.page * PAGE, data.page * PAGE + PAGE - 1);
+    const { data: rows, count, error } = await qb.order("name").order("ext_id").range(data.page * PAGE, data.page * PAGE + PAGE - 1);
     if (error) throw new Error(error.message);
     const ids = (rows ?? []).map((r: any) => r.ext_id);
     const { data: ch } = ids.length ? await ctx.supabase.from("channels").select("external_id").eq("api_integration_id", data.integrationId).in("external_id", ids) : { data: [] };
     const imp = new Set((ch ?? []).map((c: any) => c.external_id));
-    return { total: count ?? 0, pageSize: PAGE, items: (rows ?? []).map((r: any) => ({ ...r, imported: imp.has(r.ext_id) })) };
+    return { total: count ?? 0, pageSize: PAGE, items: (rows ?? []).map(({ live_catalog_categories: _m, ...r }: any) => ({ ...r, imported: imp.has(r.ext_id) })) };
   });
 
 // ---------- jobs ----------
@@ -242,6 +251,13 @@ export const liveRunJob = createServerFn({ method: "POST" }).middleware([...auth
         if (!next?.length) break;
         if (!list) { list = await fetchList(job.integration_id, "Importação de canais"); stats.fetch_ms = (stats.fetch_ms ?? 0) + list.ms; }
         const byId = new Map(list.channels.map(c => [c.id, c]));
+        // Channels beyond the 50-per-category list: official VIP link in the provider's exact format, from the paginated index.
+        const miss = next.filter((n: any) => !byId.has(n.ext_id)).map((n: any) => n.ext_id);
+        if (miss.length) {
+          const { tok } = await loadIntegration(job.integration_id);
+          const { data: idx } = await db.from("live_catalog").select("ext_id, name, logo_url, category, ext").eq("integration_id", job.integration_id).in("ext_id", miss);
+          for (const r of (idx ?? []) as any[]) if (r.ext) byId.set(r.ext_id, { id: r.ext_id, name: r.name, logo: r.logo_url, category: r.category, playUrl: liveVipLink(integ.base_url, { id: r.ext_id, name: r.name, ext: r.ext, image: r.logo_url }, tok, String(integ.params?.embed ?? "vip")), problem: null });
+        }
         const t0 = Date.now();
         const r = await importBatch(ctx, job.integration_id, next, byId);
         stats.created += r.created; stats.updated += r.updated; stats.skipped += r.skipped; stats.write_ms = (stats.write_ms ?? 0) + (Date.now() - t0);

@@ -3,14 +3,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, ChevronLeft, ChevronRight, DownloadCloud, ListVideo, Loader2, Pause, Play, RefreshCw, RotateCcw, Search } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, DownloadCloud, ListVideo, Loader2, Pause, Play, RotateCcw, Search } from "lucide-react";
 import { errMsg } from "@/lib/admin/db";
-import { bugouSearchSeries, bugouSeriesDetails, bugouImportEpisodes, bugouCreateJob, bugouRunJob, bugouRetryFailed, bugouCancelJob, bugouJobsOverview, bugouCategoryStats } from "@/lib/integrations/bugoumods.functions";
+import { bugouSearchSeries, bugouSeriesDetails, bugouImportEpisodes, bugouCreateJob, bugouRunJob, bugouRetryFailed, bugouCancelJob, bugouJobsOverview, bugouCategoryStats, bugouCategoryList } from "@/lib/integrations/bugoumods.functions";
 import type { BugouSeries, BugouDetails } from "@/lib/integrations/bugoumods";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { CatalogSyncBar } from "./CatalogSync";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; with_player?: number; no_episodes?: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
@@ -28,8 +29,10 @@ export function BugouSeriesButton({ label = "Buscar séries pela API", disabled 
 function BugouDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const search = useServerFn(bugouSearchSeries); const createJob = useServerFn(bugouCreateJob); const runJob = useServerFn(bugouRunJob);
-  const retry = useServerFn(bugouRetryFailed); const pause = useServerFn(bugouCancelJob); const overview = useServerFn(bugouJobsOverview); const catStatsFn = useServerFn(bugouCategoryStats);
-  const [catStats, setCatStats] = useState<{ total: number; imported: number; missing: number } | null>(null); const [confirmCat, setConfirmCat] = useState(false);
+  const retry = useServerFn(bugouRetryFailed); const pause = useServerFn(bugouCancelJob); const overview = useServerFn(bugouJobsOverview); const catStatsFn = useServerFn(bugouCategoryStats); const catListFn = useServerFn(bugouCategoryList);
+  const [catStats, setCatStats] = useState<Awaited<ReturnType<typeof bugouCategoryStats>> | null>(null);
+  const [catList, setCatList] = useState<Awaited<ReturnType<typeof bugouCategoryList>> | null>(null);
+  const loadCats = useCallback(() => { catListFn().then(setCatList).catch(x => toast.error(errMsg(x))); }, [catListFn]); const [confirmCat, setConfirmCat] = useState(false);
   const [q, setQ] = useState(""); const [cat, setCat] = useState(""); const [page, setPage] = useState(0);
   const [cats, setCats] = useState<string[]>([]); const [meta, setMeta] = useState<{ total: number; matches: number; pageSize: number; synced_at: string } | null>(null);
   const [items, setItems] = useState<BugouSeries[]>([]); const [existing, setExisting] = useState<Record<string, string>>({});
@@ -76,7 +79,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
   }, [runJob, qc]);
 
   useEffect(() => {
-    run(0, { withCategories: true });
+    run(0, { withCategories: true }); loadCats();
     overview().then(o => { setOv(o); const open = (o.jobs as Job[]).find(j => j.status !== "done" || j.failed > 0); if (open) setJob(open); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -85,7 +88,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
 
   async function start(data: { ids?: string[]; allMissing?: boolean; category?: string; repairEmpty?: boolean }) {
     setBusy("import");
-    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); }
+    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); loadCats(); }
     catch (x) { toast.error(errMsg(x)); setBusy(null); }
   }
   const missing = ov ? Math.max(0, ov.indexTotal - ov.imported) : null;
@@ -123,17 +126,18 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
         )}
 
         <form onSubmit={e => { e.preventDefault(); run(0); }} className="flex flex-wrap gap-2">
-          <Input className="min-w-0 flex-1" placeholder="Título (sem acento, maiúsculas ou pontuação também funciona)" value={q} onChange={e => setQ(e.target.value)} />
-          {cats.length > 0 && (
-            <select aria-label="Categoria" className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={cat} onChange={e => pickCategory(e.target.value)}>
+          <Input type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Nome da série" className="min-w-0 flex-1 basis-56" placeholder="Título (sem acento, maiúsculas ou pontuação também funciona)" value={q} onChange={e => setQ(e.target.value)} />
+          {(catList?.categories.length || cats.length) ? (
+            <select aria-label="Categoria" className="h-10 min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-sm" value={cat} onChange={e => pickCategory(e.target.value)}>
               <option value="">Todas as categorias</option>
-              {cats.map(c => <option key={c} value={c}>{c}</option>)}
+              {catList ? catList.categories.map(c => <option key={c.name} value={c.name}>{c.name} — {c.imported}/{c.total} importadas</option>) : cats.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-          )}
+          ) : null}
           <Button disabled={!!busy}>{busy === "search" ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
           <Button type="button" variant="outline" disabled={!!busy || jobActive} onClick={() => start({ repairEmpty: true })} title="Busca na API VIP as temporadas, episódios e players das séries já importadas que estão vazias"><Wrench /> Completar séries sem episódios</Button>
-          <Button type="button" variant="outline" disabled={!!busy} onClick={() => run(0, { refresh: true, withCategories: true })} title="Baixar a lista atual do provedor"><RefreshCw /> Atualizar índice</Button>
         </form>
+        <CatalogSyncBar kind="series" onDone={() => { run(0, { withCategories: true }); loadCats(); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); }} />
+        {catList && <p className="text-xs text-muted-foreground">Catálogo da API: {catList.distinct} séries únicas em {catList.categories.length} categorias · {catList.imported} já no aplicativo{catList.synced_at ? ` · leitura completa em ${new Date(catList.synced_at).toLocaleString("pt-BR")}` : ""}</p>}
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" disabled={!sel.size || !!busy || jobActive} onClick={() => start({ ids: [...sel] })}>{busy === "import" ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Importar série completa {sel.size ? `(${sel.size})` : ""}</Button>
@@ -148,7 +152,12 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
         {cat && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 p-3 text-sm">
             <b>{cat}</b>
-            <span className="text-muted-foreground">{catStats ? `${catStats.total} série(s) na categoria · ${catStats.imported} já no catálogo · ${catStats.missing} a adicionar` : "Contando séries…"}</span>
+            {catStats ? <span className="grid w-full grid-cols-3 gap-2 text-xs sm:w-auto sm:flex sm:flex-wrap">
+              <span className="rounded-lg bg-background/60 px-2 py-1">Disponíveis na API: <b>{catStats.total}</b></span>
+              <span className="rounded-lg bg-background/60 px-2 py-1">Importadas: <b>{catStats.imported}</b></span>
+              <span className="rounded-lg bg-background/60 px-2 py-1">Pendentes: <b>{catStats.missing}</b></span>
+              <span className="col-span-3 text-muted-foreground">Nas importadas: {catStats.seasons} temporada(s) · {catStats.episodes} episódio(s) · {catStats.withPlayer} com player VIP{catStats.noPlayer ? ` · ${catStats.noPlayer} sem player` : ""}{catStats.emptySeries ? ` · ${catStats.emptySeries} série(s) sem episódios` : ""}</span>
+            </span> : <span className="text-muted-foreground">Contando séries…</span>}
             <Button size="sm" variant="ghost" className="ml-auto" disabled={!items.length} onClick={() => setSel(s => { const all = items.every(i => s.has(i.id)); const x = new Set(s); items.forEach(i => (all ? x.delete(i.id) : x.add(i.id))); return x; })}>{items.length && items.every(i => sel.has(i.id)) ? "Desmarcar esta página" : "Selecionar todas desta página"}</Button>
           </div>
         )}
@@ -176,9 +185,9 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
             {!confirmCat ? <>
               <span className="text-xs text-muted-foreground">{sel.size ? `${sel.size} selecionada(s)` : "Nenhuma selecionada — você pode importar a categoria inteira."}</span>
               {sel.size > 0 && <Button size="sm" variant="outline" disabled={!!busy || jobActive} onClick={() => start({ ids: [...sel] })}>Importar selecionadas ({sel.size})</Button>}
-              <Button className="ml-auto rounded-full" disabled={!!busy || jobActive || !catStats.total} onClick={() => setConfirmCat(true)}><DownloadCloud /> Importar categoria ({catStats.total})</Button>
+              <Button className="ml-auto rounded-full" disabled={!!busy || jobActive || !catStats.total} onClick={() => setConfirmCat(true)}><DownloadCloud /> Importar categoria completa ({catStats.total})</Button>
             </> : <span className="flex w-full flex-wrap items-center gap-2 text-sm">
-              Serão processadas {catStats.total} série(s) de "{cat}": {catStats.missing} novas e {catStats.imported} já existentes (só recebem o que falta). Cada série traz temporadas, episódios e players VIP. Pode pausar e retomar. Confirmar?
+              Serão processadas {catStats.total} série(s) de "{cat}" — inclusive as que não aparecem nesta página: {catStats.missing} novas e {catStats.imported} já existentes (só recebem temporadas, episódios e players que faltam). Cada série traz temporadas, episódios e players VIP. Pode pausar e retomar. Confirmar?
               <Button size="sm" onClick={() => start({ category: cat })}>Sim, importar categoria</Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirmCat(false)}>Cancelar</Button>
             </span>}

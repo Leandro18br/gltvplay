@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { fmtDate } from "./shared";
+import { CatalogSyncBar } from "./CatalogSync";
 
 type Job = Awaited<ReturnType<typeof liveOverview>>["jobs"][number] & { busy?: boolean };
 type Item = { ext_id: string; name: string; logo_url: string | null; category: string; has_play: boolean; imported: boolean };
@@ -138,19 +139,20 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
       <DialogContent className="flex max-h-[92vh] max-w-5xl flex-col overflow-hidden">
         <DialogHeader><DialogTitle>Buscar canais pela API — {integ.name}</DialogTitle></DialogHeader>
         <form className="flex gap-2" onSubmit={e => { e.preventDefault(); doSearch(); }}>
-          <Input className="min-w-0 flex-1" placeholder="Nome do canal (maiúsculas e acentos não importam)" value={input} onChange={e => setInput(e.target.value)} />
+          <Input type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Nome do canal" className="min-w-0 flex-1" placeholder="Nome do canal (maiúsculas e acentos não importam)" value={input} onChange={e => setInput(e.target.value)} />
           <Button disabled={loading || !input.trim()}>{loading && term ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
         </form>
+        <CatalogSyncBar kind="live" integrationId={integ.id} onDone={() => { cats.refetch(); onDone(); if (cat) load(cat, 0, true, ""); }} />
         <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[240px_1fr]">
-          <div className="min-h-0 overflow-y-auto rounded-xl border border-border p-1">
+          <div className="max-h-48 min-h-0 overflow-y-auto rounded-xl border border-border p-1 md:max-h-none">
             {cats.isPending && <Loader2 className="m-3 animate-spin text-primary" />}
-            {cats.data?.map(c => <button key={c.name} type="button" onClick={() => setCat(c.name)} className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${cat === c.name ? "bg-primary/15 text-primary" : "hover:bg-muted"}`}><span className="truncate">{c.name}</span><span className="shrink-0 text-xs text-muted-foreground">{c.imported}/{c.total}</span></button>)}
+            {cats.data?.map(c => <button key={c.name} type="button" onClick={() => setCat(c.name)} className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${cat === c.name ? "bg-primary/15 text-primary" : "hover:bg-muted"}`}><span className="truncate">{c.name}</span><span className="shrink-0 text-xs text-muted-foreground" title="importados / disponíveis na API">{c.imported}/{c.total}</span></button>)}
           </div>
           <div className="flex min-h-0 flex-col">
             {err && <p className="p-3 text-sm text-destructive">{err}</p>}
             {!cat && !term ? <p className="p-6 text-sm text-muted-foreground">Escolha uma categoria ou pesquise um canal pelo nome.</p> : <>
               <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                {cat ? <><b>{cat}</b><span className="text-muted-foreground">{total} canais · {info?.imported ?? 0} já no catálogo · {info?.noLink ?? 0} sem link</span></> : <><b>Busca: “{term}”</b><span className="text-muted-foreground">{loading ? "Pesquisando…" : `${total} resultado(s)`}</span></>}
+                {cat ? <><b>{cat}</b><span className="flex flex-wrap gap-2 text-xs"><span className="rounded-lg bg-muted px-2 py-1">Disponíveis na API: <b>{info?.total ?? total}</b></span><span className="rounded-lg bg-muted px-2 py-1">Importados: <b>{info?.imported ?? 0}</b></span><span className="rounded-lg bg-muted px-2 py-1">Pendentes: <b>{info?.missing ?? 0}</b></span><span className="self-center text-muted-foreground">{items.length} de {total} exibidos</span></span></> : <><b>Busca: “{term}”</b><span className="text-muted-foreground">{loading ? "Pesquisando…" : `${total} resultado(s)`}</span></>}
                 <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSel(s => s.size === items.length ? new Set() : new Set(items.map(i => i.ext_id)))}>{sel.size === items.length && items.length ? "Limpar seleção" : "Selecionar todos (carregados)"}</Button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
@@ -164,7 +166,7 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
                     </button>); })}
                 </div>
                 {!loading && !err && !items.length && <p className="p-6 text-sm text-muted-foreground">Nenhum canal encontrado.</p>}
-                {items.length < total && <Button variant="ghost" className="mt-2 w-full" disabled={loading} onClick={() => load(cat, page + 1, false)}>{loading && <Loader2 className="animate-spin" />} Carregar mais</Button>}
+                {items.length < total && <Button variant="ghost" className="mt-2 w-full" disabled={loading} onClick={() => load(cat, page + 1, false)}>{loading && <Loader2 className="animate-spin" />} Carregar mais ({total - items.length} restantes)</Button>}
                 {loading && !items.length && <Loader2 className="m-3 animate-spin text-primary" />}
               </div>
             </>}
@@ -180,7 +182,7 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
           {job.failures.length > 0 && <ul className="max-h-24 overflow-y-auto text-xs text-destructive">{job.failures.map((f: Job["failures"][number]) => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
         </div>}
         {(cat || term) && <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          {cat && <Button variant="outline" disabled={!!running || !info?.total} onClick={() => start(true)}>Importar categoria inteira ({info?.total ?? 0})</Button>}
+          {cat && <Button variant="outline" disabled={!!running || !info?.total} onClick={() => start(true)}>Importar categoria completa ({info?.total ?? 0})</Button>}
           <Button className="ml-auto rounded-full" disabled={!sel.size || !!running} onClick={() => start(false)}>{running ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Importar {sel.size || ""}</Button>
         </div>}
       </DialogContent>

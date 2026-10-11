@@ -14,14 +14,13 @@ import { parseBugouName, parseBugouDetails, bugouVipEmbedUrl, normTitle, compact
  */
 type Ctx = { supabase: any; userId: string };
 const SOURCE = "bugoumods";
-const INDEX_TTL_MS = 6 * 3600_000;
 const PAGE = 40;
 
 const admin = async () => (await import("@/integrations/supabase/client.server")).supabaseAdmin as any;
 type SeriesInteg = { id: string; is_active: boolean; request_count: number; timeout_seconds: number; rate_limit_per_minute: number } | null;
 
 /** Token comes from the "BugouMods VIP — Séries" integration (service-role api_credentials); env secret is the legacy fallback. */
-async function seriesIntegration(): Promise<{ integ: SeriesInteg; tok: string }> {
+export async function seriesIntegration(): Promise<{ integ: SeriesInteg; tok: string }> {
   const db = await admin();
   const { data: integ } = await db.from("api_integrations").select("id, is_active, request_count, timeout_seconds, rate_limit_per_minute").eq("kind", "series").eq("provider", "bugoumods_series").order("priority").limit(1).maybeSingle();
   let raw = "";
@@ -40,7 +39,7 @@ async function seriesIntegration(): Promise<{ integ: SeriesInteg; tok: string }>
 async function token() { return (await seriesIntegration()).tok; }
 
 /** Records a provider call in api_request_logs + integration status (token never logged). */
-async function logCall(integ: SeriesInteg, label: string, t0: number, err: string | null, status: number | null = null) {
+export async function logCall(integ: SeriesInteg, label: string, t0: number, err: string | null, status: number | null = null) {
   if (!integ) return;
   const db = await admin(); const now = new Date().toISOString();
   await db.from("api_request_logs").insert({ integration_id: integ.id, content_label: label, http_status: err ? status : 200, duration_ms: Date.now() - t0, success: !err, cached: false, error: err });
@@ -91,9 +90,11 @@ async function refreshIndex(ctx: Ctx, label?: string) {
     const r = await ctx.supabase.from("bugou_catalog").upsert(rows, { onConflict: "kind,ext_id" });
     if (r.error) throw new Error(r.error.message);
   }
-  // Rows not in the current provider list (old token / removed series) have IDs series_info no longer knows: drop them from the staff index (catalog untouched).
-  const del = await (await admin()).from("bugou_catalog").delete().eq("kind", "series").lt("seen_at", now);
-  if (del.error) throw new Error(del.error.message);
+  // The c=all list caps categories at 50, so it never deletes: removals happen only in the full paginated sync (catalog-sync.functions.ts).
+  for (let i = 0; i < all.length; i += 500) {
+    const m = await ctx.supabase.from("bugou_catalog_categories").upsert(all.slice(i, i + 500).map(s => ({ kind: "series", ext_id: s.id, category: s.category, seen_at: now })), { onConflict: "kind,ext_id,category" });
+    if (m.error) throw new Error(m.error.message);
+  }
   const r = await ctx.supabase.from("bugou_sync").upsert({ kind: "series", synced_at: now, total: all.length });
   if (r.error) throw new Error(r.error.message);
   return { total: all.length, synced_at: now };
@@ -101,7 +102,7 @@ async function refreshIndex(ctx: Ctx, label?: string) {
 
 async function ensureIndex(ctx: Ctx, force: boolean) {
   const { data } = await ctx.supabase.from("bugou_sync").select("synced_at, total").eq("kind", "series").maybeSingle();
-  if (!force && data && Date.now() - Date.parse(data.synced_at) < INDEX_TTL_MS) return data as { synced_at: string; total: number };
+  if (!force && data) return data as { synced_at: string; total: number };
   return refreshIndex(ctx);
 }
 
@@ -237,12 +238,12 @@ export const bugouSearchSeries = createServerFn({ method: "POST" })
     const sync = await ensureIndex(ctx, data.refresh);
     const q = normTitle(data.query);
     const run = async (compact: boolean) => {
-      let qb = db.from("bugou_catalog").select("ext_id, title, year, poster_url, category, title_norm", { count: "exact" }).eq("kind", "series");
+      let qb = db.from("bugou_catalog").select(data.category ? "ext_id, title, year, poster_url, category, title_norm, bugou_catalog_categories!inner(category)" : "ext_id, title, year, poster_url, category, title_norm", { count: "exact" }).eq("kind", "series");
       if (q) {
         if (compact) qb = qb.ilike("title_compact", `%${q.replace(/ /g, "")}%`);
         else for (const t of q.split(" ")) qb = qb.ilike("title_norm", `%${t}%`);
       }
-      if (data.category) qb = qb.eq("category", data.category);
+      if (data.category) qb = qb.eq("bugou_catalog_categories.category", data.category);
       return qb.order("title_norm").order("ext_id").range(data.page * PAGE, data.page * PAGE + PAGE - 1);
     };
     let r = await run(false);
@@ -267,8 +268,8 @@ export const bugouSearchSeries = createServerFn({ method: "POST" })
     let categories: string[] = [];
     if (data.withCategories) {
       const set = new Set<string>();
-      for (let from = 0; from < 20000; from += 1000) {
-        const { data: c } = await db.from("bugou_catalog").select("category").eq("kind", "series").range(from, from + 999);
+      for (let from = 0; from < 200000; from += 1000) {
+        const { data: c } = await db.from("bugou_catalog_categories").select("category").eq("kind", "series").order("category").range(from, from + 999);
         (c ?? []).forEach((x: any) => x.category && set.add(x.category));
         if (!c || c.length < 1000) break;
       }
@@ -306,7 +307,7 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 
 // ---------- Resumable import jobs ----------
 
-type JobStats = { requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number };
+type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number };
 
 async function jobView(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
@@ -380,9 +381,9 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
     } else if (data.category && !data.ids.length) {
       await ensureIndex(ctx, false);
       for (let from = 0; ; from += 1000) {
-        const { data: c, error } = await db.from("bugou_catalog").select("ext_id, title").eq("kind", "series").eq("category", data.category).order("title_norm").range(from, from + 999);
+        const { data: c, error } = await db.from("bugou_catalog").select("ext_id, title, bugou_catalog_categories!inner(category)").eq("kind", "series").eq("bugou_catalog_categories.category", data.category).order("title_norm").order("ext_id").range(from, from + 999);
         if (error) throw new Error(error.message);
-        items.push(...((c ?? []) as any[]));
+        items.push(...((c ?? []) as any[]).map((x: any) => ({ ext_id: x.ext_id, title: x.title })));
         if (!c || c.length < 1000) break;
       }
     } else {
@@ -470,6 +471,16 @@ export const bugouRunJob = createServerFn({ method: "POST" })
             : { state: "pending", rate_limited: rl, error: `${msg} Nova tentativa programada.`, next_attempt_at: throttleUntil });
           break; // stop calling the provider until the wait ends
         }
+        if (/rate limit|too many requests|try again in a minute/i.test(msg)) {
+          // Temporary write limit of the backend ("try again in a minute"): pause the queue ≥1 min, keep cached details, never a definitive failure on first hits.
+          st.db_throttled = (st.db_throttled ?? 0) + 1;
+          const rl = it.rate_limited + 1;
+          throttleUntil = new Date(Date.now() + Math.max(60_000, backoffMs(rl, 60_000))).toISOString();
+          await upd(rl >= MAX_RATE_LIMITED
+            ? { state: "failed", rate_limited: rl, error: `Limite temporário do banco ao salvar episódios. Tentativas automáticas esgotadas — use "Tentar de novo só as falhas".`, next_attempt_at: null }
+            : { state: "pending", rate_limited: rl, error: "Limite temporário do banco ao salvar episódios. Nova tentativa programada.", next_attempt_at: throttleUntil });
+          break;
+        }
         const attempts = e instanceof PermanentError ? MAX_ERRORS : it.attempts + 1;
         await upd(attempts >= MAX_ERRORS ? { state: "failed", attempts, error: msg, next_attempt_at: null } : { state: "pending", attempts, error: msg, next_attempt_at: new Date(Date.now() + backoffMs(attempts, 10_000)).toISOString() });
       }
@@ -547,32 +558,70 @@ export const bugouSeriesSync = createServerFn({ method: "POST" })
     return r;
   });
 
-/** Counts for a provider category before a bulk import: total in the index vs already in the catalog. */
+async function pageAll(q: (from: number) => any): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; ; from += 1000) { const { data, error } = await q(from).range(from, from + 999); if (error) throw new Error(error.message); out.push(...(data ?? [])); if (!data || data.length < 1000) break; }
+  return out;
+}
+/** Local series matching the importer: provider id first, then normalized title (+year when both have one). Returns ext_id → local series id. */
+async function matchLocal(db: any, rows: { ext_id: string; title: string; year: number | null }[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const byExt = await pageAll(() => db.from("series").select("id, external_id").eq("external_source", SOURCE).order("id"));
+  const ext = new Map(byExt.map((x: any) => [x.external_id, x.id]));
+  const all = await pageAll(() => db.from("series").select("id, title, release_year").order("id"));
+  const byTitle = new Map<string, { id: string; y: number | null }[]>();
+  for (const x of all) { const k = normTitle(x.title); byTitle.set(k, [...(byTitle.get(k) ?? []), { id: x.id, y: x.release_year }]); }
+  for (const r of rows) {
+    const e = ext.get(r.ext_id); if (e) { out.set(r.ext_id, e as string); continue; }
+    const m = (byTitle.get(normTitle(r.title)) ?? []).find(s => !r.year || !s.y || s.y === r.year);
+    if (m) out.set(r.ext_id, m.id);
+  }
+  return out;
+}
+
+/** Every provider category (full paginated index) with available / imported / pending counts. */
+export const bugouCategoryList = createServerFn({ method: "POST" })
+  .middleware([...auth])
+  .handler(async ({ context }) => {
+    const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
+    const [mem, cat, sync] = await Promise.all([
+      pageAll(() => db.from("bugou_catalog_categories").select("ext_id, category").eq("kind", "series").order("category").order("ext_id")),
+      pageAll(() => db.from("bugou_catalog").select("ext_id, title, year").eq("kind", "series").order("ext_id")),
+      db.from("bugou_sync").select("synced_at, total").eq("kind", "series").maybeSingle(),
+    ]);
+    const local = await matchLocal(db, cat);
+    const m = new Map<string, { total: number; imported: number }>();
+    for (const r of mem) { const c = m.get(r.category) ?? { total: 0, imported: 0 }; c.total++; if (local.has(r.ext_id)) c.imported++; m.set(r.category, c); }
+    const categories = [...m.entries()].map(([name, c]) => ({ name, ...c, missing: c.total - c.imported })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    return { categories, distinct: cat.length, imported: local.size, synced_at: sync.data?.synced_at ?? null };
+  });
+
+/** Counts for one provider category before a bulk import: series available vs in the catalog, plus imported seasons/episodes/players. */
 export const bugouCategoryStats = createServerFn({ method: "POST" })
   .middleware([...auth])
   .inputValidator((d) => z.object({ category: z.string().min(1).max(200) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
-    const rows: { ext_id: string; title: string; year: number | null }[] = [];
-    for (let from = 0; ; from += 1000) {
-      const { data: c, error } = await db.from("bugou_catalog").select("ext_id, title, year").eq("kind", "series").eq("category", data.category).range(from, from + 999);
-      if (error) throw new Error(error.message);
-      rows.push(...((c ?? []) as any[]));
-      if (!c || c.length < 1000) break;
-    }
-    // Same matching the importer uses: provider id first, then title (+year) of an existing series.
-    let imported = 0;
-    for (let i = 0; i < rows.length; i += 200) {
-      const chunk = rows.slice(i, i + 200);
-      const { data: byExt } = await db.from("series").select("external_id").eq("external_source", SOURCE).in("external_id", chunk.map(x => x.ext_id));
-      const have = new Set((byExt ?? []).map((x: any) => x.external_id));
-      const rest = chunk.filter(x => !have.has(x.ext_id));
-      imported += have.size;
-      if (rest.length) {
-        const { data: byTitle } = await db.from("series").select("title, release_year").in("title", [...new Set(rest.map(x => x.title))]);
-        imported += rest.filter(x => (byTitle ?? []).some((s: any) => normTitle(s.title) === normTitle(x.title) && (!x.year || !s.release_year || s.release_year === x.year))).length;
+    const rows = (await pageAll(() => db.from("bugou_catalog").select("ext_id, title, year, bugou_catalog_categories!inner(category)").eq("kind", "series").eq("bugou_catalog_categories.category", data.category).order("ext_id"))).map((x: any) => ({ ext_id: x.ext_id, title: x.title, year: x.year }));
+    const local = await matchLocal(db, rows);
+    const ids = [...new Set(local.values())];
+    let seasons = 0, episodes = 0, empty = 0, withPlayer = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const ss = await pageAll(() => db.from("seasons").select("id, series_id").in("series_id", chunk).order("id"));
+      seasons += ss.length;
+      const withSeason = new Set(ss.map((x: any) => x.series_id)); empty += chunk.filter(x => !withSeason.has(x)).length;
+      const sids = ss.map((x: any) => x.id);
+      for (let j = 0; j < sids.length; j += 150) {
+        const eps = await pageAll(() => db.from("episodes").select("id").in("season_id", sids.slice(j, j + 150)).order("id"));
+        episodes += eps.length;
+        const eids = eps.map((e: any) => e.id);
+        for (let k = 0; k < eids.length; k += 150) {
+          const { data: src } = await db.from("playback_sources").select("content_id").eq("content_kind", "episode").eq("is_active", true).in("content_id", eids.slice(k, k + 150));
+          withPlayer += new Set((src ?? []).map((x: any) => x.content_id)).size;
+        }
       }
     }
-    return { total: rows.length, imported, missing: Math.max(0, rows.length - imported) };
+    return { total: rows.length, imported: local.size, missing: Math.max(0, rows.length - local.size), seasons, episodes, withPlayer, noPlayer: episodes - withPlayer, emptySeries: empty };
   });
