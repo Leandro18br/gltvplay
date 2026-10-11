@@ -54,7 +54,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Buscar séries no BugouMods</DialogTitle>
-          <DialogDescription>Importa só nome, ano e capa. Séries já cadastradas não são alteradas. Episódios e players não são criados.</DialogDescription>
+          <DialogDescription>"Importar" traz só nome, ano e capa. Use "Episódios" para ver temporadas, episódios e players e importá-los. Dados existentes não são alterados.</DialogDescription>
         </DialogHeader>
         <form onSubmit={run} className="flex flex-wrap gap-2">
           <Input className="min-w-0 flex-1" placeholder="Título (vazio = todas)" value={q} onChange={e => setQ(e.target.value)} />
