@@ -267,8 +267,6 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
         <header className="mx-auto flex max-w-6xl items-center gap-3 py-5">{backLink}<div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div></header>
         <main className="mx-auto max-w-6xl space-y-5">
           <div className={live ? "w-full max-w-[380px]" : "w-full"}><EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} /></div>
-          {servers}
-          {data.episodes.length>0 && <div className="flex flex-wrap items-center gap-3"><label htmlFor="embed-episode" className="text-sm">Episódio</label><select id="embed-episode" className="max-w-full rounded-md border border-border bg-background p-2 text-sm" value={id} onChange={e=>navigate({to:"/assistir/$kind/$id",params:{kind:"episode",id:e.target.value},replace:true})}>{data.episodes.map(e=><option key={e.id} value={e.id}>T{e.season_number}:E{e.episode_number} · {e.title}</option>)}</select>{next && <Button variant="secondary" onClick={goNext}><SkipForward /> Próximo episódio</Button>}</div>}
         </main>
       </div>
     );

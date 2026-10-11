@@ -90,15 +90,6 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
           </VideoPlayerFrame>
         )}
       </div>
-      {started && source?.type === "embed" && sources.length > 1 && (
-        <div role="group" aria-label="Servidores" className="flex flex-wrap items-center gap-2">
-          {sources.map((s, n) => (
-            <Button key={s.id} size="sm" variant={s.id === source?.id ? "default" : "secondary"} className="rounded-full" aria-pressed={s.id === source?.id} onClick={() => setServer(n)}>
-              Servidor {n + 1}{s.label && !/^Servidor \d+$/i.test(s.label) ? ` · ${s.label}` : ""}
-            </Button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
