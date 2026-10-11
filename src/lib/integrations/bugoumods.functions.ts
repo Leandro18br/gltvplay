@@ -295,7 +295,7 @@ async function recount(ctx: Ctx, jobId: string) {
 
 export const bugouCreateJob = createServerFn({ method: "POST" })
   .middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).max(500).default([]), allMissing: z.boolean().default(false) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).max(500).default([]), allMissing: z.boolean().default(false), category: z.string().max(200).optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
@@ -314,13 +314,21 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
         (c ?? []).forEach((x: any) => { if (!imported.has(x.ext_id)) items.push(x); });
         if (!c || c.length < 1000) break;
       }
+    } else if (data.category && !data.ids.length) {
+      await ensureIndex(ctx, false);
+      for (let from = 0; ; from += 1000) {
+        const { data: c, error } = await db.from("bugou_catalog").select("ext_id, title").eq("kind", "series").eq("category", data.category).order("title_norm").range(from, from + 999);
+        if (error) throw new Error(error.message);
+        items.push(...((c ?? []) as any[]));
+        if (!c || c.length < 1000) break;
+      }
     } else {
       const { data: c } = await db.from("bugou_catalog").select("ext_id, title").eq("kind", "series").in("ext_id", data.ids);
       const t = new Map((c ?? []).map((x: any) => [x.ext_id, x.title]));
       items = data.ids.map(id => ({ ext_id: id, title: (t.get(id) as string) ?? null }));
     }
     if (!items.length) throw new Error("Nada para importar.");
-    const j = await db.from("bugou_import_jobs").insert({ label: data.allMissing ? "Todas as séries não importadas" : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
+    const j = await db.from("bugou_import_jobs").insert({ label: data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
     if (j.error) throw new Error(j.error.message);
     for (let i = 0; i < items.length; i += 500) {
       const r = await db.from("bugou_import_items").insert(items.slice(i, i + 500).map(x => ({ job_id: j.data.id, ext_id: x.ext_id, title: x.title })));
@@ -419,4 +427,26 @@ export const bugouSeriesSync = createServerFn({ method: "POST" })
     const { integ } = await seriesIntegration();
     if (integ) await (await admin()).from("api_integrations").update({ last_synced_at: r.synced_at }).eq("id", integ.id);
     return r;
+  });
+
+/** Counts for a provider category before a bulk import: total in the index vs already in the catalog. */
+export const bugouCategoryStats = createServerFn({ method: "POST" })
+  .middleware([...auth])
+  .inputValidator((d) => z.object({ category: z.string().min(1).max(200) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx; const db = ctx.supabase;
+    await assertStaff(ctx);
+    const ids: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: c, error } = await db.from("bugou_catalog").select("ext_id").eq("kind", "series").eq("category", data.category).range(from, from + 999);
+      if (error) throw new Error(error.message);
+      (c ?? []).forEach((x: any) => ids.push(x.ext_id));
+      if (!c || c.length < 1000) break;
+    }
+    let imported = 0;
+    for (let i = 0; i < ids.length; i += 300) {
+      const { count } = await db.from("series").select("id", { count: "exact", head: true }).eq("external_source", SOURCE).in("external_id", ids.slice(i, i + 300));
+      imported += count ?? 0;
+    }
+    return { total: ids.length, imported, missing: Math.max(0, ids.length - imported) };
   });
