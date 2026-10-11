@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { fmtDate } from "./shared";
 
-type Job = Awaited<ReturnType<typeof liveRunJob>>;
+type Job = Awaited<ReturnType<typeof liveOverview>>["jobs"][number] & { busy?: boolean };
+type Item = { ext_id: string; name: string; logo_url: string | null; category: string; has_play: boolean; imported: boolean };
 type LiveInteg = { id: string; name: string; is_active: boolean; last_synced_at: string | null };
 
 export function LiveChannelsCard() {
@@ -78,7 +79,7 @@ function useJobRunner(onDone: () => void) {
   return { job, setJob, drive, stop: async (id: string) => { stop.current = true; setJob(await pause({ data: { jobId: id } })); }, retry: async (id: string) => { setJob(await retry({ data: { jobId: id } })); await drive(id); } };
 }
 
-function JobLine({ j, onChange }: { j: Job | Awaited<ReturnType<typeof liveOverview>>["jobs"][number]; onChange: () => void }) {
+function JobLine({ j, onChange }: { j: Job; onChange: () => void }) {
   const r = useJobRunner(onChange); const cur = r.job ?? j; const [show, setShow] = useState(false);
   return <div className="rounded-xl border border-border p-2 text-xs">
     <div className="flex flex-wrap items-center gap-2">
@@ -90,7 +91,7 @@ function JobLine({ j, onChange }: { j: Job | Awaited<ReturnType<typeof liveOverv
         {cur.failed > 0 && <Button size="sm" variant="ghost" onClick={() => setShow(s => !s)}>Motivos</Button>}
       </span>
     </div>
-    {show && <ul className="mt-1 space-y-0.5 text-destructive">{cur.failures.map(f => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
+    {show && <ul className="mt-1 space-y-0.5 text-destructive">{cur.failures.map((f: Job["failures"][number]) => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
   </div>;
 }
 const statusLabel = (s: string) => ({ queued: "Na fila", running: "Em andamento", done: "Concluída", paused: "Pausada", cancelled: "Cancelada" } as Record<string, string>)[s] ?? s;
@@ -99,12 +100,12 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
   const catsFn = useServerFn(liveCategories); const chFn = useServerFn(liveChannels); const create = useServerFn(liveCreateJob);
   const cats = useQuery({ queryKey: ["admin", "live-cats", integ.id], queryFn: () => catsFn({ data: { integrationId: integ.id } }), enabled: open });
   const [cat, setCat] = useState<string | null>(null); const [page, setPage] = useState(0);
-  const [items, setItems] = useState<Awaited<ReturnType<typeof liveChannels>>["items"]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<Item[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const r = useJobRunner(() => { onDone(); cats.refetch(); if (cat) load(cat, 0, true); });
   async function load(c: string, p: number, reset: boolean) {
     setLoading(true);
-    try { const res = await chFn({ data: { integrationId: integ.id, category: c, page: p } }); setItems(prev => reset ? res.items : [...prev, ...res.items]); setTotal(res.total); setPage(p); } catch (e) { toast.error(errMsg(e)); } finally { setLoading(false); }
+    try { const res = await chFn({ data: { integrationId: integ.id, category: c, page: p } }); setItems((prev: Item[]) => reset ? res.items as Item[] : [...prev, ...(res.items as Item[])]); setTotal(res.total); setPage(p); } catch (e) { toast.error(errMsg(e)); } finally { setLoading(false); }
   }
   useEffect(() => { if (cat) { setSel(new Set()); load(cat, 0, true); } }, [cat]); // eslint-disable-line react-hooks/exhaustive-deps
   const info = cats.data?.find(c => c.name === cat);
@@ -153,7 +154,7 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
             {job.failed > 0 && !running && <Button size="sm" variant="ghost" onClick={() => r.retry(job.id)}><RotateCcw /> Tentar novamente só as falhas</Button>}</div>
           <Progress value={job.total ? ((job.done + job.failed) / job.total) * 100 : 0} />
           <p className="text-xs text-muted-foreground">{job.done + job.failed}/{job.total} · {job.stats.created ?? 0} importados · {job.stats.updated ?? 0} atualizados · {job.stats.skipped ?? 0} ignorados (já existiam) · {job.failed} falharam</p>
-          {job.failures.length > 0 && <ul className="max-h-24 overflow-y-auto text-xs text-destructive">{job.failures.map(f => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
+          {job.failures.length > 0 && <ul className="max-h-24 overflow-y-auto text-xs text-destructive">{job.failures.map((f: Job["failures"][number]) => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
         </div>}
         {cat && <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
           <Button variant="outline" disabled={!!running || !info?.total} onClick={() => start(true)}>Importar todos da categoria ({info?.total ?? 0})</Button>
