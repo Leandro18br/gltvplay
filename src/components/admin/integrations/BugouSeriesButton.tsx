@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
+type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; with_player?: number; no_episodes?: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
 
 export function BugouSeriesButton({ label = "Buscar séries pela API", disabled = false }: { label?: string; disabled?: boolean } = {}) {
   const [open, setOpen] = useState(false);
