@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, DownloadCloud, FlaskConical, Loader2, Pause, Play, RefreshCw, RotateCcw, Tv } from "lucide-react";
+import { Check, DownloadCloud, Search, FlaskConical, Loader2, Pause, Play, RefreshCw, RotateCcw, Tv } from "lucide-react";
 import { db, errMsg } from "@/lib/admin/db";
 import { liveCategories, liveChannels, liveCreateJob, liveOverview, livePauseJob, liveRetryFailed, liveRunJob, liveSync, liveTest } from "@/lib/integrations/live.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { fmtDate } from "./shared";
@@ -14,6 +15,20 @@ import { fmtDate } from "./shared";
 type Job = Awaited<ReturnType<typeof liveOverview>>["jobs"][number] & { busy?: boolean };
 type Item = { ext_id: string; name: string; logo_url: string | null; category: string; has_play: boolean; imported: boolean };
 type LiveInteg = { id: string; name: string; is_active: boolean; last_synced_at: string | null };
+
+/** "Buscar canais pela API" on the Canais page: reuses the live integrations configured in APIs e Integrações. */
+export function LiveChannelsButton() {
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ["admin", "integrations", "live"], queryFn: async () => { const r = await db.from("api_integrations").select("id,name,is_active,last_synced_at").eq("kind", "live").order("priority"); if (r.error) throw r.error; return r.data as LiveInteg[]; } });
+  const usable = (list.data ?? []).filter(i => i.is_active && i.last_synced_at);
+  const [open, setOpen] = useState<LiveInteg | null>(null);
+  const hint = list.isPending ? "Carregando…" : !list.data?.length ? "Cadastre uma API de canais em APIs e Integrações" : !usable.length ? "Ative e sincronize a API de canais em APIs e Integrações" : undefined;
+  return <>
+    <Button size="sm" variant="outline" className="rounded-full" title={hint} disabled={!usable.length} onClick={() => setOpen(usable[0] ?? null)}><Search /> Buscar canais pela API</Button>
+    {usable.length > 1 && open && <select aria-label="API" className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={open.id} onChange={e => setOpen(usable.find(i => i.id === e.target.value) ?? null)}>{usable.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select>}
+    {open && <ImportDialog key={open.id} open onOpenChange={o => !o && setOpen(null)} integ={open} onDone={() => qc.invalidateQueries({ queryKey: ["admin"] })} />}
+  </>;
+}
 
 export function LiveChannelsCard() {
   const list = useQuery({ queryKey: ["admin", "integrations", "live"], queryFn: async () => { const r = await db.from("api_integrations").select("id,name,is_active,last_synced_at").eq("kind", "live").order("priority"); if (r.error) throw r.error; return r.data as LiveInteg[]; } });
@@ -102,45 +117,53 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
   const [cat, setCat] = useState<string | null>(null); const [page, setPage] = useState(0);
   const [items, setItems] = useState<Item[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const r = useJobRunner(() => { onDone(); cats.refetch(); if (cat) load(cat, 0, true); });
-  async function load(c: string, p: number, reset: boolean) {
-    setLoading(true);
-    try { const res = await chFn({ data: { integrationId: integ.id, category: c, page: p } }); setItems((prev: Item[]) => reset ? res.items as Item[] : [...prev, ...(res.items as Item[])]); setTotal(res.total); setPage(p); } catch (e) { toast.error(errMsg(e)); } finally { setLoading(false); }
+  const [input, setInput] = useState(""); const [term, setTerm] = useState(""); const [err, setErr] = useState<string | null>(null);
+  const r = useJobRunner(() => { onDone(); cats.refetch(); if (cat || term) load(cat, 0, true); });
+  async function load(c: string | null, p: number, reset: boolean, q = term) {
+    setLoading(true); setErr(null);
+    try { const res = await chFn({ data: { integrationId: integ.id, category: c ?? undefined, query: c ? undefined : q, page: p } }); setItems((prev: Item[]) => reset ? res.items as Item[] : [...prev, ...(res.items as Item[])]); setTotal(res.total); setPage(p); } catch (e) { setErr(errMsg(e)); toast.error(errMsg(e)); } finally { setLoading(false); }
   }
-  useEffect(() => { if (cat) { setSel(new Set()); load(cat, 0, true); } }, [cat]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (cat) { setSel(new Set()); setTerm(""); load(cat, 0, true, ""); } }, [cat]);
+  function doSearch() { const q = input.trim(); if (!q) return; setCat(null); setTerm(q); setSel(new Set()); setItems([]); load(null, 0, true, q); } // eslint-disable-line react-hooks/exhaustive-deps
   const info = cats.data?.find(c => c.name === cat);
   async function start(all: boolean) {
-    if (!cat) return;
+    if (!cat && !(term && !all)) return;
     const n = all ? info?.total ?? 0 : sel.size; const exist = all ? info?.imported ?? 0 : items.filter(i => sel.has(i.ext_id) && i.imported).length;
-    if (!confirm(`Importar ${n} canal(is) de "${cat}"? ${exist} já existem no catálogo e serão apenas atualizados.`)) return;
-    try { const j = await create({ data: { integrationId: integ.id, category: cat, ids: all ? [] : [...sel] } }); r.setJob(j); setSel(new Set()); await r.drive(j.id); } catch (e) { toast.error(errMsg(e)); }
+    if (!confirm(`Importar ${n} canal(is)${cat ? ` de "${cat}"` : ""}? ${exist} já existem no catálogo e serão apenas atualizados.`)) return;
+    try { const j = await create({ data: { integrationId: integ.id, category: cat ?? undefined, ids: all ? [] : [...sel] } }); r.setJob(j); setSel(new Set()); await r.drive(j.id); } catch (e) { toast.error(errMsg(e)); }
   }
   const job = r.job; const running = job && job.status !== "done" && job.status !== "paused";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92vh] max-w-5xl flex-col overflow-hidden">
-        <DialogHeader><DialogTitle>Importar canais — {integ.name}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Buscar canais pela API — {integ.name}</DialogTitle></DialogHeader>
+        <form className="flex gap-2" onSubmit={e => { e.preventDefault(); doSearch(); }}>
+          <Input className="min-w-0 flex-1" placeholder="Nome do canal (maiúsculas e acentos não importam)" value={input} onChange={e => setInput(e.target.value)} />
+          <Button disabled={loading || !input.trim()}>{loading && term ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
+        </form>
         <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[240px_1fr]">
           <div className="min-h-0 overflow-y-auto rounded-xl border border-border p-1">
             {cats.isPending && <Loader2 className="m-3 animate-spin text-primary" />}
             {cats.data?.map(c => <button key={c.name} type="button" onClick={() => setCat(c.name)} className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${cat === c.name ? "bg-primary/15 text-primary" : "hover:bg-muted"}`}><span className="truncate">{c.name}</span><span className="shrink-0 text-xs text-muted-foreground">{c.imported}/{c.total}</span></button>)}
           </div>
           <div className="flex min-h-0 flex-col">
-            {!cat ? <p className="p-6 text-sm text-muted-foreground">Escolha uma categoria para ver os canais.</p> : <>
+            {err && <p className="p-3 text-sm text-destructive">{err}</p>}
+            {!cat && !term ? <p className="p-6 text-sm text-muted-foreground">Escolha uma categoria ou pesquise um canal pelo nome.</p> : <>
               <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                <b>{cat}</b><span className="text-muted-foreground">{total} canais · {info?.imported ?? 0} já no catálogo · {info?.noLink ?? 0} sem link</span>
-                <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSel(s => s.size === items.length ? new Set() : new Set(items.map(i => i.ext_id)))}>{sel.size === items.length && items.length ? "Limpar seleção" : "Selecionar carregados"}</Button>
+                {cat ? <><b>{cat}</b><span className="text-muted-foreground">{total} canais · {info?.imported ?? 0} já no catálogo · {info?.noLink ?? 0} sem link</span></> : <><b>Busca: “{term}”</b><span className="text-muted-foreground">{loading ? "Pesquisando…" : `${total} resultado(s)`}</span></>}
+                <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSel(s => s.size === items.length ? new Set() : new Set(items.map(i => i.ext_id)))}>{sel.size === items.length && items.length ? "Limpar seleção" : "Selecionar todos (carregados)"}</Button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                   {items.map(c => { const on = sel.has(c.ext_id); return (
                     <button key={c.ext_id} type="button" onClick={() => setSel(s => { const x = new Set(s); if (x.has(c.ext_id)) x.delete(c.ext_id); else x.add(c.ext_id); return x; })} className={`relative flex items-center gap-2 rounded-xl border p-2 text-left ${on ? "border-primary shadow-glow" : "border-border"}`}>
                       <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">{c.logo_url ? <img src={c.logo_url} alt="" loading="lazy" className="max-h-full object-contain" /> : <Tv className="size-5 text-muted-foreground" />}</div>
-                      <div className="min-w-0 text-xs"><p className="truncate text-sm font-medium">{c.name}</p><p className="truncate text-muted-foreground">ID {c.ext_id}</p>
+                      <div className="min-w-0 text-xs"><p className="truncate text-sm font-medium">{c.name}</p><p className="truncate text-muted-foreground">{cat ? `ID ${c.ext_id}` : c.category}</p>
                         <p>{c.imported ? <span className="text-primary">Importado</span> : "Não importado"} · {c.has_play ? "Link OK" : <span className="text-destructive">Sem link</span>}</p></div>
                       {on && <span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground"><Check className="size-3" /></span>}
                     </button>); })}
                 </div>
+                {!loading && !err && !items.length && <p className="p-6 text-sm text-muted-foreground">Nenhum canal encontrado.</p>}
                 {items.length < total && <Button variant="ghost" className="mt-2 w-full" disabled={loading} onClick={() => load(cat, page + 1, false)}>{loading && <Loader2 className="animate-spin" />} Carregar mais</Button>}
                 {loading && !items.length && <Loader2 className="m-3 animate-spin text-primary" />}
               </div>
@@ -156,8 +179,8 @@ function ImportDialog({ open, onOpenChange, integ, onDone }: { open: boolean; on
           <p className="text-xs text-muted-foreground">{job.done + job.failed}/{job.total} · {job.stats.created ?? 0} importados · {job.stats.updated ?? 0} atualizados · {job.stats.skipped ?? 0} ignorados (já existiam) · {job.failed} falharam</p>
           {job.failures.length > 0 && <ul className="max-h-24 overflow-y-auto text-xs text-destructive">{job.failures.map((f: Job["failures"][number]) => <li key={f.ext_id}>{f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
         </div>}
-        {cat && <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <Button variant="outline" disabled={!!running || !info?.total} onClick={() => start(true)}>Importar todos da categoria ({info?.total ?? 0})</Button>
+        {(cat || term) && <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          {cat && <Button variant="outline" disabled={!!running || !info?.total} onClick={() => start(true)}>Importar categoria inteira ({info?.total ?? 0})</Button>}
           <Button className="ml-auto rounded-full" disabled={!sel.size || !!running} onClick={() => start(false)}>{running ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Importar {sel.size || ""}</Button>
         </div>}
       </DialogContent>
