@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
-import { parseBugouName, parseBugouDetails, type BugouSeries, type BugouDetails } from "./bugoumods";
+import { parseBugouName, parseBugouDetails, bugouVipEmbedUrl, type BugouSeries, type BugouDetails } from "./bugoumods";
 
 /**
  * BugouMods VIP series list — METADATA ONLY (id, name/year, cover, category).
