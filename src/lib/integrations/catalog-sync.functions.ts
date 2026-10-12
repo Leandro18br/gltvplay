@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff } from "@/lib/tmdb/tmdb.functions";
-import { fetchProviderJson, RateLimitedError, minIntervalMs, backoffMs } from "./ratelimit";
+import { fetchProviderJson, RateLimitedError, backoffMs } from "./ratelimit";
 import { parseHomeCategories, parseCategoryPage, nextCursor, PAGE_LIMIT, type ProviderCategory } from "./catalog-pages";
 import { parseBugouName, normTitle, compactTitle } from "./bugoumods";
 import { seriesIntegration, logCall } from "./bugoumods.functions";
