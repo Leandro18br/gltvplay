@@ -389,6 +389,13 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   let throttleUntil: string | null = null; let stop = false;
   const started = Date.now(); let nextSlot = 0;
   const stamp = () => new Date().toISOString();
+  /** Fresh status read: a pause/cancel from the admin stops new provider calls and new writes for this job. */
+  const halted = async () => {
+    if (stop) return true;
+    const { data } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
+    if (data?.status === "paused" || data?.status === "cancelled") stop = true;
+    return stop;
+  };
   /** Reserves the next provider call slot; false when it would fall outside the budget. */
   const slot = async () => {
     const t = Math.max(Date.now(), nextSlot);
@@ -402,12 +409,15 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     const upd = (patch: any) => db.from("bugou_import_items").update({ ...patch, updated_at: stamp() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
     try {
       let details = it.details as BugouDetails | null;
+      if (await halted()) { await upd({ state: "pending" }); return "skip"; }
       if (!details) {
         if (!(await slot())) { await upd({ state: "pending" }); return "skip"; }
         st.requests = (st.requests ?? 0) + 1;
         details = await loadDetails(it.ext_id, `Importação: ${it.title ?? it.ext_id}`);
         st.rate_factor = adaptFactor(st.rate_factor ?? 1, "ok");
         await upd({ details, step: "episodes", seasons_found: details.seasons.length, error: null });
+        // Cancelled while the provider call was in flight: keep the cached details, write nothing to the catalog.
+        if (await halted()) { await upd({ state: "pending" }); return "skip"; }
       }
       const res = await importSeriesFull(ctx, it.ext_id, undefined, details);
       episodes += res.episodesCreated; st.seasons = (st.seasons ?? 0) + res.seasonsCreated;
@@ -448,7 +458,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   while (!stop && Date.now() - started < budgetMs - 3000) {
     if ((await globalThrottle(ctx)) > Date.now()) break;
     const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
-    if (cur?.status === "paused" || cur?.status === "cancelled") break;
+    if (cur?.status === "paused" || cur?.status === "cancelled") { stop = true; break; }
     const n = Math.max(1, Math.min(MAX_CONCURRENCY, st.concurrency ?? 2));
     const { data: due } = await db.from("bugou_import_items").select("ext_id, title, attempts, rate_limited, details").eq("job_id", jobId).eq("state", "pending").or(`next_attempt_at.is.null,next_attempt_at.lte.${stamp()}`).order("attempts").order("ext_id").limit(n);
     if (!due?.length) break;
