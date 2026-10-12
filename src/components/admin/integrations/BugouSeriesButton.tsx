@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Check, ChevronLeft, ChevronRight, DownloadCloud, ListVideo, Loader2, Pause, Play, RotateCcw, Search } from "lucide-react";
 import { errMsg } from "@/lib/admin/db";
-import { bugouSearchSeries, bugouSeriesDetails, bugouImportEpisodes, bugouCreateJob, bugouRunJob, bugouRetryFailed, bugouCancelJob, bugouJobsOverview, bugouCategoryStats, bugouCategoryList } from "@/lib/integrations/bugoumods.functions";
+import { bugouSearchSeries, bugouSeriesDetails, bugouImportEpisodes, bugouCreateJob, bugouRunJob, bugouRetryFailed, bugouCancelJob, bugouStopJob, bugouJobsOverview, bugouCategoryStats, bugouCategoryList } from "@/lib/integrations/bugoumods.functions";
 import type { BugouSeries, BugouDetails } from "@/lib/integrations/bugoumods";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import { ApiSearchBar } from "./ApiSearchBar";
 import { apiSearch } from "@/lib/integrations/api-search.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; with_player?: number; no_episodes?: number; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
+type Job = { id: string; label: string; status: string; total: number; done: number; failed: number; pending: number; queued?: number; processing?: number; waiting?: number; next_retry_at?: string | null; throttled?: boolean; requests?: number; http429?: number; seasons?: number; with_player?: number; no_episodes?: number; concurrency?: number; per_min?: number; eta_min?: number | null; episodes_created: number; failures: { ext_id: string; title: string | null; error: string | null; rate_limited?: number }[] };
 
 export function BugouSeriesButton({ label = "Buscar séries pela API", disabled = false }: { label?: string; disabled?: boolean } = {}) {
   const [open, setOpen] = useState(false);
@@ -31,7 +31,7 @@ export function BugouSeriesButton({ label = "Buscar séries pela API", disabled 
 function BugouDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const search = useServerFn(bugouSearchSeries); const createJob = useServerFn(bugouCreateJob); const runJob = useServerFn(bugouRunJob);
-  const retry = useServerFn(bugouRetryFailed); const pause = useServerFn(bugouCancelJob); const overview = useServerFn(bugouJobsOverview); const catStatsFn = useServerFn(bugouCategoryStats); const catListFn = useServerFn(bugouCategoryList);
+  const retry = useServerFn(bugouRetryFailed); const pause = useServerFn(bugouCancelJob); const stopFn = useServerFn(bugouStopJob); const overview = useServerFn(bugouJobsOverview); const catStatsFn = useServerFn(bugouCategoryStats); const catListFn = useServerFn(bugouCategoryList);
   const [catStats, setCatStats] = useState<Awaited<ReturnType<typeof bugouCategoryStats>> | null>(null);
   const [catList, setCatList] = useState<Awaited<ReturnType<typeof bugouCategoryList>> | null>(null);
   const loadCats = useCallback(() => { catListFn().then(setCatList).catch(x => toast.error(errMsg(x))); }, [catListFn]); const [confirmCat, setConfirmCat] = useState(false);
@@ -79,7 +79,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
     if (running.current) return; running.current = true; setJob(j);
     try {
       let cur = j; let first = true;
-      while (cur.status !== "done" && cur.status !== "paused" && cur.pending > 0) {
+      while (cur.status !== "done" && cur.status !== "paused" && cur.status !== "cancelled" && cur.pending > 0) {
         const r = await runJob({ data: { jobId: cur.id, resume: first } }); first = false;
         cur = r as Job; setJob(cur);
         if (!running.current) break;
@@ -145,10 +145,12 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
             {job.next_retry_at && Date.parse(job.next_retry_at) > Date.now() && (
               <p className="rounded-lg bg-primary/10 px-2 py-1 text-xs">{job.throttled ? "Pausado pelo limite de requisições do provedor. " : ""}Próxima tentativa às {new Date(job.next_retry_at).toLocaleTimeString("pt-BR")}. O progresso está salvo.</p>
             )}
+            <p className="text-xs text-muted-foreground">{job.total ? Math.round(((job.done + job.failed) / job.total) * 100) : 0}% · {job.concurrency ?? 2} série(s) em paralelo · {job.per_min ? `${job.per_min} série(s)/min` : "medindo velocidade…"}{job.eta_min ? ` · faltam ~${job.eta_min >= 60 ? `${Math.floor(job.eta_min / 60)} h ${job.eta_min % 60} min` : `${job.eta_min} min`}` : ""}{job.status === "running" ? " · continua no servidor mesmo se você fechar esta tela" : job.status === "cancelled" ? " · cancelada (o que já foi importado foi mantido)" : ""}</p>
             <Progress value={job.total ? ((job.done + job.failed) / job.total) * 100 : 0} />
             <div className="flex flex-wrap gap-2">
               {jobActive && <Button size="sm" variant="outline" onClick={() => { running.current = false; pause({ data: { jobId: job.id } }).then(j => setJob(j as Job)); }}><Pause /> Pausar</Button>}
-              {!jobActive && job.pending > 0 && <Button size="sm" onClick={() => drive({ ...job, status: "running" })}><Play /> Retomar</Button>}
+              {job.status !== "cancelled" && job.status !== "done" && job.pending > 0 && <Button size="sm" variant="ghost" onClick={() => { if (!confirm("Cancelar esta importação? As séries já importadas são mantidas; as pendentes não serão processadas.")) return; running.current = false; stopFn({ data: { jobId: job.id, cancel: true } }).then(j => setJob(j as Job)); }}>Cancelar</Button>}
+              {!jobActive && job.pending > 0 && job.status !== "cancelled" && <Button size="sm" onClick={() => drive({ ...job, status: "running" })}><Play /> Retomar</Button>}
               {!jobActive && job.failed > 0 && <Button size="sm" variant="outline" onClick={() => retry({ data: { jobId: job.id } }).then(j => drive(j as Job))}><RotateCcw /> Tentar de novo só as falhas</Button>}
               {jobActive && <Loader2 className="h-4 w-4 animate-spin self-center" />}
             </div>
