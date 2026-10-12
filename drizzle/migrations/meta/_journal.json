@@ -309,6 +309,13 @@
       "when": 1791757117193,
       "tag": "0043_catalog_category_members",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1791763934351,
+      "tag": "0044_bugou_bulk_apply_and_worker",
+      "breakpoints": true
     }
   ]
 }

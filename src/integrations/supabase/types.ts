@@ -2472,6 +2472,15 @@ export type Database = {
         Args: { _display_name: string; _status?: string; _user_id: string }
         Returns: undefined
       }
+      bugou_apply_series: {
+        Args: { _actor: string; _items: Json; _series_id: string }
+        Returns: Json
+      }
+      bugou_worker_arm: {
+        Args: { _key: string; _url: string }
+        Returns: undefined
+      }
+      bugou_worker_disarm: { Args: never; Returns: undefined }
       can_manage_access: {
         Args: {
           _me: string
