@@ -117,6 +117,7 @@ export const importCatalog = createServerFn({ method: "POST" }).middleware([requ
         const ins = await sb.from(table).insert({ ...row, slug, status: "published" }).select("id").single();
         if (ins.error) throw new Error(ins.error.message); id = ins.data.id; report.created++;
       }
+      await linkCategories(sb, data.kind, id, it.genres ?? []);
       if (data.kind === "movie") {
         if (data.autoPlayer && budget-- > 0) await autoPlayer("movie", id);
         continue;
