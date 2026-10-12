@@ -196,6 +196,8 @@ export const channelCategoryMetaQuery = (slug: string) =>
     },
     staleTime: 30_000,
   });
+
+export const PAGE_SIZE = 24;
 export type SortKey = "recent" | "year" | "title";
 
 export const catalogListQuery = (kind: Kind, genre: string | undefined, sort: SortKey) =>
