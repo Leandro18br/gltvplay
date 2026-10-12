@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { linkCategories } from "./categories";
+import { pool } from "./pool";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff } from "@/lib/tmdb/tmdb.functions";
 import { isBlockedHost } from "./engine";
@@ -192,7 +194,13 @@ async function importBatch(ctx: Ctx, integrationId: string, items: { ext_id: str
   const chIds = (existing ?? []).map((c: any) => c.id);
   const { data: srcs } = chIds.length ? await db.from("playback_sources").select("id, content_id, url, external_ref, is_primary").eq("content_kind", "channel").in("content_id", chIds) : { data: [] };
   const srcBy = new Map<string, any[]>(); (srcs ?? []).forEach((s: any) => srcBy.set(s.content_id, [...(srcBy.get(s.content_id) ?? []), s]));
-  for (const it of items) {
+  const mem = new Map<string, string[]>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data: m } = await db.from("live_catalog_categories").select("ext_id, category").eq("integration_id", integrationId).in("ext_id", ids.slice(i, i + 500));
+    (m ?? []).forEach((x: any) => mem.set(x.ext_id, [...(mem.get(x.ext_id) ?? []), x.category]));
+  }
+  // Independent channels run concurrently (bounded); no fixed waits between them.
+  await pool(items, 8, async (it) => {
     const c = byId.get(it.ext_id);
     try {
       if (!c) throw Object.assign(new Error("Canal não está mais na resposta da API (removido pelo provedor)."), { permanent: true });
@@ -202,7 +210,9 @@ async function importBatch(ctx: Ctx, integrationId: string, items: { ext_id: str
         let slug = slugify(c.name);
         const { data: taken } = await db.from("channels").select("id").eq("slug", slug).maybeSingle();
         if (taken) slug = `${slug}-${c.id}`.slice(0, 100);
-        const r = await db.from("channels").insert({ name: c.name, slug, logo_url: c.logo, status: "published", external_source: "bugoumods", external_id: c.id, api_integration_id: integrationId }).select("id, external_id, name, logo_url").single();
+        const ins = (sl: string) => db.from("channels").insert({ name: c.name, slug: sl, logo_url: c.logo, status: "published", external_source: "bugoumods", external_id: c.id, api_integration_id: integrationId }).select("id, external_id, name, logo_url").single();
+        let r = await ins(slug);
+        if (r.error && /slug/i.test(r.error.message)) r = await ins(`${slugify(c.name)}-${c.id}`.slice(0, 100));
         if (r.error) throw new Error(r.error.message);
         row = r.data; out.created++;
       } else {
@@ -222,12 +232,13 @@ async function importBatch(ctx: Ctx, integrationId: string, items: { ext_id: str
         if (r.error) throw new Error(r.error.message);
         changed = true;
       }
+      if (await linkCategories(db, "channel", row.id, [c.category, ...(mem.get(c.id) ?? [])])) changed = true;
       if (ex.has(c.id)) { if (changed) out.updated++; else out.skipped++; }
     } catch (e) {
       const msg = scrub(e instanceof Error ? e.message : String(e)).slice(0, 400);
       out.failed.push({ id: it.ext_id, error: msg, permanent: !!(e as any)?.permanent || isPermanent(msg) });
     }
-  }
+  });
   return out;
 }
 
