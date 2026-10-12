@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, ChevronLeft, ChevronRight, DownloadCloud, ListVideo, Loader2, Pause, Play, RotateCcw, Search } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, DownloadCloud, ListVideo, Loader2, Pause, Play, RotateCcw, Search, XCircle } from "lucide-react";
 import { errMsg } from "@/lib/admin/db";
 import { bugouSearchSeries, bugouSeriesDetails, bugouImportEpisodes, bugouCreateJob, bugouRunJob, bugouRetryFailed, bugouCancelJob, bugouStopJob, bugouJobsOverview, bugouCategoryStats, bugouCategoryList } from "@/lib/integrations/bugoumods.functions";
 import type { BugouSeries, BugouDetails } from "@/lib/integrations/bugoumods";
@@ -45,6 +45,9 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
   const [job, setJob] = useState<Job | null>(null); const [ov, setOv] = useState<{ indexTotal: number; imported: number } | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const running = useRef(false);
+  // Jobs cancelled in this session: late responses for them never bring the progress panel back.
+  const cancelled = useRef(new Set<string>());
+  const showJob = useCallback((j: Job | null) => { if (j && cancelled.current.has(j.id)) return; setJob(j); }, []);
 
   const run = useCallback(async (p = 0, opts: { refresh?: boolean; withCategories?: boolean; category?: string } = {}) => {
     // Index browse (category / full list). A newer search or browse supersedes this one.
@@ -76,27 +79,28 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
   }
 
   const drive = useCallback(async (j: Job) => {
-    if (running.current) return; running.current = true; setJob(j);
+    if (running.current || cancelled.current.has(j.id)) return; running.current = true; setJob(j);
     try {
       let cur = j; let first = true;
       while (cur.status !== "done" && cur.status !== "paused" && cur.status !== "cancelled" && cur.pending > 0) {
         const r = await runJob({ data: { jobId: cur.id, resume: first } }); first = false;
-        cur = r as Job; setJob(cur);
-        if (!running.current) break;
+        cur = r as Job;
+        if (!running.current || cancelled.current.has(cur.id)) break;
+        setJob(cur);
         // Wait for the provider's pause / next scheduled retry instead of hammering the server.
         const until = cur.next_retry_at ? Date.parse(cur.next_retry_at) - Date.now() : 0;
         const nothingDue = (cur.queued ?? 1) === 0 && (cur.processing ?? 0) === 0;
         if (r.busy) await new Promise(res => setTimeout(res, 4000));
         else if (until > 0 && (cur.throttled || nothingDue)) await new Promise(res => setTimeout(res, Math.min(until + 500, 15000)));
       }
-      if (cur.status === "done") { toast.success(`Importação concluída: ${cur.done} série(s), ${cur.episodes_created} episódio(s) novos${cur.failed ? `, ${cur.failed} com falha` : ""}.`); qc.invalidateQueries({ queryKey: ["admin"] }); }
-    } catch (x) { toast.error(`${errMsg(x)} — use "Retomar" para continuar de onde parou.`); }
+      if (cur.status === "done" && !cancelled.current.has(cur.id)) { toast.success(`Importação concluída: ${cur.done} série(s), ${cur.episodes_created} episódio(s) novos${cur.failed ? `, ${cur.failed} com falha` : ""}.`); qc.invalidateQueries({ queryKey: ["admin"] }); }
+    } catch (x) { if (!cancelled.current.has(j.id)) toast.error(`${errMsg(x)} — use "Retomar" para continuar de onde parou.`); }
     finally { running.current = false; }
   }, [runJob, qc]);
 
   useEffect(() => {
     run(0, { withCategories: true }); loadCats();
-    overview().then(o => { setOv(o); const open = (o.jobs as Job[]).find(j => j.status !== "done" || j.failed > 0); if (open) setJob(open); }).catch(() => {});
+    overview().then(o => { setOv(o); const open = (o.jobs as Job[]).find(j => j.status !== "cancelled" && (j.status !== "done" || j.failed > 0)); if (open) showJob(open); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,61 +114,73 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
   const missing = ov ? Math.max(0, ov.indexTotal - ov.imported) : null;
   const pages = meta ? Math.max(1, Math.ceil(meta.matches / meta.pageSize)) : 1;
   const jobActive = !!job && running.current;
+  const pct = job?.total ? ((job.done + job.failed) / job.total) * 100 : 0;
+  const canCancel = !!job && job.status !== "cancelled" && job.status !== "done" && job.pending > 0;
+  /** Real cancel: stop the local loop, mark the job cancelled on the server (worker and in-flight waves check it before writing), remove the panel now. */
+  function cancelJob(j: Job) {
+    cancelled.current.add(j.id); running.current = false; setJob(null);
+    stopFn({ data: { jobId: j.id, cancel: true } })
+      .then(v => { toast.success(`Importação cancelada: ${v.done} concluída(s) mantidas, ${v.pending} pendente(s) não serão processadas.`); qc.invalidateQueries({ queryKey: ["admin"] }); overview().then(setOv).catch(() => {}); })
+      .catch(x => toast.error(`Não foi possível cancelar: ${errMsg(x)}`));
+  }
   // While showing API search results, panels move below them so results sit right under the search field (phones).
   const later = apiTerm != null ? "order-last" : "";
 
   return (
     <Dialog open onOpenChange={o => !o && onClose()}>
-      <DialogContent className="h-[100dvh] max-h-[100dvh] max-w-none content-start overflow-y-auto overscroll-contain rounded-none p-4 sm:h-auto sm:max-h-[90vh] sm:max-w-5xl sm:rounded-lg sm:p-6">
+      <DialogContent className="h-[100dvh] max-h-[100dvh] max-w-none content-start gap-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-none p-4 sm:h-auto sm:max-h-[90vh] sm:max-w-5xl sm:rounded-lg sm:p-6">
         <DialogHeader>
-          <DialogTitle>Buscar séries pela API — BugouMods VIP</DialogTitle>
-          <DialogDescription>"Importar série completa" traz a série com todas as temporadas, episódios e players VIP. Reimportar só adiciona o que falta; nada é apagado.</DialogDescription>
+          <DialogTitle className="pr-6 text-base sm:text-lg">BugouMods VIP — Séries</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">Pesquise, selecione e importe séries completas (temporadas, episódios e players VIP). Reimportar só adiciona o que falta.</DialogDescription>
         </DialogHeader>
         <div className="sticky -top-4 z-10 -mx-4 space-y-2 border-b border-border bg-background px-4 py-2 sm:static sm:mx-0 sm:border-0 sm:p-0">
           <ApiSearchBar label="Nome da série" placeholder="Nome da série (completo ou parte)" busy={busy === "search"} onSearch={searchApi}
             source="Pesquisa direto na API BugouMods VIP (busca oficial do provedor), inclusive séries ainda não importadas." />
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           {(catList?.categories.length || cats.length) ? (
-            <select aria-label="Categoria" className="h-10 min-w-0 max-w-full flex-1 rounded-md border border-input bg-background px-2 text-sm" value={cat} onChange={e => pickCategory(e.target.value)}>
+            <select aria-label="Categoria" className="h-10 w-full min-w-0 truncate rounded-md border border-input bg-background px-2 text-sm" value={cat} onChange={e => pickCategory(e.target.value)}>
               <option value="">Todas as categorias</option>
               {catList ? catList.categories.map(c => <option key={c.name} value={c.name}>{c.name} — {c.imported}/{c.total} importadas</option>) : cats.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           ) : null}
-          <Button type="button" variant="outline" disabled={!!busy || jobActive} onClick={() => start({ repairEmpty: true })} title="Busca na API VIP as temporadas, episódios e players das séries já importadas que estão vazias"><Wrench /> Completar séries sem episódios</Button>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" disabled={!!busy || jobActive} onClick={() => start({ repairEmpty: true })} title="Busca na API VIP as temporadas, episódios e players das séries já importadas que estão vazias"><Wrench /> Completar séries sem episódios</Button>
           </div>
         </div>
 
         {job && (
-          <div className={`space-y-2 rounded-xl border border-border p-3 text-sm ${later}`}>
+          <section aria-label="Progresso da importação" className={`space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm ${later}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-medium">{job.label}</span>
-              <span className="text-xs text-muted-foreground">{job.queued ?? job.pending} na fila · {job.processing ?? 0} processando · {job.done} concluída(s) · {job.waiting ?? 0} aguardando nova tentativa · {job.failed} com falha</span>
+              <span className="min-w-0 flex-1 truncate font-medium" title={job.label}>{job.label}</span>
+              <Badge variant={job.status === "paused" ? "outline" : "secondary"}>{job.status === "paused" ? "Pausada" : job.status === "done" ? "Concluída" : jobActive ? "Em andamento" : "Parada"}</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">{job.seasons ?? 0} temporada(s) e {job.episodes_created} episódio(s) novos · {job.requests ?? 0} consulta(s) ao provedor · {job.http429 ?? 0} limite(s) HTTP 429</p>
-            <p className="text-xs text-muted-foreground">{job.with_player ?? 0} episódio(s) verificados com player VIP · {job.no_episodes ?? 0} série(s) sem episódios no provedor · uma série só conta como concluída depois de conferir no banco todos os episódios e players.</p>
+            <Progress value={pct} />
+            <div className="grid grid-cols-3 gap-1.5 text-center text-xs sm:grid-cols-6">
+              {([["Progresso", `${Math.round(pct)}%`], ["Concluídas", job.done], ["Na fila", job.queued ?? job.pending], ["Processando", job.processing ?? 0], ["Falhas", job.failed], ["Episódios novos", job.episodes_created]] as const).map(([k, v]) => (
+                <div key={k} className="min-w-0 rounded-lg bg-background/60 px-1 py-1.5"><div className="truncate font-semibold">{v}</div><div className="truncate text-[11px] text-muted-foreground">{k}</div></div>))}
+            </div>
+            <p className="break-words text-xs text-muted-foreground">{job.seasons ?? 0} temporada(s) · {job.with_player ?? 0} com player VIP · {job.concurrency ?? 2} em paralelo · {job.per_min ? `${job.per_min}/min` : "medindo velocidade…"}{job.eta_min ? ` · faltam ~${job.eta_min >= 60 ? `${Math.floor(job.eta_min / 60)} h ${job.eta_min % 60} min` : `${job.eta_min} min`}` : ""} · {job.requests ?? 0} consulta(s) · {job.http429 ?? 0}× HTTP 429{(job.waiting ?? 0) > 0 ? ` · ${job.waiting} aguardando nova tentativa` : ""}</p>
             {job.next_retry_at && Date.parse(job.next_retry_at) > Date.now() && (
-              <p className="rounded-lg bg-primary/10 px-2 py-1 text-xs">{job.throttled ? "Pausado pelo limite de requisições do provedor. " : ""}Próxima tentativa às {new Date(job.next_retry_at).toLocaleTimeString("pt-BR")}. O progresso está salvo.</p>
+              <p className="rounded-lg bg-primary/10 px-2 py-1 text-xs">{job.throttled ? "Pausado pelo limite do provedor. " : ""}Próxima tentativa às {new Date(job.next_retry_at).toLocaleTimeString("pt-BR")}. Progresso salvo.</p>
             )}
-            <p className="text-xs text-muted-foreground">{job.total ? Math.round(((job.done + job.failed) / job.total) * 100) : 0}% · {job.concurrency ?? 2} série(s) em paralelo · {job.per_min ? `${job.per_min} série(s)/min` : "medindo velocidade…"}{job.eta_min ? ` · faltam ~${job.eta_min >= 60 ? `${Math.floor(job.eta_min / 60)} h ${job.eta_min % 60} min` : `${job.eta_min} min`}` : ""}{job.status === "running" ? " · continua no servidor mesmo se você fechar esta tela" : job.status === "cancelled" ? " · cancelada (o que já foi importado foi mantido)" : ""}</p>
-            <Progress value={job.total ? ((job.done + job.failed) / job.total) * 100 : 0} />
-            <div className="flex flex-wrap gap-2">
-              {jobActive && <Button size="sm" variant="outline" onClick={() => { running.current = false; pause({ data: { jobId: job.id } }).then(j => setJob(j as Job)); }}><Pause /> Pausar</Button>}
-              {job.status !== "cancelled" && job.status !== "done" && job.pending > 0 && <Button size="sm" variant="ghost" onClick={() => { if (!confirm("Cancelar esta importação? As séries já importadas são mantidas; as pendentes não serão processadas.")) return; running.current = false; stopFn({ data: { jobId: job.id, cancel: true } }).then(j => setJob(j as Job)); }}>Cancelar</Button>}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              {jobActive && <Button size="sm" variant="outline" onClick={() => { running.current = false; pause({ data: { jobId: job.id } }).then(j => showJob(j as Job)); }}><Pause /> Pausar</Button>}
               {!jobActive && job.pending > 0 && job.status !== "cancelled" && <Button size="sm" onClick={() => drive({ ...job, status: "running" })}><Play /> Retomar</Button>}
-              {!jobActive && job.failed > 0 && <Button size="sm" variant="outline" onClick={() => retry({ data: { jobId: job.id } }).then(j => drive(j as Job))}><RotateCcw /> Tentar de novo só as falhas</Button>}
-              {jobActive && <Loader2 className="h-4 w-4 animate-spin self-center" />}
+              {canCancel && <Button size="sm" variant="destructive" onClick={() => cancelJob(job)}><XCircle /> Cancelar importação</Button>}
+              {!jobActive && job.failed > 0 && <Button size="sm" variant="outline" className="col-span-2 sm:col-span-1" onClick={() => retry({ data: { jobId: job.id } }).then(j => drive(j as Job))}><RotateCcw /> Tentar de novo só as falhas</Button>}
+              {jobActive && <Loader2 className="hidden h-4 w-4 animate-spin self-center sm:block" />}
             </div>
-            {job.failures.length > 0 && <ul className="max-h-28 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">{job.failures.map(f => <li key={f.ext_id}><span className="text-destructive">✕</span> {f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
-          </div>
+            <p className="text-[11px] text-muted-foreground">Pausar mantém a fila para retomar depois. Cancelar encerra a tarefa; o que já foi importado é mantido.{job.status === "running" ? " A importação continua no servidor mesmo se você fechar esta tela." : ""}</p>
+            {job.failures.length > 0 && <ul className="max-h-28 space-y-0.5 overflow-y-auto break-words text-xs text-muted-foreground">{job.failures.map(f => <li key={f.ext_id}><span className="text-destructive">✕</span> {f.title ?? f.ext_id}: {f.error}</li>)}</ul>}
+          </section>
         )}
 
         <div className={later}><CatalogSyncBar kind="series" onDone={() => { if (apiTerm == null) run(0, { withCategories: true }); loadCats(); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); }} /></div>
         {catList && <p className={`text-xs text-muted-foreground ${later}`}>Catálogo da API: {catList.distinct} séries únicas em {catList.categories.length} categorias · {catList.imported} já no aplicativo{catList.synced_at ? ` · leitura completa em ${new Date(catList.synced_at).toLocaleString("pt-BR")}` : ""}</p>}
 
-        <div className={`flex flex-wrap items-center gap-2 ${later}`}>
+        <div className={`grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center ${later}`}>
           <Button size="sm" disabled={!sel.size || !!busy || jobActive} onClick={() => start({ ids: [...sel] })}>{busy === "import" ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Importar série completa {sel.size ? `(${sel.size})` : ""}</Button>
-          {missing != null && missing > 0 && !confirmAll && <Button size="sm" variant="outline" disabled={!!busy || jobActive} onClick={() => setConfirmAll(true)}>Importar todas as não importadas…</Button>}
-          {confirmAll && <span className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2 text-xs">
+          {missing != null && missing > 0 && !confirmAll && <Button size="sm" variant="outline" disabled={!!busy || jobActive} onClick={() => setConfirmAll(true)}>Importar todas as não importadas ({missing})…</Button>}
+          {confirmAll && <span className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2 text-xs sm:basis-full">
             Isso vai importar cerca de {missing} séries com todos os episódios (1 consulta ao provedor por série, em sequência — pode levar horas; pode pausar e retomar). Confirmar?
             <Button size="sm" onClick={() => start({ allMissing: true })}>Sim, importar</Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirmAll(false)}>Cancelar</Button>
@@ -173,7 +189,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
 
         {cat && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 p-3 text-sm">
-            <b>{cat}</b>
+            <b className="min-w-0 truncate">{cat}</b>
             {catStats ? <span className="grid w-full grid-cols-3 gap-2 text-xs sm:w-auto sm:flex sm:flex-wrap">
               <span className="rounded-lg bg-background/60 px-2 py-1">Disponíveis na API: <b>{catStats.total}</b></span>
               <span className="rounded-lg bg-background/60 px-2 py-1">Importadas: <b>{catStats.imported}</b></span>
