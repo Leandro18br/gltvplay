@@ -1,7 +1,7 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Home, Search, Film, Tv, Shapes, User } from "lucide-react";
+import { Home, Search, Film, Tv, Shapes, MonitorPlay } from "lucide-react";
 import { siteSettingsQuery } from "@/lib/catalog";
 import { SiteHeader } from "./SiteHeader";
 
@@ -9,9 +9,9 @@ const MOBILE = [
   { to: "/", label: "Início", icon: Home, exact: true },
   { to: "/series", label: "Séries", icon: Tv },
   { to: "/filmes", label: "Filmes", icon: Film },
-  { to: "/categorias", label: "Categorias", icon: Shapes },
+  { to: "/canais-categorias", label: "Canais", icon: MonitorPlay },
   { to: "/buscar", label: "Busca", icon: Search },
-  { to: "/perfil", label: "Perfil", icon: User },
+  { to: "/categorias", label: "Categorias", icon: Shapes },
 ] as const;
 
 function MobileNav() {

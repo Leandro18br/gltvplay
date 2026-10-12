@@ -158,6 +158,45 @@ export const categoriesQuery = queryOptions({
   staleTime: 60_000,
 });
 
+/** Published categories that actually contain published items of the requested kinds
+ *  (movie/series via the join tables, channel via category_id). Keeps each menu area unmixed. */
+export const kindCategoriesQuery = (kinds: Kind[]) =>
+  queryOptions({
+    queryKey: ["catalog", "categories", kinds.slice().sort().join(",")],
+    queryFn: async () => {
+      const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").order("sort_order").order("name");
+      if (error) throw error;
+      const want = new Set(kinds);
+      const [m, s, c] = await Promise.all([
+        want.has("movie") ? sb.from("movies").select("movie_categories!inner(category_id)").eq("status", "published") : null,
+        want.has("series") ? sb.from("series").select("series_categories!inner(category_id)").eq("status", "published") : null,
+        want.has("channel") ? sb.from("channels").select("category_id").eq("status", "published").not("category_id", "is", null) : null,
+      ]);
+      if (m?.error || s?.error || c?.error) throw m?.error ?? s?.error ?? c?.error;
+      const ids = new Set<string>();
+      for (const r of m?.data ?? []) for (const x of r.movie_categories ?? []) ids.add(x.category_id);
+      for (const r of s?.data ?? []) for (const x of r.series_categories ?? []) ids.add(x.category_id);
+      for (const r of c?.data ?? []) ids.add(r.category_id);
+      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[]).filter((cat) => ids.has(cat.id));
+    },
+    staleTime: 60_000,
+  });
+
+/** Category meta for the channel-categories area; null when the category is missing or has no published channels. */
+export const channelCategoryMetaQuery = (slug: string) =>
+  queryOptions({
+    queryKey: ["catalog", "channel-category", slug],
+    queryFn: async () => {
+      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").maybeSingle();
+      if (error) throw error;
+      if (!cat) return null;
+      const { count, error: e2 } = await sb.from("channels").select("id", { count: "exact", head: true }).eq("status", "published").eq("category_id", cat.id);
+      if (e2) throw e2;
+      return (count ?? 0) > 0 ? { category: cat as { id: string; name: string; slug: string; description: string | null; image_url: string | null } } : null;
+    },
+    staleTime: 30_000,
+  });
+
 export const PAGE_SIZE = 24;
 export type SortKey = "recent" | "year" | "title";
 
