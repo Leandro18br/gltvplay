@@ -168,62 +168,18 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
     if (cur && !cur.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
     if (Object.keys(patch).length) { const u = await db.from("series").update(patch).eq("id", seriesId); if (u.error) throw new Error(u.error.message); }
   }
-  const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsFound: want.length, episodesTotal: want.reduce((n, s) => n + s.episodes.length, 0), seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0, episodesSaved: 0, withPlayer: 0, withoutPlayer: 0, complete: false };
+  const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsFound: want.length, episodesTotal: apiEpisodes, seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0, episodesSaved: 0, withPlayer: 0, withoutPlayer: 0, complete: false };
+  if (!apiEpisodes) return out;
+  // One set-based RPC per series: seasons, episodes and VIP sources upserted + verified by re-read, one summary audit row.
   const vtok = await token();
-  for (const s of want) {
-    let { data: season } = await db.from("seasons").select("id").eq("series_id", seriesId).eq("season_number", s.season).maybeSingle();
-    if (!season) {
-      const r = await db.from("seasons").insert({ series_id: seriesId, season_number: s.season, title: `Temporada ${s.season}`, status: "published", sort_order: s.season }).select("id").single();
-      if (r.error) throw new Error(r.error.message);
-      season = r.data; out.seasonsCreated++;
-    }
-    const { data: have } = await db.from("episodes").select("id, episode_number").eq("season_id", season!.id);
-    const byNum = new Map<number, string>((have ?? []).map((e: any) => [e.episode_number, e.id]));
-    const missing = s.episodes.filter(e => !byNum.has(e.episode));
-    out.episodesExisting += s.episodes.length - missing.length;
-    if (missing.length) {
-      const r = await db.from("episodes").insert(missing.map(e => ({ season_id: season!.id, episode_number: e.episode, title: e.title, thumbnail_url: e.image, duration_minutes: e.duration_minutes, status: "published" }))).select("id, episode_number");
-      if (r.error) throw new Error(r.error.message);
-      (r.data ?? []).forEach((e: any) => byNum.set(e.episode_number, e.id));
-      out.episodesCreated += r.data?.length ?? 0;
-    }
-    const epIds = s.episodes.map(e => byNum.get(e.episode)).filter(Boolean) as string[];
-    const srcs: any[] = [];
-    for (let i = 0; i < epIds.length; i += 150) {
-      const { data, error } = await db.from("playback_sources").select("id, content_id, external_ref, url").eq("content_kind", "episode").in("content_id", epIds.slice(i, i + 150));
-      if (error) throw new Error(error.message);
-      srcs.push(...(data ?? []));
-    }
-    const inserts: any[] = [];
-    for (const e of s.episodes) {
-      const epId = byNum.get(e.episode); if (!epId) continue;
-      const ref = `bugoumods:${e.id}`; const vipUrl = bugouVipEmbedUrl(e.id, e.ext, vtok);
-      const mine = srcs.filter(x => x.content_id === epId);
-      const prev = mine.find(x => x.external_ref === ref);
-      if (prev) {
-        if (prev.url !== vipUrl) { const u = await db.from("playback_sources").update({ url: vipUrl }).eq("id", prev.id); if (u.error) throw new Error(u.error.message); }
-        out.sourcesExisting++; continue;
-      }
-      inserts.push({ content_kind: "episode", content_id: epId, url: vipUrl, source_type: "embed", provider: "BugouMods", label: "BugouMods", external_ref: ref, is_active: true, is_primary: mine.length === 0, sort_order: mine.length, drm: {} });
-    }
-    if (inserts.length) { const r = await db.from("playback_sources").insert(inserts); if (r.error) throw new Error(r.error.message); out.sourcesCreated += inserts.length; }
-  }
-  // Verify by re-reading: every API episode must exist under the right series/season and carry its VIP source (matched by provider episode id).
-  for (const s of want) {
-    const { data: season } = await db.from("seasons").select("id").eq("series_id", seriesId).eq("season_number", s.season).maybeSingle();
-    if (!season) { out.withoutPlayer += s.episodes.length; continue; }
-    const { data: eps } = await db.from("episodes").select("id, episode_number").eq("season_id", season.id);
-    const byNum = new Map<number, string>((eps ?? []).map((e: any) => [e.episode_number, e.id]));
-    const ids = s.episodes.map(e => byNum.get(e.episode)).filter(Boolean) as string[];
-    out.episodesSaved += ids.length;
-    const refs = new Set<string>();
-    for (let i = 0; i < ids.length; i += 150) {
-      const { data } = await db.from("playback_sources").select("content_id, external_ref").eq("content_kind", "episode").eq("is_active", true).in("content_id", ids.slice(i, i + 150)).like("external_ref", "bugoumods:%");
-      (data ?? []).forEach((x: any) => refs.add(`${x.content_id}|${x.external_ref}`));
-    }
-    for (const e of s.episodes) { const epId = byNum.get(e.episode); if (epId && refs.has(`${epId}|bugoumods:${e.id}`)) out.withPlayer++; else out.withoutPlayer++; }
-  }
-  out.complete = apiEpisodes > 0 && out.episodesSaved === apiEpisodes && out.withPlayer === apiEpisodes;
+  const items = want.flatMap(s => s.episodes.map(e => ({ s: s.season, e: e.episode, ref: `bugoumods:${e.id}`, t: e.title, img: e.image, dur: e.duration_minutes, url: bugouVipEmbedUrl(e.id, e.ext, vtok) })));
+  const r = await (await admin()).rpc("bugou_apply_series", { _series_id: seriesId, _items: items, _actor: ctx.userId ?? null });
+  if (r.error) throw new Error(r.error.message);
+  const x = r.data as { items: number; seasons: number; episodes: number; sources_new: number; sources_updated: number; saved: number; with_player: number };
+  out.seasonsCreated = x.seasons; out.episodesCreated = x.episodes; out.episodesExisting = Math.max(0, x.items - x.episodes);
+  out.sourcesCreated = x.sources_new; out.sourcesExisting = Math.max(0, x.items - x.sources_new);
+  out.episodesSaved = x.saved; out.withPlayer = x.with_player; out.withoutPlayer = apiEpisodes - x.with_player;
+  out.complete = x.saved === apiEpisodes && x.with_player === apiEpisodes;
   return out;
 }
 
