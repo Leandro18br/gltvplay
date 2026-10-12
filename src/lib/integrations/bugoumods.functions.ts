@@ -12,7 +12,7 @@ import { parseBugouName, parseBugouDetails, bugouVipEmbedUrl, normTitle, compact
  * Imports run as resumable jobs (`bugou_import_jobs/items`) driven in short server calls.
  * The vtoken stays server-side; the provider list "link" is never stored.
  */
-type Ctx = { supabase: any; userId: string | null };
+type Ctx = { supabase: any; userId: string };
 const SOURCE = "bugoumods";
 const PAGE = 40;
 
@@ -173,7 +173,7 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
   // One set-based RPC per series: seasons, episodes and VIP sources upserted + verified by re-read, one summary audit row.
   const vtok = await token();
   const items = want.flatMap(s => s.episodes.map(e => ({ s: s.season, e: e.episode, ref: `bugoumods:${e.id}`, t: e.title, img: e.image, dur: e.duration_minutes, url: bugouVipEmbedUrl(e.id, e.ext, vtok) })));
-  const r = await (await admin()).rpc("bugou_apply_series", { _series_id: seriesId, _items: items, _actor: ctx.userId ?? null });
+  const r = await (await admin()).rpc("bugou_apply_series", { _series_id: seriesId, _items: items, _actor: ctx.userId || null });
   if (r.error) throw new Error(r.error.message);
   const x = r.data as { items: number; seasons: number; episodes: number; sources_new: number; sources_updated: number; saved: number; with_player: number };
   out.seasonsCreated = x.seasons; out.episodesCreated = x.episodes; out.episodesExisting = Math.max(0, x.items - x.episodes);

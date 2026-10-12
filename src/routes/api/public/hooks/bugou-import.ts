@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/public/hooks/bugou-import")({
         if (!token || token !== process.env["SUPABASE_PUBLISHABLE_KEY"]) return new Response("Unauthorized", { status: 401 });
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const db = supabaseAdmin as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-        const ctx = { supabase: db, userId: null };
+        const ctx = { supabase: db, userId: "" }; // "" = system actor (no audit actor)
         const started = Date.now(); const BUDGET = 45_000; const ran: string[] = [];
         const { data: jobs } = await db.from("bugou_import_jobs").select("id").neq("kind", "live").eq("status", "running").order("created_at").limit(10);
         for (const j of jobs ?? []) {
