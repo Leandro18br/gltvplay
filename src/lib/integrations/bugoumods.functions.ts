@@ -361,6 +361,7 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
       const r = await db.from("bugou_import_items").insert(items.slice(i, i + 500).map(x => ({ job_id: j.data.id, ext_id: x.ext_id, title: x.title })));
       if (r.error) throw new Error(r.error.message);
     }
+    await armWorker();
     return { ...(await jobView(ctx, j.data.id)), unmatched };
   });
 
@@ -522,6 +523,7 @@ export const bugouRetryFailed = createServerFn({ method: "POST" })
     if (r.error) throw new Error(r.error.message);
     const c = await recount(ctx, data.jobId);
     await db.from("bugou_import_jobs").update({ failed: c.failed, status: "running" }).eq("id", data.jobId);
+    await armWorker();
     return jobView(ctx, data.jobId);
   });
 
