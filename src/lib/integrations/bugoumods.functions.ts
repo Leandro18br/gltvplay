@@ -470,7 +470,6 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     if (!wave.length) continue;
     await db.from("bugou_import_items").update({ state: "processing", updated_at: stamp() }).eq("job_id", jobId).in("ext_id", wave.map(x => x.ext_id));
     const out = await Promise.all(wave.map(processOne));
-    if (stop && !throttleUntil) break;
     st.concurrency = out.includes("throttle") ? Math.max(1, Math.floor(n / 2)) : out.every(o => o === "ok") && wave.length === n ? Math.min(MAX_CONCURRENCY, n + 1) : n;
     const c = await recount(ctx, jobId);
     await db.from("bugou_import_jobs").update({ done: c.done, failed: c.failed, episodes_created: episodes, stats: st, updated_at: stamp(), ...(throttleUntil ? { throttle_until: throttleUntil } : {}) }).eq("id", jobId);
