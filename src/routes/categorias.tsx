@@ -2,13 +2,13 @@ import { requireSiteAccess } from "@/lib/access/gate";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Tags } from "lucide-react";
-import { categoriesQuery } from "@/lib/catalog";
+import { kindCategoriesQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
 
 export const Route = createFileRoute("/categorias")({
   ssr: false,
   beforeLoad: requireSiteAccess,
-  loader: ({ context }) => context.queryClient.ensureQueryData(categoriesQuery),
+  loader: ({ context }) => context.queryClient.ensureQueryData(kindCategoriesQuery(["movie", "series"])),
   head: () => ({
     meta: [
       { title: "Categorias — Streaming" },
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/categorias")({
 });
 
 function Page() {
-  const { data } = useSuspenseQuery(categoriesQuery);
+  const { data } = useSuspenseQuery(kindCategoriesQuery(["movie", "series"]));
   return (
     <SiteShell>
       <PageTitle title="Categorias" subtitle="Encontre exatamente o que você quer assistir." />

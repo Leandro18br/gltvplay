@@ -1,5 +1,5 @@
 import { requireSiteAccess } from "@/lib/access/gate";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { MonitorPlay } from "lucide-react";
 import { kindCategoriesQuery } from "@/lib/catalog";
@@ -34,14 +34,14 @@ function Page() {
         <ul className="mx-auto grid max-w-[1600px] grid-cols-2 gap-3 px-4 md:grid-cols-3 md:px-10 lg:grid-cols-4">
           {data.map((c) => (
             <li key={c.id}>
-              <a href={`/canais-categorias/${c.slug}`} className="group relative flex aspect-[16/9] items-end overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent to-card p-4 transition hover:border-primary/50 hover:shadow-glow">
+              <Link to="/canais-categorias/$slug" params={{ slug: c.slug }} className="group relative flex aspect-[16/9] items-end overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent to-card p-4 transition hover:border-primary/50 hover:shadow-glow">
                 {c.image_url && <img src={c.image_url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-60 transition duration-500 group-hover:scale-105" />}
                 <div className="absolute inset-0 bg-fade" />
                 <div className="relative min-w-0">
                   <h2 className="truncate text-lg font-semibold">{c.name}</h2>
                   {c.description && <p className="line-clamp-1 text-xs text-muted-foreground">{c.description}</p>}
                 </div>
-              </a>
+              </Link>
             </li>
           ))}
         </ul>

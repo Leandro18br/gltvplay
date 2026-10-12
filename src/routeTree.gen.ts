@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BuscarRouteImport } from './routes/buscar'
 import { Route as CanaisRouteImport } from './routes/canais'
+import { Route as CanaisCategoriasRouteImport } from './routes/canais-categorias'
 import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as FilmesRouteImport } from './routes/filmes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -39,6 +40,7 @@ import { Route as AdminSeriesRouteImport } from './routes/admin.series'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminHomePreviewRouteImport } from './routes/admin_.home-preview'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
+import { Route as CanaisCategoriasSlugRouteImport } from './routes/canais-categorias.$slug'
 import { Route as CanalSlugRouteImport } from './routes/canal.$slug'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as FilmeSlugRouteImport } from './routes/filme.$slug'
@@ -77,6 +79,11 @@ const BuscarRoute = BuscarRouteImport.update({
 const CanaisRoute = CanaisRouteImport.update({
   id: '/canais',
   path: '/canais',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CanaisCategoriasRoute = CanaisCategoriasRouteImport.update({
+  id: '/canais-categorias',
+  path: '/canais-categorias',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CategoriasRoute = CategoriasRouteImport.update({
@@ -199,6 +206,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CanaisCategoriasSlugRoute = CanaisCategoriasSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => CanaisCategoriasRoute,
+} as any)
 const CanalSlugRoute = CanalSlugRouteImport.update({
   id: '/canal/$slug',
   path: '/canal/$slug',
@@ -259,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/buscar': typeof BuscarRoute
   '/canais': typeof CanaisRoute
+  '/canais-categorias': typeof CanaisCategoriasRouteWithChildren
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -282,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
   '/admin/login': typeof AdminLoginRoute
+  '/canais-categorias/$slug': typeof CanaisCategoriasSlugRoute
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
@@ -299,6 +313,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/buscar': typeof BuscarRoute
   '/canais': typeof CanaisRoute
+  '/canais-categorias': typeof CanaisCategoriasRouteWithChildren
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -322,6 +337,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin/home-preview': typeof AdminHomePreviewRoute
   '/admin/login': typeof AdminLoginRoute
+  '/canais-categorias/$slug': typeof CanaisCategoriasSlugRoute
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
@@ -342,6 +358,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/buscar': typeof BuscarRoute
   '/canais': typeof CanaisRoute
+  '/canais-categorias': typeof CanaisCategoriasRouteWithChildren
   '/categorias': typeof CategoriasRoute
   '/filmes': typeof FilmesRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -365,6 +382,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin_/home-preview': typeof AdminHomePreviewRoute
   '/admin_/login': typeof AdminLoginRoute
+  '/canais-categorias/$slug': typeof CanaisCategoriasSlugRoute
   '/canal/$slug': typeof CanalSlugRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/filme/$slug': typeof FilmeSlugRoute
@@ -385,6 +403,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/buscar'
     | '/canais'
+    | '/canais-categorias'
     | '/categorias'
     | '/filmes'
     | '/reset-password'
@@ -408,6 +427,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/home-preview'
     | '/admin/login'
+    | '/canais-categorias/$slug'
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
@@ -425,6 +445,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/buscar'
     | '/canais'
+    | '/canais-categorias'
     | '/categorias'
     | '/filmes'
     | '/reset-password'
@@ -448,6 +469,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/home-preview'
     | '/admin/login'
+    | '/canais-categorias/$slug'
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
@@ -467,6 +489,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/buscar'
     | '/canais'
+    | '/canais-categorias'
     | '/categorias'
     | '/filmes'
     | '/reset-password'
@@ -490,6 +513,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin_/home-preview'
     | '/admin_/login'
+    | '/canais-categorias/$slug'
     | '/canal/$slug'
     | '/categoria/$slug'
     | '/filme/$slug'
@@ -510,6 +534,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BuscarRoute: typeof BuscarRoute
   CanaisRoute: typeof CanaisRoute
+  CanaisCategoriasRoute: typeof CanaisCategoriasRouteWithChildren
   CategoriasRoute: typeof CategoriasRoute
   FilmesRoute: typeof FilmesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -570,6 +595,13 @@ declare module '@tanstack/react-router' {
       path: '/canais'
       fullPath: '/canais'
       preLoaderRoute: typeof CanaisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/canais-categorias': {
+      id: '/canais-categorias'
+      path: '/canais-categorias'
+      fullPath: '/canais-categorias'
+      preLoaderRoute: typeof CanaisCategoriasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/categorias': {
@@ -740,6 +772,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/canais-categorias/$slug': {
+      id: '/canais-categorias/$slug'
+      path: '/$slug'
+      fullPath: '/canais-categorias/$slug'
+      preLoaderRoute: typeof CanaisCategoriasSlugRouteImport
+      parentRoute: typeof CanaisCategoriasRoute
+    }
     '/canal/$slug': {
       id: '/canal/$slug'
       path: '/canal/$slug'
@@ -866,6 +905,17 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface CanaisCategoriasRouteChildren {
+  CanaisCategoriasSlugRoute: typeof CanaisCategoriasSlugRoute
+}
+
+const CanaisCategoriasRouteChildren: CanaisCategoriasRouteChildren = {
+  CanaisCategoriasSlugRoute: CanaisCategoriasSlugRoute,
+}
+
+const CanaisCategoriasRouteWithChildren =
+  CanaisCategoriasRoute._addFileChildren(CanaisCategoriasRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
@@ -873,6 +923,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BuscarRoute: BuscarRoute,
   CanaisRoute: CanaisRoute,
+  CanaisCategoriasRoute: CanaisCategoriasRouteWithChildren,
   CategoriasRoute: CategoriasRoute,
   FilmesRoute: FilmesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
