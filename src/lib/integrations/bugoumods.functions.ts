@@ -273,7 +273,7 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 // ---------- Resumable import jobs ----------
 
 type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
-export const MAX_CONCURRENCY = 6;
+export const MAX_CONCURRENCY = 12;
 
 async function jobView(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
@@ -392,7 +392,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   if (!lease.data?.length) return { busy: true };
   await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", jobId).eq("state", "processing");
   let episodes = lease.data[0].episodes_created as number;
-  const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, concurrency: 2, ...(lease.data[0].stats ?? {}) };
+  const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, concurrency: 4, ...(lease.data[0].stats ?? {}) };
   const { integ } = await seriesIntegration();
   const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
   let throttleUntil: string | null = null; let stop = false;
@@ -480,7 +480,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     if (!wave.length) continue;
     await db.from("bugou_import_items").update({ state: "processing", updated_at: stamp() }).eq("job_id", jobId).in("ext_id", wave.map(x => x.ext_id));
     const out = await Promise.all(wave.map(processOne));
-    st.concurrency = out.includes("throttle") ? Math.max(1, Math.floor(n / 2)) : out.every(o => o === "ok") && wave.length === n ? Math.min(MAX_CONCURRENCY, n + 1) : n;
+    st.concurrency = out.includes("throttle") ? Math.max(1, Math.floor(n / 2)) : out.every(o => o === "ok") && wave.length === n ? Math.min(MAX_CONCURRENCY, n + 2) : n;
     const c = await recount(ctx, jobId);
     await db.from("bugou_import_jobs").update({ done: c.done, failed: c.failed, episodes_created: episodes, stats: st, updated_at: stamp(), ...(throttleUntil ? { throttle_until: throttleUntil } : {}) }).eq("id", jobId);
     if (out.includes("skip")) break;

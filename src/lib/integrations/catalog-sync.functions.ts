@@ -67,7 +67,7 @@ export const catalogSyncStep = createServerFn({ method: "POST" }).middleware([re
       throw new Error(scrub((e as Error).message));
     }
 
-    const t0 = Date.now(); const gap = minIntervalMs(p.rpm);
+    const t0 = Date.now(); const gap = 0; // no fixed spacing between pages; a 429 returns waitMs (Retry-After/backoff) to the caller
     let last = 0;
     while (st.ci < st.cats.length && Date.now() - t0 < STEP_BUDGET_MS) {
       const cat = st.cats[st.ci]!;
