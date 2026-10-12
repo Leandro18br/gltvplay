@@ -2562,6 +2562,10 @@ export type Database = {
         Returns: boolean
       }
       has_site_access: { Args: { _user_id: string }; Returns: boolean }
+      import_link_categories: {
+        Args: { _cats: Json; _id: string; _kind: string }
+        Returns: number
+      }
       import_tmdb_movie_metadata: {
         Args: { _genre_ids: number[]; _patch: Json }
         Returns: Json

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { extractPlayer, mapCatalog, maskSecret, VARIABLES, type CatalogItem } from "./engine";
 
@@ -117,6 +118,7 @@ export const importCatalog = createServerFn({ method: "POST" }).middleware([requ
         const ins = await sb.from(table).insert({ ...row, slug, status: "published" }).select("id").single();
         if (ins.error) throw new Error(ins.error.message); id = ins.data.id; report.created++;
       }
+      await linkCategories(sb, data.kind, id, it.genres ?? []);
       if (data.kind === "movie") {
         if (data.autoPlayer && budget-- > 0) await autoPlayer("movie", id);
         continue;

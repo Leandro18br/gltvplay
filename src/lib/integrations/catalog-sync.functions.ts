@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff } from "@/lib/tmdb/tmdb.functions";
-import { fetchProviderJson, RateLimitedError, minIntervalMs, backoffMs } from "./ratelimit";
+import { fetchProviderJson, RateLimitedError, backoffMs } from "./ratelimit";
 import { parseHomeCategories, parseCategoryPage, nextCursor, PAGE_LIMIT, type ProviderCategory } from "./catalog-pages";
 import { parseBugouName, normTitle, compactTitle } from "./bugoumods";
 import { seriesIntegration, logCall } from "./bugoumods.functions";
@@ -67,7 +67,7 @@ export const catalogSyncStep = createServerFn({ method: "POST" }).middleware([re
       throw new Error(scrub((e as Error).message));
     }
 
-    const t0 = Date.now(); const gap = minIntervalMs(p.rpm);
+    const t0 = Date.now(); const gap = 0; // no fixed spacing between pages; a 429 returns waitMs (Retry-After/backoff) to the caller
     let last = 0;
     while (st.ci < st.cats.length && Date.now() - t0 < STEP_BUDGET_MS) {
       const cat = st.cats[st.ci]!;
