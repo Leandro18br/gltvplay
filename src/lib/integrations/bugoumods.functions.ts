@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
 import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor } from "./ratelimit";
@@ -167,6 +168,14 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
     if (cur && !cur.release_year && year) patch.release_year = year;
     if (cur && !cur.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
     if (Object.keys(patch).length) { const u = await db.from("series").update(patch).eq("id", seriesId); if (u.error) throw new Error(u.error.message); }
+  }
+  // Original provider categories (all memberships from the paginated index + the list's own category).
+  {
+    const [{ data: mem }, { data: row }] = await Promise.all([
+      db.from("bugou_catalog_categories").select("category").eq("kind", "series").eq("ext_id", id),
+      db.from("bugou_catalog").select("category").eq("kind", "series").eq("ext_id", id).maybeSingle(),
+    ]);
+    await linkCategories(await admin(), "series", seriesId!, [row?.category, ...((mem ?? []) as any[]).map(m => m.category)]);
   }
   const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsFound: want.length, episodesTotal: apiEpisodes, seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0, episodesSaved: 0, withPlayer: 0, withoutPlayer: 0, complete: false };
   if (!apiEpisodes) return out;
@@ -400,7 +409,8 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   const slot = async () => {
     const t = Math.max(Date.now(), nextSlot);
     if (t - started > budgetMs) return false;
-    nextSlot = t + minIntervalMs(rpm, st.rate_factor);
+    // No fixed spacing while the provider accepts the pace; the configured rpm only applies after a real 429 slowed us down.
+    nextSlot = (st.rate_factor ?? 1) < 1 ? t + minIntervalMs(rpm, st.rate_factor) : t;
     if (t > Date.now()) await sleep(t - Date.now());
     return !stop;
   };
