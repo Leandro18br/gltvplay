@@ -12,7 +12,7 @@ import { parseBugouName, parseBugouDetails, bugouVipEmbedUrl, normTitle, compact
  * Imports run as resumable jobs (`bugou_import_jobs/items`) driven in short server calls.
  * The vtoken stays server-side; the provider list "link" is never stored.
  */
-type Ctx = { supabase: any; userId: string };
+type Ctx = { supabase: any; userId: string | null };
 const SOURCE = "bugoumods";
 const PAGE = 40;
 
@@ -263,18 +263,25 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 
 // ---------- Resumable import jobs ----------
 
-type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number };
+type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
+export const MAX_CONCURRENCY = 6;
 
 async function jobView(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
   const { data: job, error } = await db.from("bugou_import_jobs").select("*").eq("id", jobId).single();
   if (error) throw new Error(error.message);
-  const { data: failures } = await db.from("bugou_import_items").select("ext_id, title, error, attempts, rate_limited, step").eq("job_id", jobId).eq("state", "failed").order("updated_at", { ascending: false }).limit(20);
-  const c = await recount(ctx, jobId);
-  const { data: nxt } = await db.from("bugou_import_items").select("next_attempt_at").eq("job_id", jobId).eq("state", "pending").gt("next_attempt_at", new Date().toISOString()).order("next_attempt_at").limit(1);
+  const since = new Date(Date.now() - 5 * 60_000).toISOString();
+  const [{ data: failures }, c, { data: nxt }, recent] = await Promise.all([
+    db.from("bugou_import_items").select("ext_id, title, error, attempts, rate_limited, step").eq("job_id", jobId).eq("state", "failed").order("updated_at", { ascending: false }).limit(20),
+    recount(ctx, jobId),
+    db.from("bugou_import_items").select("next_attempt_at").eq("job_id", jobId).eq("state", "pending").gt("next_attempt_at", new Date().toISOString()).order("next_attempt_at").limit(1),
+    db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("job_id", jobId).eq("state", "done").gte("updated_at", since),
+  ]);
   const st = (job.stats ?? {}) as JobStats;
   const throttle = job.throttle_until && Date.parse(job.throttle_until) > Date.now() ? job.throttle_until : null;
-  return { ...job, pending: c.pending + c.processing, queued: c.pending - c.waiting, processing: c.processing, waiting: c.waiting, next_retry_at: throttle ?? nxt?.[0]?.next_attempt_at ?? null, throttled: !!throttle, requests: st.requests ?? 0, http429: st.http429 ?? 0, seasons: st.seasons ?? 0, with_player: st.with_player ?? 0, no_episodes: st.no_episodes ?? 0, failures: failures ?? [] };
+  const perMin = Math.round(((recent.count ?? 0) / 5) * 10) / 10; // series completed per minute over the last 5 min
+  const left = c.pending + c.processing;
+  return { ...job, pending: left, queued: c.pending - c.waiting, processing: c.processing, waiting: c.waiting, next_retry_at: throttle ?? nxt?.[0]?.next_attempt_at ?? null, throttled: !!throttle, requests: st.requests ?? 0, http429: st.http429 ?? 0, seasons: st.seasons ?? 0, with_player: st.with_player ?? 0, no_episodes: st.no_episodes ?? 0, concurrency: st.concurrency ?? 2, per_min: perMin, eta_min: perMin > 0 && left ? Math.ceil(left / perMin) : null, failures: failures ?? [] };
 }
 
 async function recount(ctx: Ctx, jobId: string) {
@@ -358,97 +365,149 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
   });
 
 /**
- * Processes due items for ~20s under a lease, paced by the integration's requests-per-minute
- * (adaptive: halves on 429, recovers on success). A 429 defers the item (Retry-After or jittered
- * backoff), pauses all series queues and ends the run; fetched series_info is cached on the item
- * so a later DB failure resumes without calling the provider again.
+ * Core queue runner shared by the admin screen and the background worker.
+ * Under a job lease it claims waves of up to `concurrency` due series and processes them in parallel:
+ * series_info calls start on a shared schedule paced by the integration's requests-per-minute, while
+ * DB writes (one set-based RPC per series) overlap with the next provider calls. Concurrency grows by 1
+ * after each clean wave (max MAX_CONCURRENCY) and halves on 429/DB throttle. A 429 defers the item
+ * (Retry-After or jittered backoff), pauses every series queue and stops calling the provider.
  */
+export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, resume = false) {
+  const db = ctx.supabase;
+  if (resume) await db.from("bugou_import_jobs").update({ status: "running" }).eq("id", jobId).eq("status", "paused");
+  const now = new Date();
+  const lease = await db.from("bugou_import_jobs").update({ lease_until: new Date(now.getTime() + budgetMs + 30_000).toISOString(), status: "running" })
+    .eq("id", jobId).not("status", "in", "(cancelled,paused,done)").or(`lease_until.is.null,lease_until.lt.${now.toISOString()}`).select("id, episodes_created, stats");
+  if (lease.error) throw new Error(lease.error.message);
+  if (!lease.data?.length) return { busy: true };
+  await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", jobId).eq("state", "processing");
+  let episodes = lease.data[0].episodes_created as number;
+  const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, concurrency: 2, ...(lease.data[0].stats ?? {}) };
+  const { integ } = await seriesIntegration();
+  const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
+  let throttleUntil: string | null = null; let stop = false;
+  const started = Date.now(); let nextSlot = 0;
+  const stamp = () => new Date().toISOString();
+  /** Reserves the next provider call slot; false when it would fall outside the budget. */
+  const slot = async () => {
+    const t = Math.max(Date.now(), nextSlot);
+    if (t - started > budgetMs) return false;
+    nextSlot = t + minIntervalMs(rpm, st.rate_factor);
+    if (t > Date.now()) await sleep(t - Date.now());
+    return !stop;
+  };
+  type It = { ext_id: string; title: string | null; attempts: number; rate_limited: number; details: any };
+  const processOne = async (it: It): Promise<"ok" | "throttle" | "err" | "skip"> => {
+    const upd = (patch: any) => db.from("bugou_import_items").update({ ...patch, updated_at: stamp() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
+    try {
+      let details = it.details as BugouDetails | null;
+      if (!details) {
+        if (!(await slot())) { await upd({ state: "pending" }); return "skip"; }
+        st.requests = (st.requests ?? 0) + 1;
+        details = await loadDetails(it.ext_id, `Importação: ${it.title ?? it.ext_id}`);
+        st.rate_factor = adaptFactor(st.rate_factor ?? 1, "ok");
+        await upd({ details, step: "episodes", seasons_found: details.seasons.length, error: null });
+      }
+      const res = await importSeriesFull(ctx, it.ext_id, undefined, details);
+      episodes += res.episodesCreated; st.seasons = (st.seasons ?? 0) + res.seasonsCreated;
+      st.with_player = (st.with_player ?? 0) + res.withPlayer; st.no_episodes = (st.no_episodes ?? 0) + (res.episodesTotal ? 0 : 1);
+      const base = { result: res, series_id: res.seriesId, seasons_found: res.seasonsFound, episodes_imported: res.episodesSaved, episodes_pending: Math.max(0, res.episodesTotal - res.episodesSaved) };
+      if (res.complete || !res.episodesTotal) {
+        await upd({ ...base, state: "done", step: "done", attempts: it.attempts + 1, error: res.episodesTotal ? null : (res.skipped ?? "A API não disponibiliza episódios para esta série."), details: null, next_attempt_at: null });
+        return "ok";
+      }
+      await upd(base);
+      throw new Error(`Verificação incompleta: ${res.episodesSaved}/${res.episodesTotal} episódios salvos, ${res.withPlayer} com player VIP.`);
+    } catch (e) {
+      const msg = scrub(e instanceof Error ? e.message : String(e)).slice(0, 500);
+      if (e instanceof RateLimitedError) {
+        st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429"); stop = true;
+        const rl = it.rate_limited + 1;
+        const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(rl, 30_000))).toISOString();
+        if (!throttleUntil || until > throttleUntil) throttleUntil = until;
+        await upd(rl >= MAX_RATE_LIMITED
+          ? { state: "failed", rate_limited: rl, error: `${msg} Tentativas automáticas esgotadas — use "Tentar de novo só as falhas" mais tarde.`, next_attempt_at: null }
+          : { state: "pending", rate_limited: rl, error: `${msg} Nova tentativa programada.`, next_attempt_at: until });
+        return "throttle";
+      }
+      if (/rate limit|too many requests|try again in a minute|statement timeout|canceling statement/i.test(msg)) {
+        st.db_throttled = (st.db_throttled ?? 0) + 1;
+        const rl = it.rate_limited + 1;
+        await upd(rl >= MAX_RATE_LIMITED
+          ? { state: "failed", rate_limited: rl, error: "Limite temporário do banco ao salvar episódios. Tentativas automáticas esgotadas — use \"Tentar de novo só as falhas\".", next_attempt_at: null }
+          : { state: "pending", rate_limited: rl, error: "Limite temporário do banco ao salvar episódios. Nova tentativa programada.", next_attempt_at: new Date(Date.now() + backoffMs(rl, 20_000)).toISOString() });
+        return "throttle";
+      }
+      const attempts = e instanceof PermanentError ? MAX_ERRORS : it.attempts + 1;
+      await upd(attempts >= MAX_ERRORS ? { state: "failed", attempts, error: msg, next_attempt_at: null } : { state: "pending", attempts, error: msg, next_attempt_at: new Date(Date.now() + backoffMs(attempts, 10_000)).toISOString() });
+      return "err";
+    }
+  };
+
+  while (!stop && Date.now() - started < budgetMs - 3000) {
+    if ((await globalThrottle(ctx)) > Date.now()) break;
+    const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
+    if (cur?.status === "paused" || cur?.status === "cancelled") break;
+    const n = Math.max(1, Math.min(MAX_CONCURRENCY, st.concurrency ?? 2));
+    const { data: due } = await db.from("bugou_import_items").select("ext_id, title, attempts, rate_limited, details").eq("job_id", jobId).eq("state", "pending").or(`next_attempt_at.is.null,next_attempt_at.lte.${stamp()}`).order("attempts").order("ext_id").limit(n);
+    if (!due?.length) break;
+    // Never process the same series in two jobs at once (one query for the whole wave).
+    const { data: busy } = await db.from("bugou_import_items").select("ext_id").in("ext_id", due.map((x: any) => x.ext_id)).eq("state", "processing").neq("job_id", jobId).gt("updated_at", new Date(Date.now() - 120_000).toISOString());
+    const busySet = new Set((busy ?? []).map((x: any) => x.ext_id));
+    if (busySet.size) await db.from("bugou_import_items").update({ next_attempt_at: new Date(Date.now() + 30_000).toISOString() }).eq("job_id", jobId).in("ext_id", [...busySet]);
+    const wave = (due as It[]).filter(x => !busySet.has(x.ext_id));
+    if (!wave.length) continue;
+    await db.from("bugou_import_items").update({ state: "processing", updated_at: stamp() }).eq("job_id", jobId).in("ext_id", wave.map(x => x.ext_id));
+    const out = await Promise.all(wave.map(processOne));
+    st.concurrency = out.includes("throttle") ? Math.max(1, Math.floor(n / 2)) : out.every(o => o === "ok") && wave.length === n ? Math.min(MAX_CONCURRENCY, n + 1) : n;
+    const c = await recount(ctx, jobId);
+    await db.from("bugou_import_jobs").update({ done: c.done, failed: c.failed, episodes_created: episodes, stats: st, updated_at: stamp(), ...(throttleUntil ? { throttle_until: throttleUntil } : {}) }).eq("id", jobId);
+    if (out.includes("skip")) break;
+  }
+  const c = await recount(ctx, jobId);
+  const left = c.pending + c.processing;
+  const patch: any = { done: c.done, failed: c.failed, episodes_created: episodes, stats: st, lease_until: null, updated_at: stamp() };
+  const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
+  if (cur?.status === "running") patch.status = left ? "running" : "done";
+  if (throttleUntil) patch.throttle_until = throttleUntil;
+  await db.from("bugou_import_jobs").update(patch).eq("id", jobId);
+  return { busy: false, left };
+}
+
+const PROJECT_ID = "a60e024f-d8d7-4202-815f-86d1103dd07c";
+/** Arms the background worker schedule (removed by the worker when the queue drains). Preview runs target the preview build. */
+async function armWorker() {
+  try {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const host = new URL(getRequest().url).host;
+    const dev = /localhost|preview|-dev\.|127\.0\.0\.1|sandbox/.test(host);
+    const url = `https://project--${PROJECT_ID}${dev ? "-dev" : ""}.lovable.app/api/public/hooks/bugou-import`;
+    const key = process.env["SUPABASE_PUBLISHABLE_KEY"] ?? "";
+    if (!key) return;
+    await (await admin()).rpc("bugou_worker_arm", { _url: url, _key: key });
+  } catch (e) { console.error("bugou worker arm failed", (e as Error).message); }
+}
+
 export const bugouRunJob = createServerFn({ method: "POST" })
   .middleware([...auth])
   .inputValidator((d) => z.object({ jobId: z.string().uuid(), resume: z.boolean().default(false) }).parse(d))
   .handler(async ({ data, context }) => {
-    const ctx = context as Ctx; const db = ctx.supabase;
+    const ctx = context as Ctx;
     await assertStaff(ctx);
-    if (data.resume) await db.from("bugou_import_jobs").update({ status: "running" }).eq("id", data.jobId).eq("status", "paused");
-    const now = new Date();
-    const lease = await db.from("bugou_import_jobs").update({ lease_until: new Date(now.getTime() + 45_000).toISOString(), status: "running" })
-      .eq("id", data.jobId).not("status", "in", "(cancelled,paused)").or(`lease_until.is.null,lease_until.lt.${now.toISOString()}`).select("id, episodes_created, stats");
-    if (lease.error) throw new Error(lease.error.message);
-    if (!lease.data?.length) return { ...(await jobView(ctx, data.jobId)), busy: true };
-    // We hold the lease: anything left "processing" by this job is from an interrupted run.
-    await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", data.jobId).eq("state", "processing");
-    let episodes = lease.data[0].episodes_created as number;
-    const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, ...(lease.data[0].stats ?? {}) };
-    const { integ } = await seriesIntegration();
-    const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
-    let throttleUntil: string | null = null;
-    const started = Date.now(); let lastCall = 0;
-    while (Date.now() - started < 20_000) {
-      if ((await globalThrottle(ctx)) > Date.now()) break;
-      const nowIso = new Date().toISOString();
-      const { data: next } = await db.from("bugou_import_items").select("ext_id, title, attempts, rate_limited, details, step").eq("job_id", data.jobId).eq("state", "pending").or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`).order("attempts").order("ext_id").limit(1);
-      const it = next?.[0]; if (!it) break;
-      // Never process the same series in two jobs at once.
-      const { count: busyElsewhere } = await db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("ext_id", it.ext_id).eq("state", "processing").neq("job_id", data.jobId).gt("updated_at", new Date(Date.now() - 120_000).toISOString());
-      if (busyElsewhere) { await db.from("bugou_import_items").update({ next_attempt_at: new Date(Date.now() + 30_000).toISOString() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id); continue; }
-      const stamp = () => new Date().toISOString();
-      await db.from("bugou_import_items").update({ state: "processing", updated_at: stamp() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id);
-      const upd = (patch: any) => db.from("bugou_import_items").update({ ...patch, updated_at: stamp() }).eq("job_id", data.jobId).eq("ext_id", it.ext_id);
-      try {
-        let details = it.details as BugouDetails | null;
-        if (!details) {
-          const wait = lastCall + minIntervalMs(rpm, st.rate_factor) - Date.now();
-          if (wait > 0) { if (Date.now() + wait - started > 20_000) { await upd({ state: "pending" }); break; } await sleep(wait); }
-          lastCall = Date.now(); st.requests = (st.requests ?? 0) + 1;
-          details = await loadDetails(it.ext_id, `Importação: ${it.title ?? it.ext_id}`);
-          st.rate_factor = adaptFactor(st.rate_factor ?? 1, "ok");
-          await upd({ details, step: "episodes", seasons_found: details.seasons.length, error: null });
-        }
-        const res = await importSeriesFull(ctx, it.ext_id, undefined, details);
-        episodes += res.episodesCreated; st.seasons = (st.seasons ?? 0) + res.seasonsCreated;
-        st.with_player = (st.with_player ?? 0) + res.withPlayer; st.no_episodes = (st.no_episodes ?? 0) + (res.episodesTotal ? 0 : 1);
-        const pendingEp = Math.max(0, res.episodesTotal - res.episodesSaved);
-        const base = { result: res, series_id: res.seriesId, seasons_found: res.seasonsFound, episodes_imported: res.episodesSaved, episodes_pending: pendingEp };
-        if (res.complete || !res.episodesTotal) {
-          await upd({ ...base, state: "done", step: "done", attempts: it.attempts + 1, error: res.episodesTotal ? null : (res.skipped ?? "A API não disponibiliza episódios para esta série."), details: null, next_attempt_at: null });
-        } else {
-          // Verification failed: keep cached details and retry only what is missing (never "done" while episodes/players are missing).
-          throw new Error(`Verificação incompleta: ${res.episodesSaved}/${res.episodesTotal} episódios salvos, ${res.withPlayer} com player VIP.`);
-        }
-      } catch (e) {
-        const msg = scrub(e instanceof Error ? e.message : String(e)).slice(0, 500);
-        if (e instanceof RateLimitedError) {
-          st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429");
-          const rl = it.rate_limited + 1;
-          const waitMs = e.retryAfterMs ?? backoffMs(rl, 30_000);
-          throttleUntil = new Date(Date.now() + waitMs).toISOString();
-          await upd(rl >= MAX_RATE_LIMITED
-            ? { state: "failed", rate_limited: rl, error: `${msg} Tentativas automáticas esgotadas — use "Tentar de novo só as falhas" mais tarde.`, next_attempt_at: null }
-            : { state: "pending", rate_limited: rl, error: `${msg} Nova tentativa programada.`, next_attempt_at: throttleUntil });
-          break; // stop calling the provider until the wait ends
-        }
-        if (/rate limit|too many requests|try again in a minute/i.test(msg)) {
-          // Temporary write limit of the backend ("try again in a minute"): pause the queue ≥1 min, keep cached details, never a definitive failure on first hits.
-          st.db_throttled = (st.db_throttled ?? 0) + 1;
-          const rl = it.rate_limited + 1;
-          throttleUntil = new Date(Date.now() + Math.max(60_000, backoffMs(rl, 60_000))).toISOString();
-          await upd(rl >= MAX_RATE_LIMITED
-            ? { state: "failed", rate_limited: rl, error: `Limite temporário do banco ao salvar episódios. Tentativas automáticas esgotadas — use "Tentar de novo só as falhas".`, next_attempt_at: null }
-            : { state: "pending", rate_limited: rl, error: "Limite temporário do banco ao salvar episódios. Nova tentativa programada.", next_attempt_at: throttleUntil });
-          break;
-        }
-        const attempts = e instanceof PermanentError ? MAX_ERRORS : it.attempts + 1;
-        await upd(attempts >= MAX_ERRORS ? { state: "failed", attempts, error: msg, next_attempt_at: null } : { state: "pending", attempts, error: msg, next_attempt_at: new Date(Date.now() + backoffMs(attempts, 10_000)).toISOString() });
-      }
-    }
-    const c = await recount(ctx, data.jobId);
-    const left = c.pending + c.processing;
-    const patch: any = { done: c.done, failed: c.failed, episodes_created: episodes, stats: st, status: left ? "running" : "done", lease_until: null, updated_at: new Date().toISOString() };
-    if (throttleUntil) patch.throttle_until = throttleUntil;
-    const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", data.jobId).single();
-    if (cur?.status === "paused" && left) delete patch.status; // keep a pause requested mid-run
-    await db.from("bugou_import_jobs").update(patch).eq("id", data.jobId);
-    return { ...(await jobView(ctx, data.jobId)), busy: false };
+    if (data.resume) await armWorker();
+    const r = await runSeriesJob(ctx, data.jobId, 20_000, data.resume);
+    return { ...(await jobView(ctx, data.jobId)), busy: r.busy };
+  });
+
+/** Pause (keeps progress, resumable) or cancel (stops for good; imported data is kept). */
+export const bugouStopJob = createServerFn({ method: "POST" })
+  .middleware([...auth])
+  .inputValidator((d) => z.object({ jobId: z.string().uuid(), cancel: z.boolean().default(false) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx;
+    await assertStaff(ctx);
+    await ctx.supabase.from("bugou_import_jobs").update({ status: data.cancel ? "cancelled" : "paused" }).eq("id", data.jobId);
+    return jobView(ctx, data.jobId);
   });
 
 /** Re-queues only failed items; keeps cached details/progress and respects any active provider wait. */
