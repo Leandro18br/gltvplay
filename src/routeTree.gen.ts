@@ -47,6 +47,7 @@ import { Route as SerieSlugRouteImport } from './routes/serie.$slug'
 import { Route as AdminSeriesIdRouteImport } from './routes/admin.series_.$id'
 import { Route as HomeSecoesIdRouteImport } from './routes/home.secoes.$id'
 import { Route as AuthenticatedAssistirKindIdRouteImport } from './routes/_authenticated/assistir.$kind.$id'
+import { Route as ApiPublicHooksBugouImportRouteImport } from './routes/api/public/hooks/bugou-import'
 import { Route as AdminSeriesIdTemporadaSeasonIdRouteImport } from './routes/admin.series_.$id_.temporada.$seasonId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -239,6 +240,12 @@ const AuthenticatedAssistirKindIdRoute =
     path: '/assistir/$kind/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicHooksBugouImportRoute =
+  ApiPublicHooksBugouImportRouteImport.update({
+    id: '/api/public/hooks/bugou-import',
+    path: '/api/public/hooks/bugou-import',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AdminSeriesIdTemporadaSeasonIdRoute =
   AdminSeriesIdTemporadaSeasonIdRouteImport.update({
     id: '/series_/$id_/temporada/$seasonId',
@@ -284,6 +291,7 @@ export interface FileRoutesByFullPath {
   '/admin/series/$id': typeof AdminSeriesIdRoute
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
+  '/api/public/hooks/bugou-import': typeof ApiPublicHooksBugouImportRoute
   '/admin/series/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 export interface FileRoutesByTo {
@@ -323,6 +331,7 @@ export interface FileRoutesByTo {
   '/admin/series/$id': typeof AdminSeriesIdRoute
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
+  '/api/public/hooks/bugou-import': typeof ApiPublicHooksBugouImportRoute
   '/admin/series/$id/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 export interface FileRoutesById {
@@ -365,6 +374,7 @@ export interface FileRoutesById {
   '/admin/series_/$id': typeof AdminSeriesIdRoute
   '/home/secoes/$id': typeof HomeSecoesIdRoute
   '/_authenticated/assistir/$kind/$id': typeof AuthenticatedAssistirKindIdRoute
+  '/api/public/hooks/bugou-import': typeof ApiPublicHooksBugouImportRoute
   '/admin/series_/$id_/temporada/$seasonId': typeof AdminSeriesIdTemporadaSeasonIdRoute
 }
 export interface FileRouteTypes {
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/admin/series/$id'
     | '/home/secoes/$id'
     | '/assistir/$kind/$id'
+    | '/api/public/hooks/bugou-import'
     | '/admin/series/$id/temporada/$seasonId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -446,6 +457,7 @@ export interface FileRouteTypes {
     | '/admin/series/$id'
     | '/home/secoes/$id'
     | '/assistir/$kind/$id'
+    | '/api/public/hooks/bugou-import'
     | '/admin/series/$id/temporada/$seasonId'
   id:
     | '__root__'
@@ -487,6 +499,7 @@ export interface FileRouteTypes {
     | '/admin/series_/$id'
     | '/home/secoes/$id'
     | '/_authenticated/assistir/$kind/$id'
+    | '/api/public/hooks/bugou-import'
     | '/admin/series_/$id_/temporada/$seasonId'
   fileRoutesById: FileRoutesById
 }
@@ -512,6 +525,7 @@ export interface RootRouteChildren {
   RevendedorLoginRoute: typeof RevendedorLoginRoute
   SerieSlugRoute: typeof SerieSlugRoute
   HomeSecoesIdRoute: typeof HomeSecoesIdRoute
+  ApiPublicHooksBugouImportRoute: typeof ApiPublicHooksBugouImportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -782,6 +796,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssistirKindIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/bugou-import': {
+      id: '/api/public/hooks/bugou-import'
+      path: '/api/public/hooks/bugou-import'
+      fullPath: '/api/public/hooks/bugou-import'
+      preLoaderRoute: typeof ApiPublicHooksBugouImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/series_/$id_/temporada/$seasonId': {
       id: '/admin/series_/$id_/temporada/$seasonId'
       path: '/series/$id/temporada/$seasonId'
@@ -867,6 +888,7 @@ const rootRouteChildren: RootRouteChildren = {
   RevendedorLoginRoute: RevendedorLoginRoute,
   SerieSlugRoute: SerieSlugRoute,
   HomeSecoesIdRoute: HomeSecoesIdRoute,
+  ApiPublicHooksBugouImportRoute: ApiPublicHooksBugouImportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
