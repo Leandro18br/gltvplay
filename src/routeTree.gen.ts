@@ -331,6 +331,7 @@ export interface FileRoutesByTo {
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/channel-categories': typeof AdminChannelCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
@@ -376,6 +377,7 @@ export interface FileRoutesById {
   '/_authenticated/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/channel-categories': typeof AdminChannelCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
@@ -421,6 +423,7 @@ export interface FileRouteTypes {
     | '/minha-lista'
     | '/perfil'
     | '/admin/categories'
+    | '/admin/channel-categories'
     | '/admin/channels'
     | '/admin/clients'
     | '/admin/credits'
@@ -463,6 +466,7 @@ export interface FileRouteTypes {
     | '/minha-lista'
     | '/perfil'
     | '/admin/categories'
+    | '/admin/channel-categories'
     | '/admin/channels'
     | '/admin/clients'
     | '/admin/credits'
@@ -507,6 +511,7 @@ export interface FileRouteTypes {
     | '/_authenticated/minha-lista'
     | '/_authenticated/perfil'
     | '/admin/categories'
+    | '/admin/channel-categories'
     | '/admin/channels'
     | '/admin/clients'
     | '/admin/credits'
