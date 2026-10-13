@@ -2,7 +2,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createParser, lines, itemKey, seriesItemKey, seriesKey, categoryName, norm, slugify, assertSafeListUrl, type M3uEntry } from "./m3u";
 import { tmdbGet, movieMeta, seriesMeta, linkGenres, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
-import { linkCategories } from "./categories";
+import { categorySlugForKind, linkCategories } from "./categories";
 
 /**
  * M3U catalog: (1) resumable, chunked INDEXING of the list into m3u_items, (2) paginated EXPLORE,
@@ -415,8 +415,8 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     let slug = baseSlug;
     let { data } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
     if (!data) {
-      const { data: collision } = await db.from("categories").select("id").eq("slug", slug).maybeSingle();
-      if (collision) slug = kind === "channel" ? `${baseSlug.slice(0, 90)}-canais` : `${baseSlug.slice(0, 90)}-catalogo`;
+      const { data: collision } = await db.from("categories").select("id,kind").eq("slug", slug).maybeSingle();
+      if (collision) slug = categorySlugForKind(baseSlug, kind, collision.kind);
       const { data: existing } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
       data = existing;
     }
