@@ -494,7 +494,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
 
   async function importChannel(it: Item) {
     let id = await exists("channels", it.content_id);
-    if (id) { await source("channel", id, it); return { id, skipped: true }; }
+    if (id) { await linkCategories(db, "channel", id, [it.group_title]); await source("channel", id, it); return { id, skipped: true }; }
     id = (await byTitle("channels", "name", it.title)) ?? (await byUrl("channel", it.url));
     if (id) await fillMissing("channels", id, "logo_url", it);
     else {
@@ -503,6 +503,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
       if (ins.error) throw ins.error;
       id = ins.data.id as string;
     }
+    await linkCategories(db, "channel", id!, [it.group_title]);
     await source("channel", id!, it);
     return { id: id!, skipped: false };
   }
