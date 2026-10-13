@@ -166,7 +166,9 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
     queryFn: async () => {
       const categoryKind = want.has("channel") && !want.has("movie") && !want.has("series") ? "channel" : "catalog";
       const selection = categoryKind === "channel" ? "id,name,slug,description,image_url,channels(count)" : "id,name,slug,description,image_url";
-      const { data, error } = await sb.from("categories").select(selection).eq("status", "published").eq("kind", categoryKind).order("sort_order").order("name");
+      let query = sb.from("categories").select(selection).eq("status", "published").eq("kind", categoryKind);
+      if (categoryKind === "channel") query = query.eq("channels.status", "published");
+      const { data, error } = await query.order("sort_order").order("name");
       if (error) throw error;
       const want = new Set(kinds);
       const [m, s, c] = await Promise.all([
@@ -298,7 +300,7 @@ export const categoryQuery = (slug: string) =>
   queryOptions({
     queryKey: ["catalog", "category", slug],
     queryFn: async () => {
-      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").eq("category_type", "catalog").maybeSingle();
+      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").eq("kind", "catalog").maybeSingle();
       if (error) throw error;
       if (!cat) return null;
       const [m, s] = await Promise.all([
