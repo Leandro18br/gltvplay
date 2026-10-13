@@ -453,7 +453,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   };
   const fillMissing = async (table: string, id: string, imgCol: string, it: Item) => {
     const { data: cur } = await db.from(table).select(`${imgCol},category_id`).eq("id", id).single();
-    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title);
+    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title, table === "channels" ? "channel" : "media");
     if (upd.category_id === null) delete upd.category_id;
     if (Object.keys(upd).length) await db.from(table).update(upd).eq("id", id);
   };
@@ -495,7 +495,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     if (id) await fillMissing("channels", id, "logo_url", it);
     else {
       const slug = await uniqueSlug(ctx, "channels", it.title, null);
-      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title), status: "published" }).select("id").single();
+      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title, "channel"), status: "published" }).select("id").single();
       if (ins.error) throw ins.error;
       id = ins.data.id as string;
     }
