@@ -23,7 +23,7 @@ const NAV = [
 
 export function Logo() {
   const { data: settings } = useQuery(siteSettingsQuery);
-  const name = "GLTV Play";
+  const name = settings?.platform_name ?? "Streaming";
   return (
     <Link to="/" className="flex shrink-0 items-center gap-2" aria-label={name}>
       {settings?.logo_url ? (

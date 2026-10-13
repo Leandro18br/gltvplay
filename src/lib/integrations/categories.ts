@@ -1,10 +1,5 @@
 import { slugify } from "./m3u";
 
-export function categorySlugForKind(baseSlug: string, kind: "catalog" | "channel", conflictingKind?: string | null): string {
-  if (!conflictingKind || conflictingKind === kind) return baseSlug;
-  return `${baseSlug.slice(0, 90)}-${kind === "channel" ? "canais" : "catalogo"}`;
-}
-
 /** Source category names → unique {name, slug} pairs (same slug rule as M3U, so one category per name across sources). */
 export function categoryEntries(names: (string | null | undefined)[]): { name: string; slug: string }[] {
   const out = new Map<string, { name: string; slug: string }>();

@@ -37,7 +37,6 @@ export type Field = {
   table?: string;
   select?: string;
   labelOf?: (r: Row) => string;
-  relationFilter?: Record<string, string>;
   joinTable?: string;
   fk?: string;
   kind?: "movie" | "series" | "episode" | "channel";
@@ -68,20 +67,16 @@ export type ResourceConfig = {
   addLabel?: string;
   /** After creating, keep the form open so related items (e.g. players) can be added. */
   stayOpenAfterCreate?: boolean;
-  /** Fixed query filters and values for scoped resource managers. */
-  fixedFilters?: Record<string, string>;
 };
 
 const PAGE = 12;
 
-function useRelation(table?: string, select?: string, relationFilter?: Record<string, string>) {
+function useRelation(table?: string, select?: string) {
   return useQuery({
-    queryKey: ["rel", table, select, relationFilter],
+    queryKey: ["rel", table, select],
     enabled: !!table,
     queryFn: async () => {
-      let query = db.from(table!).select(select ?? "*");
-      for (const [column, value] of Object.entries(relationFilter ?? {})) query = query.eq(column, value);
-      const { data, error } = await query.limit(1000);
+      const { data, error } = await db.from(table!).select(select ?? "*").limit(1000);
       if (error) throw error;
       return data as Row[];
     },
@@ -90,7 +85,7 @@ function useRelation(table?: string, select?: string, relationFilter?: Record<st
 
 function RelationSelect({ field, value, onChange, kindTable }: { field: Field; value: any; onChange: (v: any) => void; kindTable?: string }) {
   const table = kindTable ?? field.table;
-  const { data, isLoading } = useRelation(table, field.select ?? (kindTable ? (kindTable === "channels" ? "id,name" : "id,title") : undefined), field.relationFilter);
+  const { data, isLoading } = useRelation(table, field.select ?? (kindTable ? (kindTable === "channels" ? "id,name" : "id,title") : undefined));
   const labelOf = field.labelOf ?? ((r: Row) => r.title ?? r.name ?? r.id);
   return (
     <Select value={value ?? "none"} onValueChange={(v) => onChange(v === "none" ? null : v)}>
@@ -157,7 +152,6 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
     if (config.hasStatus && status !== "all") q = q.eq("status", status);
     if (config.hasActive && status !== "all") q = q.eq("is_active", status === "active");
     if (config.scope && scope !== "all") q = q.eq(config.scope.col, scope);
-    for (const [column, value] of Object.entries(config.fixedFilters ?? {})) q = q.eq(column, value);
     return q;
   }
 
@@ -267,7 +261,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
         const value=playbackSchema.parse(values[f.name] ?? emptyPlayback);
         await validateSource({data:value});
       }
-      const payload: Row = { ...(config.fixedFilters ?? {}) };
+      const payload: Row = {};
       for (const f of config.fields) {
         if (f.type === "genres" || f.type === "playback" || f.type === "sources") continue;
         let v = values[f.name];
