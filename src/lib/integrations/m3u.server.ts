@@ -2,6 +2,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createParser, lines, itemKey, seriesItemKey, seriesKey, categoryName, norm, slugify, assertSafeListUrl, type M3uEntry } from "./m3u";
 import { tmdbGet, movieMeta, seriesMeta, linkGenres, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
+import { categorySlugForKind, linkCategories } from "./categories";
 
 /**
  * M3U catalog: (1) resumable, chunked INDEXING of the list into m3u_items, (2) paginated EXPLORE,
@@ -406,13 +407,24 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   const cats = new Map<string, string | null>();
   let tmdbBudget = list.enrich_tmdb ? 8 : 0;
 
-  const category = async (group: string | null) => {
+  const category = async (group: string | null, kind: "catalog" | "channel" = "catalog") => {
     const name = categoryName(group); if (!name) return null;
-    const slug = slugify(name); if (!slug) return null;
-    if (cats.has(slug)) return cats.get(slug)!;
-    let { data } = await db.from("categories").select("id").eq("slug", slug).maybeSingle();
-    if (!data) { const r = await db.from("categories").insert({ name, slug, status: "published" }).select("id").single(); data = r.data ?? (await db.from("categories").select("id").eq("slug", slug).maybeSingle()).data; }
-    cats.set(slug, data?.id ?? null); return data?.id ?? null;
+    const baseSlug = slugify(name); if (!baseSlug) return null;
+    const cacheKey = `${kind}:${baseSlug}`;
+    if (cats.has(cacheKey)) return cats.get(cacheKey)!;
+    let slug = baseSlug;
+    let { data } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
+    if (!data) {
+      const { data: collision } = await db.from("categories").select("id,kind").eq("slug", slug).maybeSingle();
+      if (collision) slug = categorySlugForKind(baseSlug, kind, collision.kind);
+      const { data: existing } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
+      data = existing;
+    }
+    if (!data) {
+      const r = await db.from("categories").insert({ name, slug, status: "published", kind }).select("id").single();
+      data = r.data ?? (await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle()).data;
+    }
+    cats.set(cacheKey, data?.id ?? null); return data?.id ?? null;
   };
   const exists = async (table: string, id: string | null) => (id ? ((await db.from(table).select("id").eq("id", id).maybeSingle()).data?.id as string | undefined) ?? null : null);
   const byTmdb = async (table: string, tmdbId: number | null) => (tmdbId ? ((await db.from(table).select("id").eq("tmdb_id", tmdbId).limit(1).maybeSingle()).data?.id as string | undefined) ?? null : null);
@@ -444,7 +456,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   };
   const fillMissing = async (table: string, id: string, imgCol: string, it: Item) => {
     const { data: cur } = await db.from(table).select(`${imgCol},category_id`).eq("id", id).single();
-    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title);
+    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title, it.kind === "channel" ? "channel" : "catalog");
     if (upd.category_id === null) delete upd.category_id;
     if (Object.keys(upd).length) await db.from(table).update(upd).eq("id", id);
   };
@@ -458,7 +470,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
 
   async function importMovie(it: Item) {
     let id = await exists("movies", it.content_id);
-    if (id) { await source("movie", id, it); return { id, skipped: true }; }
+    if (id) { await linkCategories(db, "movie", id, [it.group_title]); await source("movie", id, it); return { id, skipped: true }; }
     id = (await byTmdb("movies", it.tmdb_id)) ?? (await byTitle("movies", "title", it.title, it.year)) ?? (await byUrl("movie", it.url));
     if (id) await fillMissing("movies", id, "poster_url", it);
     else {
@@ -475,21 +487,23 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
         if (meta) await linkGenres(ctx, "movie", id, meta.genres);
       }
     }
+    await linkCategories(db, "movie", id!, [it.group_title]);
     await source("movie", id!, it);
     return { id: id!, skipped: false };
   }
 
   async function importChannel(it: Item) {
     let id = await exists("channels", it.content_id);
-    if (id) { await source("channel", id, it); return { id, skipped: true }; }
+    if (id) { await linkCategories(db, "channel", id, [it.group_title]); await source("channel", id, it); return { id, skipped: true }; }
     id = (await byTitle("channels", "name", it.title)) ?? (await byUrl("channel", it.url));
     if (id) await fillMissing("channels", id, "logo_url", it);
     else {
       const slug = await uniqueSlug(ctx, "channels", it.title, null);
-      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title), status: "published" }).select("id").single();
+      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title, "channel"), status: "published" }).select("id").single();
       if (ins.error) throw ins.error;
       id = ins.data.id as string;
     }
+    await linkCategories(db, "channel", id!, [it.group_title]);
     await source("channel", id!, it);
     return { id: id!, skipped: false };
   }
@@ -515,6 +529,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
       }
       await markOk(it, sid!);
     }
+    await linkCategories(db, "series", sid!, [it.group_title]);
     // Set-based: one database call imports a whole chunk (seasons, episodes, sources, item status), instead of ~7 calls per episode.
     let errors = 0;
     let size = BULK_START;

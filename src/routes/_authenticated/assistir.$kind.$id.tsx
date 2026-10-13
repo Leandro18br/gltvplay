@@ -76,8 +76,8 @@ function PlayerPage() {
   const info = usePlaybackInfo(kind, id);
   const router = useRouter();
   const [server, setServer] = useState(0);
-  const [started, setStarted] = useState(false);
-  useEffect(() => { setServer(0); setStarted(false); }, [kind, id]);
+  const [started, setStarted] = useState(kind === "channel");
+  useEffect(() => { setServer(0); setStarted(kind === "channel"); }, [kind, id]);
 
   if (info.isPending) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="size-10 animate-spin text-primary" /></div>;
   if (info.isError || !info.data?.url) {

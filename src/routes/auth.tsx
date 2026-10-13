@@ -24,7 +24,7 @@ export const Route = createFileRoute("/auth")({
   }),
   head: () => ({
     meta: [
-      { title: "Entrar — Streaming" },
+      { title: "Entrar — GLTV Play" },
       { name: "description", content: "Entre com seu login e senha de acesso para assistir filmes, séries e canais." },
       { property: "og:title", content: "Entrar — Streaming" },
       { property: "og:description", content: "Entre com seu login e senha de acesso para assistir filmes, séries e canais." },
