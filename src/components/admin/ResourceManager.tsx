@@ -37,6 +37,7 @@ export type Field = {
   table?: string;
   select?: string;
   labelOf?: (r: Row) => string;
+  relationFilter?: Record<string, string>;
   joinTable?: string;
   fk?: string;
   kind?: "movie" | "series" | "episode" | "channel";
@@ -73,12 +74,14 @@ export type ResourceConfig = {
 
 const PAGE = 12;
 
-function useRelation(table?: string, select?: string) {
+function useRelation(table?: string, select?: string, relationFilter?: Record<string, string>) {
   return useQuery({
-    queryKey: ["rel", table, select],
+    queryKey: ["rel", table, select, relationFilter],
     enabled: !!table,
     queryFn: async () => {
-      const { data, error } = await db.from(table!).select(select ?? "*").limit(1000);
+      let query = db.from(table!).select(select ?? "*");
+      for (const [column, value] of Object.entries(relationFilter ?? {})) query = query.eq(column, value);
+      const { data, error } = await query.limit(1000);
       if (error) throw error;
       return data as Row[];
     },
@@ -87,7 +90,7 @@ function useRelation(table?: string, select?: string) {
 
 function RelationSelect({ field, value, onChange, kindTable }: { field: Field; value: any; onChange: (v: any) => void; kindTable?: string }) {
   const table = kindTable ?? field.table;
-  const { data, isLoading } = useRelation(table, field.select ?? (kindTable ? (kindTable === "channels" ? "id,name" : "id,title") : undefined));
+  const { data, isLoading } = useRelation(table, field.select ?? (kindTable ? (kindTable === "channels" ? "id,name" : "id,title") : undefined), field.relationFilter);
   const labelOf = field.labelOf ?? ((r: Row) => r.title ?? r.name ?? r.id);
   return (
     <Select value={value ?? "none"} onValueChange={(v) => onChange(v === "none" ? null : v)}>
