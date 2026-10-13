@@ -299,7 +299,7 @@ export const categoryQuery = (slug: string) =>
   queryOptions({
     queryKey: ["catalog", "category", slug],
     queryFn: async () => {
-      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").maybeSingle();
+      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").eq("scope", "media").maybeSingle();
       if (error) throw error;
       if (!cat) return null;
       const [m, s, c] = await Promise.all([
