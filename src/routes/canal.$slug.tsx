@@ -1,5 +1,5 @@
 import { requireSiteAccess } from "@/lib/access/gate";
-import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Play, Radio } from "lucide-react";
 import { channelDetailQuery } from "@/lib/catalog";
@@ -13,8 +13,7 @@ export const Route = createFileRoute("/canal/$slug")({
   loader: async ({ context, params }) => {
     const data = await context.queryClient.ensureQueryData(channelDetailQuery(params.slug));
     if (!data) throw notFound();
-    // A direct channel URL opens playback, without an extra details/Play screen.
-    throw redirect({ to: "/assistir/$kind/$id", params: { kind: "channel", id: data.item.id } });
+    return { title: data.item.title, description: data.item.description };
   },
   head: ({ loaderData, params }) => {
     if (!loaderData) return { meta: [{ title: "Indisponível — Streaming" }, { name: "robots", content: "noindex" }] };
