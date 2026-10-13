@@ -166,10 +166,7 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
     queryFn: async () => {
       const want = new Set(kinds);
       const categoryKind = want.has("channel") && !want.has("movie") && !want.has("series") ? "channel" : "catalog";
-      const selection = categoryKind === "channel" ? "id,name,slug,description,image_url,channels(count)" : "id,name,slug,description,image_url";
-      let query = sb.from("categories").select(selection).eq("status", "published").eq("kind", categoryKind);
-      if (categoryKind === "channel") query = query.eq("channels.status", "published");
-      const { data, error } = await query.order("sort_order").order("name");
+      const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").eq("kind", categoryKind).order("sort_order").order("name");
       if (error) throw error;
       const [m, s, c] = await Promise.all([
         want.has("movie") ? sb.from("movies").select("movie_categories!inner(category_id)").eq("status", "published") : null,
@@ -178,10 +175,16 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
       ]);
       if (m?.error || s?.error || c?.error) throw m?.error ?? s?.error ?? c?.error;
       const ids = new Set<string>();
+      const channelCounts = new Map<string, number>();
       for (const r of m?.data ?? []) for (const x of r.movie_categories ?? []) ids.add(x.category_id);
       for (const r of s?.data ?? []) for (const x of r.series_categories ?? []) ids.add(x.category_id);
-      for (const r of c?.data ?? []) ids.add(r.category_id);
-      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null; channels?: { count: number }[] }[]).filter((cat) => ids.has(cat.id));
+      for (const r of c?.data ?? []) {
+        ids.add(r.category_id);
+        channelCounts.set(r.category_id, (channelCounts.get(r.category_id) ?? 0) + 1);
+      }
+      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[])
+        .filter((cat) => ids.has(cat.id))
+        .map((cat) => categoryKind === "channel" ? { ...cat, channels: [{ count: channelCounts.get(cat.id) ?? 0 }] } : cat);
     },
     staleTime: 60_000,
   });
