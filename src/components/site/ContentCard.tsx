@@ -10,12 +10,7 @@ export function DetailLink({ item, children, className }: { item: Item; children
   const p = { slug: itemParam(item) };
   if (item.kind === "movie") return <Link to="/filme/$slug" params={p} className={className}>{children}</Link>;
   if (item.kind === "series") return <Link to="/serie/$slug" params={p} className={className}>{children}</Link>;
-  const requestPlayerFullscreen = () => {
-    // Use the channel-card tap as the explicit gesture; fullscreen may be denied on mobile.
-    if (typeof document === "undefined" || !document.fullscreenEnabled || !document.documentElement.requestFullscreen) return;
-    void document.documentElement.requestFullscreen().catch(() => {});
-  };
-  return <Link to="/assistir/$kind/$id" params={{ kind: "channel", id: item.id }} onClick={requestPlayerFullscreen} className={className}>{children}</Link>;
+  return <Link to="/canal/$slug" params={p} className={className}>{children}</Link>;
 }
 
 export function WatchlistButton({ item, className = "" }: { item: Item; className?: string }) {

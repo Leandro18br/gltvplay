@@ -151,7 +151,7 @@ export const genresQuery = queryOptions({
 export const categoriesQuery = queryOptions({
   queryKey: ["catalog", "categories"],
   queryFn: async () => {
-    const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").eq("kind", "catalog").order("sort_order").order("name");
+    const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").order("sort_order").order("name");
     if (error) throw error;
     return data as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[];
   },
@@ -164,13 +164,9 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
   queryOptions({
     queryKey: ["catalog", "categories", kinds.slice().sort().join(",")],
     queryFn: async () => {
-      const want = new Set(kinds);
-      const categoryKind = want.has("channel") && !want.has("movie") && !want.has("series") ? "channel" : "catalog";
-      const selection = categoryKind === "channel" ? "id,name,slug,description,image_url,channels(count)" : "id,name,slug,description,image_url";
-      let query = sb.from("categories").select(selection).eq("status", "published").eq("kind", categoryKind);
-      if (categoryKind === "channel") query = query.eq("channels.status", "published");
-      const { data, error } = await query.order("sort_order").order("name");
+      const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").order("sort_order").order("name");
       if (error) throw error;
+      const want = new Set(kinds);
       const [m, s, c] = await Promise.all([
         want.has("movie") ? sb.from("movies").select("movie_categories!inner(category_id)").eq("status", "published") : null,
         want.has("series") ? sb.from("series").select("series_categories!inner(category_id)").eq("status", "published") : null,
@@ -181,7 +177,7 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
       for (const r of m?.data ?? []) for (const x of r.movie_categories ?? []) ids.add(x.category_id);
       for (const r of s?.data ?? []) for (const x of r.series_categories ?? []) ids.add(x.category_id);
       for (const r of c?.data ?? []) ids.add(r.category_id);
-      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null; channels?: { count: number }[] }[]).filter((cat) => ids.has(cat.id));
+      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[]).filter((cat) => ids.has(cat.id));
     },
     staleTime: 60_000,
   });
@@ -191,7 +187,7 @@ export const channelCategoryMetaQuery = (slug: string) =>
   queryOptions({
     queryKey: ["catalog", "channel-category", slug],
     queryFn: async () => {
-      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").eq("kind", "channel").maybeSingle();
+      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").maybeSingle();
       if (error) throw error;
       if (!cat) return null;
       const { count, error: e2 } = await sb.from("channels").select("id", { count: "exact", head: true }).eq("status", "published").eq("category_id", cat.id);
@@ -300,19 +296,20 @@ export const categoryQuery = (slug: string) =>
   queryOptions({
     queryKey: ["catalog", "category", slug],
     queryFn: async () => {
-      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").eq("kind", "catalog").maybeSingle();
+      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").maybeSingle();
       if (error) throw error;
       if (!cat) return null;
-      const [m, s] = await Promise.all([
+      const [m, s, c] = await Promise.all([
         sb.from("movies").select(`${MOVIE_SEL},movie_categories!inner(category_id)`).eq("status", "published").eq("movie_categories.category_id", cat.id).order("sort_order").limit(60),
         sb.from("series").select(`${SERIES_SEL},series_categories!inner(category_id)`).eq("status", "published").eq("series_categories.category_id", cat.id).order("sort_order").limit(60),
+        sb.from("channels").select(CHANNEL_SEL).eq("status", "published").eq("category_id", cat.id).order("sort_order").limit(60),
       ]);
-      if (m.error || s.error) throw m.error ?? s.error;
+      if (m.error || s.error || c.error) throw m.error ?? s.error ?? c.error;
       return {
         category: cat as { id: string; name: string; slug: string; description: string | null; image_url: string | null },
         movies: (m.data ?? []).map(toMovie) as Item[],
         series: (s.data ?? []).map(toSeries) as Item[],
-        channels: [] as Item[],
+        channels: (c.data ?? []).map(toChannel) as Item[],
       };
     },
     staleTime: 30_000,

@@ -323,13 +323,6 @@
       "when": 1791805244471,
       "tag": "0045_import_link_categories",
       "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1791852301868,
-      "tag": "0046_separate_channel_categories",
-      "breakpoints": true
     }
   ]
 }
