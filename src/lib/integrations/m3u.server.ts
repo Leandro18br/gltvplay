@@ -455,7 +455,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   };
   const fillMissing = async (table: string, id: string, imgCol: string, it: Item) => {
     const { data: cur } = await db.from(table).select(`${imgCol},category_id`).eq("id", id).single();
-    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title);
+    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title, it.kind === "channel" ? "channel" : "catalog");
     if (upd.category_id === null) delete upd.category_id;
     if (Object.keys(upd).length) await db.from(table).update(upd).eq("id", id);
   };
