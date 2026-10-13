@@ -701,6 +701,7 @@ export type Database = {
           id: string
           image_url: string | null
           name: string
+          scope: string
           slug: string
           sort_order: number
           status: Database["public"]["Enums"]["content_status"]
@@ -712,6 +713,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           name: string
+          scope?: string
           slug: string
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
@@ -723,6 +725,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           name?: string
+          scope?: string
           slug?: string
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]

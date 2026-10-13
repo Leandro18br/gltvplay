@@ -406,13 +406,22 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   const cats = new Map<string, string | null>();
   let tmdbBudget = list.enrich_tmdb ? 8 : 0;
 
-  const category = async (group: string | null) => {
+  // Channel and movie/series categories are separate scopes; same-named slugs get a scope prefix.
+  const category = async (group: string | null, scope: "media" | "channel" = "media") => {
     const name = categoryName(group); if (!name) return null;
-    const slug = slugify(name); if (!slug) return null;
-    if (cats.has(slug)) return cats.get(slug)!;
-    let { data } = await db.from("categories").select("id").eq("slug", slug).maybeSingle();
-    if (!data) { const r = await db.from("categories").insert({ name, slug, status: "published" }).select("id").single(); data = r.data ?? (await db.from("categories").select("id").eq("slug", slug).maybeSingle()).data; }
-    cats.set(slug, data?.id ?? null); return data?.id ?? null;
+    const base = slugify(name); if (!base) return null;
+    const key = `${scope}:${base}`;
+    if (cats.has(key)) return cats.get(key)!;
+    const { data: same } = await db.from("categories").select("id,scope").eq("slug", base).maybeSingle();
+    let id: string | null = null;
+    if (same?.scope === scope) id = same.id;
+    else {
+      const slug = same ? `${scope === "channel" ? "canais" : "vod"}-${base}` : base;
+      const { data } = await db.from("categories").select("id").eq("slug", slug).eq("scope", scope).maybeSingle();
+      id = data?.id ?? null;
+      if (!id) { const r = await db.from("categories").insert({ name, slug, status: "published", scope }).select("id").single(); id = r.data?.id ?? (await db.from("categories").select("id").eq("slug", slug).eq("scope", scope).maybeSingle()).data?.id ?? null; }
+    }
+    cats.set(key, id); return id;
   };
   const exists = async (table: string, id: string | null) => (id ? ((await db.from(table).select("id").eq("id", id).maybeSingle()).data?.id as string | undefined) ?? null : null);
   const byTmdb = async (table: string, tmdbId: number | null) => (tmdbId ? ((await db.from(table).select("id").eq("tmdb_id", tmdbId).limit(1).maybeSingle()).data?.id as string | undefined) ?? null : null);
@@ -444,7 +453,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   };
   const fillMissing = async (table: string, id: string, imgCol: string, it: Item) => {
     const { data: cur } = await db.from(table).select(`${imgCol},category_id`).eq("id", id).single();
-    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title);
+    const upd: any = {}; if (!cur?.[imgCol] && it.logo) upd[imgCol] = it.logo; if (!cur?.category_id) upd.category_id = await category(it.group_title, table === "channels" ? "channel" : "media");
     if (upd.category_id === null) delete upd.category_id;
     if (Object.keys(upd).length) await db.from(table).update(upd).eq("id", id);
   };
@@ -486,7 +495,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     if (id) await fillMissing("channels", id, "logo_url", it);
     else {
       const slug = await uniqueSlug(ctx, "channels", it.title, null);
-      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title), status: "published" }).select("id").single();
+      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title, "channel"), status: "published" }).select("id").single();
       if (ins.error) throw ins.error;
       id = ins.data.id as string;
     }
