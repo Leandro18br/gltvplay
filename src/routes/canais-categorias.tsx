@@ -39,6 +39,7 @@ function Page() {
                 <div className="absolute inset-0 bg-fade" />
                 <div className="relative min-w-0">
                   <h2 className="truncate text-lg font-semibold">{c.name}</h2>
+                  {c.channels?.[0]?.count != null && <p className="text-xs text-muted-foreground">{c.channels[0].count} canal(is)</p>}
                   {c.description && <p className="line-clamp-1 text-xs text-muted-foreground">{c.description}</p>}
                 </div>
               </Link>
