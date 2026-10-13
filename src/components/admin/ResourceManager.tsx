@@ -143,7 +143,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
   }, [search]);
 
   const scopeRows = useRelation(config.scope?.table, config.scope?.select);
-  const key = ["admin", config.table, debounced, status, scope, sort, page];
+  const key = ["admin", config.table, JSON.stringify(config.fixedFilters ?? {}), debounced, status, scope, sort, page];
   const bulkKind = BULK_TABLES[config.table];
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [allMode, setAllMode] = useState(false);
