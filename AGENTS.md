@@ -33,3 +33,4 @@
 - Detail rules: `src/lib/{integrations,playback,tmdb,admin,access}/AGENTS.md`. Why: directory scope.
 - Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
 - Per-area session slots (`session-vault.ts`): guards restore slot, then re-check server-side. Why: logins must not evict each other.
+- Categories carry `scope` (media|channel); channels use only channel categories, movies/series only media ones, enforced by DB triggers and scope-aware import helpers (same-name slugs get a scope prefix). Why: keep the two catalog areas unmixed.
