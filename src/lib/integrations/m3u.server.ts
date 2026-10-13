@@ -2,6 +2,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createParser, lines, itemKey, seriesItemKey, seriesKey, categoryName, norm, slugify, assertSafeListUrl, type M3uEntry } from "./m3u";
 import { tmdbGet, movieMeta, seriesMeta, linkGenres, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
+import { linkCategories } from "./categories";
 
 /**
  * M3U catalog: (1) resumable, chunked INDEXING of the list into m3u_items, (2) paginated EXPLORE,
@@ -413,9 +414,9 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     if (cats.has(cacheKey)) return cats.get(cacheKey)!;
     let slug = baseSlug;
     let { data } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
-    if (!data && kind === "channel") {
+    if (!data) {
       const { data: collision } = await db.from("categories").select("id").eq("slug", slug).maybeSingle();
-      if (collision) slug = `${baseSlug.slice(0, 90)}-canais`;
+      if (collision) slug = kind === "channel" ? `${baseSlug.slice(0, 90)}-canais` : `${baseSlug.slice(0, 90)}-catalogo`;
       const { data: existing } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
       data = existing;
     }
@@ -469,7 +470,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
 
   async function importMovie(it: Item) {
     let id = await exists("movies", it.content_id);
-    if (id) { await source("movie", id, it); return { id, skipped: true }; }
+    if (id) { await linkCategories(db, "movie", id, [it.group_title]); await source("movie", id, it); return { id, skipped: true }; }
     id = (await byTmdb("movies", it.tmdb_id)) ?? (await byTitle("movies", "title", it.title, it.year)) ?? (await byUrl("movie", it.url));
     if (id) await fillMissing("movies", id, "poster_url", it);
     else {
@@ -486,6 +487,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
         if (meta) await linkGenres(ctx, "movie", id, meta.genres);
       }
     }
+    await linkCategories(db, "movie", id!, [it.group_title]);
     await source("movie", id!, it);
     return { id: id!, skipped: false };
   }
@@ -526,6 +528,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
       }
       await markOk(it, sid!);
     }
+    await linkCategories(db, "series", sid!, [it.group_title]);
     // Set-based: one database call imports a whole chunk (seasons, episodes, sources, item status), instead of ~7 calls per episode.
     let errors = 0;
     let size = BULK_START;
