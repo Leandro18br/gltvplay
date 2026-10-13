@@ -4,6 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Film } from "lucide-react";
 import { categoryQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, PageTitle, EmptyState } from "@/components/site/SiteShell";
+import { Row } from "@/components/site/ContentCard";
 import { PagedGridSection } from "@/components/site/Pager";
 
 const pageParam = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) > 1 ? Number(v) : undefined);
@@ -43,7 +44,7 @@ function Page() {
   const go = (key: "pf" | "ps") => (n: number) => navigate({ search: (prev) => ({ ...prev, [key]: n > 1 ? n : undefined }), replace: true });
   const { data } = useSuspenseQuery(categoryQuery(slug));
   if (!data) return null;
-  const empty = !data.movies.length && !data.series.length;
+  const empty = !data.movies.length && !data.series.length && !data.channels.length;
   return (
     <SiteShell>
       <PageTitle title={data.category.name} subtitle={data.category.description} />
@@ -51,6 +52,7 @@ function Page() {
         <div className="space-y-4">
           <PagedGridSection title="Filmes" kind="movie" filter={{ categoryId: data.category.id }} page={pf ?? 1} onChange={go("pf")} />
           <PagedGridSection title="Séries" kind="series" filter={{ categoryId: data.category.id }} page={ps ?? 1} onChange={go("ps")} />
+          <Row title="Canais" items={data.channels} />
         </div>
       )}
     </SiteShell>

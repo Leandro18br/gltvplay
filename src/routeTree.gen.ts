@@ -27,7 +27,6 @@ import { Route as AuthenticatedMinhaListaRouteImport } from './routes/_authentic
 import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
-import { Route as AdminChannelCategoriesRouteImport } from './routes/admin.channel-categories'
 import { Route as AdminChannelsRouteImport } from './routes/admin.channels'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
 import { Route as AdminCreditsRouteImport } from './routes/admin.credits'
@@ -140,11 +139,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminChannelCategoriesRoute = AdminChannelCategoriesRouteImport.update({
-  id: '/channel-categories',
-  path: '/channel-categories',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminChannelsRoute = AdminChannelsRouteImport.update({
@@ -288,7 +282,6 @@ export interface FileRoutesByFullPath {
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
-  '/admin/channel-categories': typeof AdminChannelCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
@@ -331,7 +324,6 @@ export interface FileRoutesByTo {
   '/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
-  '/admin/channel-categories': typeof AdminChannelCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
@@ -377,7 +369,6 @@ export interface FileRoutesById {
   '/_authenticated/minha-lista': typeof AuthenticatedMinhaListaRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/admin/categories': typeof AdminCategoriesRoute
-  '/admin/channel-categories': typeof AdminChannelCategoriesRoute
   '/admin/channels': typeof AdminChannelsRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/credits': typeof AdminCreditsRoute
@@ -423,7 +414,6 @@ export interface FileRouteTypes {
     | '/minha-lista'
     | '/perfil'
     | '/admin/categories'
-    | '/admin/channel-categories'
     | '/admin/channels'
     | '/admin/clients'
     | '/admin/credits'
@@ -466,7 +456,6 @@ export interface FileRouteTypes {
     | '/minha-lista'
     | '/perfil'
     | '/admin/categories'
-    | '/admin/channel-categories'
     | '/admin/channels'
     | '/admin/clients'
     | '/admin/credits'
@@ -511,7 +500,6 @@ export interface FileRouteTypes {
     | '/_authenticated/minha-lista'
     | '/_authenticated/perfil'
     | '/admin/categories'
-    | '/admin/channel-categories'
     | '/admin/channels'
     | '/admin/clients'
     | '/admin/credits'
@@ -691,13 +679,6 @@ declare module '@tanstack/react-router' {
       path: '/categories'
       fullPath: '/admin/categories'
       preLoaderRoute: typeof AdminCategoriesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/channel-categories': {
-      id: '/admin/channel-categories'
-      path: '/channel-categories'
-      fullPath: '/admin/channel-categories'
-      preLoaderRoute: typeof AdminChannelCategoriesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/channels': {
@@ -888,7 +869,6 @@ const AuthenticatedRouteRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
-  AdminChannelCategoriesRoute: typeof AdminChannelCategoriesRoute
   AdminChannelsRoute: typeof AdminChannelsRoute
   AdminClientsRoute: typeof AdminClientsRoute
   AdminCreditsRoute: typeof AdminCreditsRoute
@@ -907,7 +887,6 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
-  AdminChannelCategoriesRoute: AdminChannelCategoriesRoute,
   AdminChannelsRoute: AdminChannelsRoute,
   AdminClientsRoute: AdminClientsRoute,
   AdminCreditsRoute: AdminCreditsRoute,
