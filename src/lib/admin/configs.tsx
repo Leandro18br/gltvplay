@@ -18,7 +18,8 @@ function SourcesCount({ id }: { id: string }) {
 
 const status: Field = { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS, defaultValue: "published", editOnly: true };
 const featured: Field = { name: "featured", label: "Marcar como destaque", type: "boolean" };
-const category: Field = { name: "category_id", label: "Categoria", type: "relation", table: "categories", select: "id,name" };
+const category: Field = { name: "category_id", label: "Categoria", type: "relation", table: "categories", select: "id,name", where: { scope: "media" } };
+const channelCategory: Field = { ...category, where: { scope: "channel" } };
 const sortOrder: Field = { name: "sort_order", label: "Ordem", type: "number", defaultValue: 0 };
 
 const titleSorts = [
@@ -147,7 +148,7 @@ export const channelsConfig: ResourceConfig = {
   ],
   fields: [
     { name: "name", label: "Nome", type: "text", required: true },
-    category,
+    channelCategory,
     { name: "description", label: "Descrição", type: "textarea" },
     status, sortOrder, featured,
     { name: "logo_url", label: "Logo", type: "image", folder: "logos" },
@@ -156,16 +157,35 @@ export const channelsConfig: ResourceConfig = {
 };
 
 export const categoriesConfig: ResourceConfig = {
-  table: "categories", title: "Categorias", singular: "Categoria", searchCol: "name", hasStatus: true,
+  table: "categories", where: { scope: "media" }, select: "*, movie_categories(count), series_categories(count)", title: "Categorias de filmes e séries", singular: "Categoria", searchCol: "name", hasStatus: true,
   sortOptions: [{ value: "sort_order:asc", label: "Ordem manual" }, { value: "name:asc", label: "Nome A–Z" }],
   columns: [
     { key: "image_url", label: "", render: (r) => <Thumb src={r.image_url} wide />, className: "w-24" },
     { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name}</span> },
     { key: "slug", label: "Slug" },
+    { key: "items", label: "Filmes / Séries", render: (r) => `${r.movie_categories?.[0]?.count ?? 0} / ${r.series_categories?.[0]?.count ?? 0}` },
   ],
   fields: [
     { name: "name", label: "Nome", type: "text", required: true },
     { name: "slug", label: "Slug (URL)", type: "text", required: true, placeholder: "ex: acao" },
+    { name: "description", label: "Descrição", type: "textarea" },
+    { ...status, defaultValue: "published" }, sortOrder,
+    { name: "image_url", label: "Imagem", type: "image", folder: "categories" },
+  ],
+};
+
+export const channelCategoriesConfig: ResourceConfig = {
+  table: "categories", where: { scope: "channel" }, select: "*, channels(count)", title: "Categorias de canais", singular: "Categoria de canais", searchCol: "name", hasStatus: true,
+  sortOptions: [{ value: "sort_order:asc", label: "Ordem manual" }, { value: "name:asc", label: "Nome A–Z" }],
+  columns: [
+    { key: "image_url", label: "", render: (r) => <Thumb src={r.image_url} wide />, className: "w-24" },
+    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "slug", label: "Slug" },
+    { key: "channels", label: "Canais", render: (r) => r.channels?.[0]?.count ?? 0 },
+  ],
+  fields: [
+    { name: "name", label: "Nome", type: "text", required: true },
+    { name: "slug", label: "Slug (URL)", type: "text", required: true, placeholder: "ex: esportes" },
     { name: "description", label: "Descrição", type: "textarea" },
     { ...status, defaultValue: "published" }, sortOrder,
     { name: "image_url", label: "Imagem", type: "image", folder: "categories" },

@@ -44,6 +44,8 @@ export type Field = {
   defaultValue?: unknown;
   /** Hidden when creating; new rows use defaultValue. */
   editOnly?: boolean;
+  /** Fixed equality filters for relation options (e.g. category scope). */
+  where?: Record<string, string>;
 };
 
 export type Column = { key: string; label: string; render?: (r: Row) => ReactNode; className?: string };
@@ -67,16 +69,20 @@ export type ResourceConfig = {
   addLabel?: string;
   /** After creating, keep the form open so related items (e.g. players) can be added. */
   stayOpenAfterCreate?: boolean;
+  /** Fixed equality filters for the list; also written on create. */
+  where?: Record<string, string>;
 };
 
 const PAGE = 12;
 
-function useRelation(table?: string, select?: string) {
+function useRelation(table?: string, select?: string, where?: Record<string, string>) {
   return useQuery({
-    queryKey: ["rel", table, select],
+    queryKey: ["rel", table, select, where ?? null],
     enabled: !!table,
     queryFn: async () => {
-      const { data, error } = await db.from(table!).select(select ?? "*").limit(1000);
+      let q = db.from(table!).select(select ?? "*");
+      for (const [k, v] of Object.entries(where ?? {})) q = q.eq(k, v);
+      const { data, error } = await q.limit(1000);
       if (error) throw error;
       return data as Row[];
     },
@@ -85,7 +91,7 @@ function useRelation(table?: string, select?: string) {
 
 function RelationSelect({ field, value, onChange, kindTable }: { field: Field; value: any; onChange: (v: any) => void; kindTable?: string }) {
   const table = kindTable ?? field.table;
-  const { data, isLoading } = useRelation(table, field.select ?? (kindTable ? (kindTable === "channels" ? "id,name" : "id,title") : undefined));
+  const { data, isLoading } = useRelation(table, field.select ?? (kindTable ? (kindTable === "channels" ? "id,name" : "id,title") : undefined), kindTable ? undefined : field.where);
   const labelOf = field.labelOf ?? ((r: Row) => r.title ?? r.name ?? r.id);
   return (
     <Select value={value ?? "none"} onValueChange={(v) => onChange(v === "none" ? null : v)}>
@@ -148,6 +154,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
   const busyRef = useRef(false);
 
   function applyFilters(q: any) {
+    for (const [k, v] of Object.entries(config.where ?? {})) q = q.eq(k, v);
     if (debounced) q = q.ilike(config.searchCol, `%${debounced}%`);
     if (config.hasStatus && status !== "all") q = q.eq("status", status);
     if (config.hasActive && status !== "all") q = q.eq("is_active", status === "active");
@@ -270,6 +277,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
         payload[f.name] = v;
       }
       const isNew = !editing?.id;
+      if (isNew) Object.assign(payload, config.where ?? {});
       // Keep existing public links stable: only create a slug for new rows or rows that never had one.
       if (config.slugFrom && !payload.slug && payload[config.slugFrom] && (isNew || !editing?.slug)) {
         payload.slug = `${slugify(String(payload[config.slugFrom]))}-${Math.random().toString(36).slice(2, 6)}`;
