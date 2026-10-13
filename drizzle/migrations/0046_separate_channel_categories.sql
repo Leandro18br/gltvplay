@@ -83,9 +83,8 @@ BEGIN
   ), normalized AS (
     SELECT name,
       CASE
-        WHEN category_kind = 'channel'
-         AND EXISTS (SELECT 1 FROM public.categories c WHERE c.slug = src.original_slug AND c.kind <> 'channel')
-        THEN left(src.original_slug, 90) || '-canais'
+        WHEN EXISTS (SELECT 1 FROM public.categories c WHERE c.slug = src.original_slug AND c.kind <> category_kind)
+        THEN left(src.original_slug, 90) || CASE WHEN category_kind = 'channel' THEN '-canais' ELSE '-catalogo' END
         ELSE src.original_slug
       END AS slug
     FROM src
@@ -100,9 +99,8 @@ BEGIN
   JOIN public.categories c
     ON c.kind = category_kind
    AND c.slug = CASE
-     WHEN category_kind = 'channel'
-      AND EXISTS (SELECT 1 FROM public.categories other WHERE other.slug = left(o.x->>'slug',100) AND other.kind <> 'channel')
-     THEN left(o.x->>'slug',90) || '-canais'
+     WHEN EXISTS (SELECT 1 FROM public.categories other WHERE other.slug = left(o.x->>'slug',100) AND other.kind <> category_kind)
+     THEN left(o.x->>'slug',90) || CASE WHEN category_kind = 'channel' THEN '-canais' ELSE '-catalogo' END
      ELSE left(o.x->>'slug',100)
    END;
 
