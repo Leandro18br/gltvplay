@@ -164,13 +164,13 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
   queryOptions({
     queryKey: ["catalog", "categories", kinds.slice().sort().join(",")],
     queryFn: async () => {
+      const want = new Set(kinds);
       const categoryKind = want.has("channel") && !want.has("movie") && !want.has("series") ? "channel" : "catalog";
       const selection = categoryKind === "channel" ? "id,name,slug,description,image_url,channels(count)" : "id,name,slug,description,image_url";
       let query = sb.from("categories").select(selection).eq("status", "published").eq("kind", categoryKind);
       if (categoryKind === "channel") query = query.eq("channels.status", "published");
       const { data, error } = await query.order("sort_order").order("name");
       if (error) throw error;
-      const want = new Set(kinds);
       const [m, s, c] = await Promise.all([
         want.has("movie") ? sb.from("movies").select("movie_categories!inner(category_id)").eq("status", "published") : null,
         want.has("series") ? sb.from("series").select("series_categories!inner(category_id)").eq("status", "published") : null,
