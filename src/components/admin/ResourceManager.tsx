@@ -67,6 +67,8 @@ export type ResourceConfig = {
   addLabel?: string;
   /** After creating, keep the form open so related items (e.g. players) can be added. */
   stayOpenAfterCreate?: boolean;
+  /** Fixed query filters and values for scoped resource managers. */
+  fixedFilters?: Record<string, string>;
 };
 
 const PAGE = 12;
@@ -152,6 +154,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
     if (config.hasStatus && status !== "all") q = q.eq("status", status);
     if (config.hasActive && status !== "all") q = q.eq("is_active", status === "active");
     if (config.scope && scope !== "all") q = q.eq(config.scope.col, scope);
+    for (const [column, value] of Object.entries(config.fixedFilters ?? {})) q = q.eq(column, value);
     return q;
   }
 
@@ -261,7 +264,7 @@ export function ResourceManager({ config, initialScope, lockScope, editId, title
         const value=playbackSchema.parse(values[f.name] ?? emptyPlayback);
         await validateSource({data:value});
       }
-      const payload: Row = {};
+      const payload: Row = { ...(config.fixedFilters ?? {}) };
       for (const f of config.fields) {
         if (f.type === "genres" || f.type === "playback" || f.type === "sources") continue;
         let v = values[f.name];
