@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import type { MouseEvent } from "react";
 import { useRef, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Play, Plus, Check, Radio } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +10,7 @@ export function DetailLink({ item, children, className }: { item: Item; children
   const p = { slug: itemParam(item) };
   if (item.kind === "movie") return <Link to="/filme/$slug" params={p} className={className}>{children}</Link>;
   if (item.kind === "series") return <Link to="/serie/$slug" params={p} className={className}>{children}</Link>;
-  const requestPlayerFullscreen = (event: MouseEvent<HTMLAnchorElement>) => {
+  const requestPlayerFullscreen = () => {
     // Use the channel-card tap as the explicit gesture; fullscreen may be denied on mobile.
     if (typeof document === "undefined" || !document.fullscreenEnabled || !document.documentElement.requestFullscreen) return;
     void document.documentElement.requestFullscreen().catch(() => {});
