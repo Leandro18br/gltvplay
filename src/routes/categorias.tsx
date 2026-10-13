@@ -12,9 +12,9 @@ export const Route = createFileRoute("/categorias")({
   head: () => ({
     meta: [
       { title: "Categorias — Streaming" },
-      { name: "description", content: "Navegue por categorias de filmes, séries e canais." },
+      { name: "description", content: "Navegue por categorias de filmes e séries." },
       { property: "og:title", content: "Categorias — Streaming" },
-      { property: "og:description", content: "Navegue por categorias de filmes, séries e canais." },
+      { property: "og:description", content: "Navegue por categorias de filmes e séries." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
