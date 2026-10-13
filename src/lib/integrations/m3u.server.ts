@@ -406,13 +406,24 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   const cats = new Map<string, string | null>();
   let tmdbBudget = list.enrich_tmdb ? 8 : 0;
 
-  const category = async (group: string | null) => {
+  const category = async (group: string | null, kind: "catalog" | "channel" = "catalog") => {
     const name = categoryName(group); if (!name) return null;
-    const slug = slugify(name); if (!slug) return null;
-    if (cats.has(slug)) return cats.get(slug)!;
-    let { data } = await db.from("categories").select("id").eq("slug", slug).maybeSingle();
-    if (!data) { const r = await db.from("categories").insert({ name, slug, status: "published" }).select("id").single(); data = r.data ?? (await db.from("categories").select("id").eq("slug", slug).maybeSingle()).data; }
-    cats.set(slug, data?.id ?? null); return data?.id ?? null;
+    const baseSlug = slugify(name); if (!baseSlug) return null;
+    const cacheKey = `${kind}:${baseSlug}`;
+    if (cats.has(cacheKey)) return cats.get(cacheKey)!;
+    let slug = baseSlug;
+    let { data } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
+    if (!data && kind === "channel") {
+      const { data: collision } = await db.from("categories").select("id").eq("slug", slug).maybeSingle();
+      if (collision) slug = `${baseSlug.slice(0, 90)}-canais`;
+      const { data: existing } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
+      data = existing;
+    }
+    if (!data) {
+      const r = await db.from("categories").insert({ name, slug, status: "published", kind }).select("id").single();
+      data = r.data ?? (await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle()).data;
+    }
+    cats.set(cacheKey, data?.id ?? null); return data?.id ?? null;
   };
   const exists = async (table: string, id: string | null) => (id ? ((await db.from(table).select("id").eq("id", id).maybeSingle()).data?.id as string | undefined) ?? null : null);
   const byTmdb = async (table: string, tmdbId: number | null) => (tmdbId ? ((await db.from(table).select("id").eq("tmdb_id", tmdbId).limit(1).maybeSingle()).data?.id as string | undefined) ?? null : null);
@@ -486,7 +497,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     if (id) await fillMissing("channels", id, "logo_url", it);
     else {
       const slug = await uniqueSlug(ctx, "channels", it.title, null);
-      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title), status: "published" }).select("id").single();
+      const ins = await db.from("channels").insert({ name: it.title.slice(0, 200), slug, logo_url: it.logo, category_id: await category(it.group_title, "channel"), status: "published" }).select("id").single();
       if (ins.error) throw ins.error;
       id = ins.data.id as string;
     }
