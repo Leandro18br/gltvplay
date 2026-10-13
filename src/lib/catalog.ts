@@ -164,7 +164,8 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
   queryOptions({
     queryKey: ["catalog", "categories", kinds.slice().sort().join(",")],
     queryFn: async () => {
-      const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").order("sort_order").order("name");
+      const scope = kinds.includes("channel") ? "channel" : "media";
+      const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").eq("scope", scope).order("sort_order").order("name");
       if (error) throw error;
       const want = new Set(kinds);
       const [m, s, c] = await Promise.all([
@@ -176,8 +177,10 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
       const ids = new Set<string>();
       for (const r of m?.data ?? []) for (const x of r.movie_categories ?? []) ids.add(x.category_id);
       for (const r of s?.data ?? []) for (const x of r.series_categories ?? []) ids.add(x.category_id);
-      for (const r of c?.data ?? []) ids.add(r.category_id);
-      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[]).filter((cat) => ids.has(cat.id));
+      const counts = new Map<string, number>();
+      const bump = (id: string) => { ids.add(id); counts.set(id, (counts.get(id) ?? 0) + 1); };
+      for (const r of c?.data ?? []) bump(r.category_id);
+      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[]).filter((cat) => ids.has(cat.id)).map((cat) => ({ ...cat, count: counts.get(cat.id) ?? null }));
     },
     staleTime: 60_000,
   });
@@ -187,7 +190,7 @@ export const channelCategoryMetaQuery = (slug: string) =>
   queryOptions({
     queryKey: ["catalog", "channel-category", slug],
     queryFn: async () => {
-      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").maybeSingle();
+      const { data: cat, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("slug", slug).eq("status", "published").eq("scope", "channel").maybeSingle();
       if (error) throw error;
       if (!cat) return null;
       const { count, error: e2 } = await sb.from("channels").select("id", { count: "exact", head: true }).eq("status", "published").eq("category_id", cat.id);

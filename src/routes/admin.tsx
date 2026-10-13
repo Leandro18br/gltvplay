@@ -34,6 +34,7 @@ const NAV = [
   { to: "/admin/series", label: "Séries", icon: Tv },
   { to: "/admin/channels", label: "Canais", icon: Radio },
   { to: "/admin/categories", label: "Categorias", icon: Tags },
+  { to: "/admin/channel-categories", label: "Categorias de canais", icon: Tags },
   { to: "/admin/genres", label: "Gêneros", icon: Shapes },
   { to: "/admin/users", label: "Usuários", icon: Users, adminOnly: true },
   { to: "/admin/integrations", label: "APIs e Integrações", icon: Cable, adminOnly: true },

@@ -39,7 +39,7 @@ function Page() {
                 <div className="absolute inset-0 bg-fade" />
                 <div className="relative min-w-0">
                   <h2 className="truncate text-lg font-semibold">{c.name}</h2>
-                  {c.description && <p className="line-clamp-1 text-xs text-muted-foreground">{c.description}</p>}
+                  <p className="line-clamp-1 text-xs text-muted-foreground">{c.count != null ? `${c.count} ${c.count === 1 ? "canal" : "canais"}` : c.description}</p>
                 </div>
               </Link>
             </li>
