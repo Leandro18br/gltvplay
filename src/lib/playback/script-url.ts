@@ -3,7 +3,7 @@
 export function isDirectEmbedEndpoint(url: string): boolean {
   try {
     const u = new URL(url);
-    return u.protocol === "https:" && u.hostname.toLowerCase() === "cinema.bugoumods.com" && /\\.php$/i.test(u.pathname);
+    return u.protocol === "https:" && u.hostname.toLowerCase() === "cinema.bugoumods.com" && /\.php$/i.test(u.pathname);
   } catch { return false; }
 }
 
