@@ -46,16 +46,16 @@ export async function linkCategories(
   const db = supabaseAdmin as any;
 
   const create = await db.from("categories").upsert(
-    cats.map((c) => ({ ...c, status: "published", kind: categoryKind })),
+    cats.map((c) => ({ ...c, status: "published", scope: categoryKind === "channel" ? "channel" : "media" })),
     { onConflict: "slug", ignoreDuplicates: true },
   );
   if (create.error) throw new Error(`Categoria: ${create.error.message}`);
 
   const { data: categoryRows, error: lookupError } = await db
     .from("categories")
-    .select("id,slug,kind")
+    .select("id,slug,scope")
     .in("slug", cats.map((c) => c.slug))
-    .eq("kind", categoryKind);
+    .eq("scope", categoryKind === "channel" ? "channel" : "media");
   if (lookupError) throw new Error(`Categoria: ${lookupError.message}`);
 
   const idsBySlug = new Map((categoryRows ?? []).map((c: any) => [String(c.slug), String(c.id)]));

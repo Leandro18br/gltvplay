@@ -413,16 +413,16 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     const cacheKey = `${kind}:${baseSlug}`;
     if (cats.has(cacheKey)) return cats.get(cacheKey)!;
     let slug = baseSlug;
-    let { data } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
+    let { data } = await db.from("categories").select("id").eq("slug", slug).eq("scope", kind === "channel" ? "channel" : "media").maybeSingle();
     if (!data) {
-      const { data: collision } = await db.from("categories").select("id,kind").eq("slug", slug).maybeSingle();
-      if (collision) slug = categorySlugForKind(baseSlug, kind, collision.kind);
-      const { data: existing } = await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle();
+      const { data: collision } = await db.from("categories").select("id,scope").eq("slug", slug).maybeSingle();
+      if (collision) slug = categorySlugForKind(baseSlug, kind, collision.scope === "channel" ? "channel" : "catalog");
+      const { data: existing } = await db.from("categories").select("id").eq("slug", slug).eq("scope", kind === "channel" ? "channel" : "media").maybeSingle();
       data = existing;
     }
     if (!data) {
-      const r = await db.from("categories").insert({ name, slug, status: "published", kind }).select("id").single();
-      data = r.data ?? (await db.from("categories").select("id").eq("slug", slug).eq("kind", kind).maybeSingle()).data;
+      const r = await db.from("categories").insert({ name, slug, status: "published", scope: kind === "channel" ? "channel" : "media" }).select("id").single();
+      data = r.data ?? (await db.from("categories").select("id").eq("slug", slug).eq("scope", kind === "channel" ? "channel" : "media").maybeSingle()).data;
     }
     cats.set(cacheKey, data?.id ?? null); return data?.id ?? null;
   };
