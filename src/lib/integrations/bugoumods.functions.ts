@@ -791,7 +791,7 @@ export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\\d+$/)).min(1).max(100) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(100) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
     await refreshMovieIndex(ctx, false);
@@ -817,7 +817,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       if (findErr) throw new Error(findErr.message);
       let existing = byExternal;
       if (!existing) {
-        let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\\\]/g, "\\\\$&")).limit(2);
+        let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\title.replace(/[%_\\\\]/g, "\\\\$&")")).limit(2);
         if (year) same = same.eq("release_year", year);
         const { data: matches, error: sameErr } = await same;
         if (sameErr) throw new Error(sameErr.message);
