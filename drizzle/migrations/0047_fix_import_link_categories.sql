@@ -49,7 +49,7 @@ BEGIN
       SET category_id = ids[1]
       WHERE id = _id AND category_id IS NULL;
     INSERT INTO public.movie_categories
-      SELECT _id, category_id FROM unnest(ids) AS category_id
+      SELECT _id, category_id FROM unnest(ids) AS u(category_id)
       ON CONFLICT DO NOTHING;
     GET DIAGNOSTICS n = ROW_COUNT;
   ELSIF _kind = 'series' THEN
