@@ -18,6 +18,7 @@ import { MegaEmbedCard } from "@/components/admin/integrations/MegaEmbedCard";
 import { M3uListsCard } from "@/components/admin/integrations/M3uListsCard";
 import { LiveChannelsCard } from "@/components/admin/integrations/LiveChannelsCard";
 import { SeriesApiCard } from "@/components/admin/integrations/SeriesApiCard";
+import { BugouMoviesButton } from "@/components/admin/integrations/BugouMoviesButton";
 import { StatusBadge, fmtDate, type Integration } from "@/components/admin/integrations/shared";
 
 export const Route = createFileRoute("/admin/integrations")({
@@ -57,6 +58,7 @@ function IntegrationsPage() {
         <TabsContent value="apis" className="space-y-3">
           <LiveChannelsCard />
           <SeriesApiCard />
+          <div className="rounded-2xl border border-primary/30 bg-card p-4"><div className="mb-3"><h2 className="font-semibold">BugouMods — Catálogo de filmes</h2><p className="mt-1 text-sm text-muted-foreground">Pesquisa e importação de filmes usando a credencial BugouMods já configurada. O catálogo de séries permanece separado.</p></div><BugouMoviesButton label="Pesquisar e importar filmes" /></div>
           <TmdbIntegrationCard />
           <MegaEmbedCard />
           <M3uListsCard />
