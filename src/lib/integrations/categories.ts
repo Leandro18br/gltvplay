@@ -56,7 +56,8 @@ export async function linkCategories(
     .in("slug", cats.map((c) => c.slug));
   if (lookupError) throw new Error(`Categoria: ${lookupError.message}`);
 
-  const ids = [...new Set((categoryRows ?? []).map((c: any) => String(c.id)))];
+  const idsBySlug = new Map((categoryRows ?? []).map((c: any) => [String(c.slug), String(c.id)]));
+  const ids = [...new Set(cats.map((c) => idsBySlug.get(c.slug)).filter((x): x is string => !!x))];
   if (!ids.length) return 0;
   const primaryId = ids[0];
 
