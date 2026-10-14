@@ -662,3 +662,138 @@ export const bugouCategoryStats = createServerFn({ method: "POST" })
     }
     return { total: rows.length, imported: local.size, missing: Math.max(0, rows.length - local.size), seasons, episodes, withPlayer, noPlayer: episodes - withPlayer, emptySeries: empty };
   });
+
+// ---------- BugouMods movie catalog (metadata only; no player URLs are imported) ----------
+type BugouMovie = { id: string; title: string; year: number | null; poster_url: string | null; category: string };
+
+async function loadAllMovies(): Promise<BugouMovie[]> {
+  const { integ, tok } = await seriesIntegration();
+  const url = new URL("https://cinema.bugoumods.com/");
+  url.search = new URLSearchParams({ api: "1", t: "vod", c: "all", vtoken: tok }).toString();
+  const t0 = Date.now();
+  try {
+    const json = await getJson(url, "lista de filmes", integ?.timeout_seconds ?? 25);
+    if (!json || typeof json !== "object" || Array.isArray(json)) throw new Error("Formato inesperado: a API de filmes não devolveu categorias.");
+    if (json.Aviso) throw new Error("BugouMods informou um aviso; verifique se o token está válido.");
+    const seen = new Set<string>();
+    const items: BugouMovie[] = [];
+    for (const [categoryName, list] of Object.entries(json)) {
+      if (!Array.isArray(list)) continue;
+      for (const raw of list as any[]) {
+        const id = String(raw?.id ?? "").trim();
+        if (!/^\d+$/.test(id) || seen.has(id)) continue;
+        const parsed = parseBugouName(String(raw?.nome ?? raw?.name ?? raw?.title ?? ""));
+        if (!parsed.title) continue;
+        seen.add(id);
+        const image = String(raw?.capa ?? raw?.cover ?? raw?.poster ?? "").trim();
+        const poster_url = /^https?:\/\//i.test(image) ? image.replace(/^http:\/\//i, "https://") : null;
+        items.push({ id, title: parsed.title.slice(0, 200), year: parsed.year, poster_url, category: String(raw?.categoria ?? categoryName).trim().slice(0, 120) });
+      }
+    }
+    if (!items.length) throw new Error("A resposta não contém filmes reconhecíveis. Nenhum dado foi alterado.");
+    await logCall(integ, "Catálogo de filmes", t0, null);
+    return items;
+  } catch (e) {
+    const message = scrub((e as Error).message).slice(0, 400);
+    await logCall(integ, "Catálogo de filmes", t0, message, e instanceof RateLimitedError ? 429 : null);
+    throw new Error(message);
+  }
+}
+
+async function refreshMovieIndex(ctx: Ctx, force: boolean) {
+  const { data } = await ctx.supabase.from("bugou_sync").select("synced_at,total").eq("kind", "movie").maybeSingle();
+  if (!force && data) return data as { synced_at: string; total: number };
+  const all = await loadAllMovies();
+  const now = new Date().toISOString();
+  for (let i = 0; i < all.length; i += 500) {
+    const chunk = all.slice(i, i + 500);
+    const rows = chunk.map(m => ({ kind: "movie", ext_id: m.id, title: m.title, title_norm: normTitle(m.title), title_compact: compactTitle(m.title), year: m.year, poster_url: m.poster_url, category: m.category, seen_at: now }));
+    const up = await ctx.supabase.from("bugou_catalog").upsert(rows, { onConflict: "kind,ext_id" });
+    if (up.error) throw new Error(up.error.message);
+    const cats = await ctx.supabase.from("bugou_catalog_categories").upsert(chunk.map(m => ({ kind: "movie", ext_id: m.id, category: m.category, seen_at: now })).filter(m => !!m.category), { onConflict: "kind,ext_id,category" });
+    if (cats.error) throw new Error(cats.error.message);
+  }
+  const sync = await ctx.supabase.from("bugou_sync").upsert({ kind: "movie", synced_at: now, total: all.length });
+  if (sync.error) throw new Error(sync.error.message);
+  return { synced_at: now, total: all.length };
+}
+
+export const bugouMoviesTest = createServerFn({ method: "POST" }).middleware([...auth])
+  .handler(async ({ context }) => {
+    const ctx = context as Ctx; await assertStaff(ctx);
+    const all = await loadAllMovies();
+    return { total: all.length, categories: [...new Set(all.map(m => m.category).filter(Boolean))].sort(), sample: all[0] ? { title: all[0].title, year: all[0].year, hasPoster: !!all[0].poster_url } : null };
+  });
+
+export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([...auth])
+  .inputValidator((d) => z.object({ query: z.string().trim().max(200).default(""), category: z.string().max(120).default(""), page: z.number().int().min(0).max(10000).default(0), refresh: z.boolean().default(false), withCategories: z.boolean().default(false) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
+    const sync = await refreshMovieIndex(ctx, data.refresh);
+    const q = normTitle(data.query);
+    const queryRows = async (compact: boolean) => {
+      let qb = db.from("bugou_catalog").select(data.category ? "ext_id,title,year,poster_url,category,title_norm,bugou_catalog_categories!inner(category)" : "ext_id,title,year,poster_url,category,title_norm", { count: "exact" }).eq("kind", "movie");
+      if (q) {
+        if (compact) qb = qb.ilike("title_compact", "%" + q.replace(/ /g, "") + "%");
+        else for (const part of q.split(" ")) qb = qb.ilike("title_norm", "%" + part + "%");
+      }
+      if (data.category) qb = qb.eq("bugou_catalog_categories.category", data.category);
+      return qb.order("title_norm").order("ext_id").range(data.page * PAGE, data.page * PAGE + PAGE - 1);
+    };
+    let result = await queryRows(false);
+    if (!result.error && q && !result.count) result = await queryRows(true);
+    if (result.error) throw new Error(result.error.message);
+    const rows = (result.data ?? []) as any[];
+    if (q) rows.sort((a,b) => (a.title_norm === q ? 0 : a.title_norm.startsWith(q) ? 1 : 2) - (b.title_norm === q ? 0 : b.title_norm.startsWith(q) ? 1 : 2));
+    const results: BugouMovie[] = rows.map(x => ({ id: x.ext_id, title: x.title, year: x.year, poster_url: x.poster_url, category: x.category ?? "" }));
+    const existing: Record<string,string> = {};
+    if (results.length) {
+      const { data: byExt, error } = await db.from("movies").select("id,external_id").eq("external_source", SOURCE).in("external_id", results.map(m => m.id));
+      if (error) throw new Error(error.message);
+      (byExt ?? []).forEach((x: any) => { existing[x.external_id] = x.id; });
+    }
+    let categories: string[] = [];
+    if (data.withCategories) {
+      const { data: catRows, error } = await db.from("bugou_catalog_categories").select("category").eq("kind", "movie").order("category").range(0, 9999);
+      if (error) throw new Error(error.message);
+      categories = [...new Set((catRows ?? []).map((x: any) => String(x.category ?? "")).filter(Boolean))].sort();
+    }
+    return { total: sync.total, synced_at: sync.synced_at, matches: result.count ?? 0, page: data.page, pageSize: PAGE, categories, results, existing };
+  });
+
+export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(100) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
+    await refreshMovieIndex(ctx, false);
+    const { data: items, error } = await db.from("bugou_catalog").select("ext_id,title,year,poster_url,category").eq("kind", "movie").in("ext_id", data.ids);
+    if (error) throw new Error(error.message);
+    const byId = new Map((items ?? []).map((x: any) => [x.ext_id, x]));
+    const report = { created: 0, updated: 0, skipped: 0 };
+    for (const id of data.ids) {
+      const m = byId.get(id) as any;
+      if (!m) { report.skipped++; continue; }
+      const { data: existing, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+      if (findErr) throw new Error(findErr.message);
+      if (existing) {
+        const patch: Record<string, unknown> = {};
+        if (!existing.title && m.title) patch.title = m.title;
+        if (!existing.poster_url && m.poster_url) patch.poster_url = m.poster_url;
+        if (!existing.release_year && m.year) patch.release_year = m.year;
+        if (Object.keys(patch).length) {
+          const up = await db.from("movies").update(patch).eq("id", existing.id);
+          if (up.error) throw new Error(up.error.message);
+        }
+        await linkCategories(db, "movie", existing.id, [m.category]);
+        report.updated++;
+        continue;
+      }
+      const base = normTitle(m.title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
+      const slug = (base + "-" + id).slice(0, 200);
+      const ins = await db.from("movies").insert({ title: m.title, release_year: m.year, poster_url: m.poster_url, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
+      if (ins.error) throw new Error(ins.error.message);
+      await linkCategories(db, "movie", ins.data.id, [m.category]);
+      report.created++;
+    }
+    return report;
+  });
