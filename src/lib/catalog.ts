@@ -182,8 +182,11 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
         ids.add(r.category_id);
         channelCounts.set(r.category_id, (channelCounts.get(r.category_id) ?? 0) + 1);
       }
+      // Visibility must depend on the category's own published status and kind,
+      // not on a second query's join results. Legacy/imported records can have a
+      // valid category_id but missing join rows, which previously hid the category
+      // entirely from the public category directory.
       return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[])
-        .filter((cat) => ids.has(cat.id))
         .map((cat) => categoryKind === "channel" ? { ...cat, channels: [{ count: channelCounts.get(cat.id) ?? 0 }] } : cat);
     },
     staleTime: 60_000,
