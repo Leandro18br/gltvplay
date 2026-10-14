@@ -25,6 +25,8 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
+  const [categoryStats, setCategoryStats] = useState<Record<string, { total: number; imported: number }>>({});
+  const [lastImportReport, setLastImportReport] = useState<{ category: string; total: number; created: number; updated: number; skipped: number } | null>(null);
   const [page, setPage] = useState(0);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -36,7 +38,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
     setBusy(refresh ? "test" : "search"); setError("");
     try {
       const r = await search({ data: { query, category, page: nextPage, refresh, withCategories } });
-      setResult(r); setExisting(r.existing); if (withCategories) setCategories(r.categories);
+      setResult(r); setExisting(r.existing); if (withCategories) { setCategories(r.categories); setCategoryStats(r.categoryStats ?? {}); }
       setPage(nextPage); setSelected(new Set());
       if (refresh) toast.success("Catálogo atualizado: " + r.total + " filmes.");
     } catch (e) { setError(errMsg(e)); } finally { setBusy(""); }
@@ -63,6 +65,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
     if (!selected.size) return; setBusy("import"); setImportProgress("");
     try {
       const r = await importIds([...selected]);
+      setLastImportReport({ category: category || "Seleção manual", total: selected.size, ...r });
       toast.success("Importação concluída: " + r.created + " novos, " + r.updated + " atualizados" + (r.skipped ? ", " + r.skipped + " ignorados" : "") + ".");
       setSelected(new Set()); await run(page);
     } catch (e) { toast.error(errMsg(e)); } finally { setBusy(""); setImportProgress(""); }
@@ -80,7 +83,9 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
         ids.push(...next.results.map(m => m.id));
       }
       if (!ids.length) { toast.info("Não há filmes nesta categoria para importar."); return; }
-      const report = await importIds([...new Set(ids)]);
+      const uniqueIds = [...new Set(ids)];
+      const report = await importIds(uniqueIds);
+      setLastImportReport({ category, total: uniqueIds.length, ...report });
       toast.success("Categoria “" + category + "” concluída: " + report.created + " novos, " + report.updated + " atualizados" + (report.skipped ? ", " + report.skipped + " ignorados" : "") + ".");
       setSelected(new Set()); await run(0, false, true);
     } catch (e) { setError(errMsg(e)); toast.error(errMsg(e)); } finally { setBusy(""); setImportProgress(""); }
@@ -91,14 +96,15 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
       <DialogHeader><DialogTitle>Catálogo de filmes — BugouMods</DialogTitle><DialogDescription>Importa apenas metadados (título, ano, capa e categoria), sem links de reprodução. A credencial é lida no servidor pela integração BugouMods já configurada.</DialogDescription></DialogHeader>
       <form className="grid gap-2 md:grid-cols-[1fr_200px_auto_auto]" onSubmit={e => { e.preventDefault(); void run(0); }}>
         <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar título do filme" />
-        <Select value={category || "__all"} onValueChange={v => { setCategory(v === "__all" ? "" : v); setPage(0); }}><SelectTrigger aria-label="Categoria"><SelectValue placeholder="Todas as categorias" /></SelectTrigger><SelectContent><SelectItem value="__all">Todas as categorias</SelectItem>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select>
+        <Select value={category || "__all"} onValueChange={v => { setCategory(v === "__all" ? "" : v); setPage(0); }}><SelectTrigger aria-label="Categoria"><SelectValue placeholder="Todas as categorias" /></SelectTrigger><SelectContent><SelectItem value="__all">Todas as categorias</SelectItem>{categories.map(c => { const s = categoryStats[c]; return <SelectItem key={c} value={c}>{c}{s ? ` · ${s.total} filmes · ${s.imported} importados` : ""}</SelectItem>; })}</SelectContent></Select>
         <Button disabled={!!busy} type="submit">{busy === "search" ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
         <Button disabled={!!busy} type="button" variant="outline" onClick={testConnection}>{busy === "test" ? <Loader2 className="animate-spin" /> : <RefreshCw />} Testar / sincronizar</Button>
       </form>
       {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {result && <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><span>{result.matches} resultados · catálogo com {result.total} filmes</span><span className="ml-auto">{selected.size} selecionados</span><Button type="button" size="sm" variant="outline" disabled={!!busy || !items.length} onClick={() => setSelected(s => { const n = new Set(s); const allSelected = items.every(m => n.has(m.id)); items.forEach(m => allSelected ? n.delete(m.id) : n.add(m.id)); return n; })}>{items.length && items.every(m => selected.has(m.id)) ? "Desmarcar página" : "Selecionar página"}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setSelected(new Set())}><X /> Limpar seleção</Button></div>}
-      {category && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 p-3"><div className="flex-1"><p className="text-sm font-medium">Importação em massa por categoria</p><p className="text-xs text-muted-foreground">Importa todos os filmes de “{category}”, incluindo os que estão em outras páginas.</p></div><Button type="button" disabled={!!busy} onClick={importWholeCategory}><DownloadCloud /> Importar todos da categoria</Button></div>}
+      {category && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 p-3"><div className="flex-1"><p className="text-sm font-medium">Importação em massa por categoria</p><p className="text-xs text-muted-foreground">{categoryStats[category] ? `${categoryStats[category].total} filmes na categoria · ${categoryStats[category].imported} já importados. ` : ""}Importa todos os filmes de “{category}”, incluindo os que estão em outras páginas.</p></div><Button type="button" disabled={!!busy} onClick={importWholeCategory}><DownloadCloud /> Importar todos da categoria</Button></div>}
       {importProgress && <p className="text-sm text-muted-foreground" role="status">{importProgress}</p>}
+      {lastImportReport && <div className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-sm sm:grid-cols-5"><div><p className="text-muted-foreground">Categoria / seleção</p><p className="font-medium">{lastImportReport.category}</p></div><div><p className="text-muted-foreground">Processados</p><p className="font-medium">{lastImportReport.total}</p></div><div><p className="text-muted-foreground">Novos importados</p><p className="font-medium">{lastImportReport.created}</p></div><div><p className="text-muted-foreground">Atualizados</p><p className="font-medium">{lastImportReport.updated}</p></div><div><p className="text-muted-foreground">Ignorados</p><p className="font-medium">{lastImportReport.skipped}</p></div></div>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {items.map(m => { const checked = selected.has(m.id); return <button key={m.id} type="button" onClick={() => setSelected(s => { const n = new Set(s); n.has(m.id) ? n.delete(m.id) : n.add(m.id); return n; })} className={"relative overflow-hidden rounded-xl border text-left " + (checked ? "border-primary ring-1 ring-primary" : "border-border")}>
           <div className="aspect-[2/3] bg-muted">{m.poster_url && <img src={m.poster_url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
