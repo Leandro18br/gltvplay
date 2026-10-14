@@ -1,11 +1,13 @@
 import { slugify } from "./m3u";
 
 /**
- * Prevent slug collisions between catalog and live-channel categories.
+ * Keep channel categories separate from the movie/series catalog.
+ * The database uses a global unique slug, so channel slugs get a suffix.
  */
 export function categorySlugForKind(baseSlug: string, kind: "catalog" | "channel", conflictingKind?: string | null): string {
-  if (!conflictingKind || conflictingKind === kind) return baseSlug;
-  return `${baseSlug.slice(0, 90)}-${kind === "channel" ? "canais" : "catalogo"}`;
+  if (kind === "channel") return baseSlug.endsWith("-canais") ? baseSlug : `${baseSlug.slice(0, 90)}-canais`;
+  if (conflictingKind === "channel") return `${baseSlug.slice(0, 90)}-catalogo`;
+  return baseSlug;
 }
 
 /** Source category names → unique {name, slug} pairs. */
@@ -20,14 +22,9 @@ export function categoryEntries(names: (string | null | undefined)[]): { name: s
 }
 
 /**
- * Link imported content to categories using explicit, additive writes.
- *
- * Deliberately does not call the legacy import_link_categories RPC: some deployed
- * databases still have an older definition that attempts an unscoped DELETE and
- * fails with "DELETE requires a WHERE clause". The importer runs server-side and
- * has already authorized the staff user, so use the service-role client for these
- * narrowly scoped upserts/inserts instead. Existing links and primary categories
- * are preserved; this function never deletes content or category rows.
+ * Create categories on demand during import and link them to the imported item.
+ * Writes are additive and idempotent: this function never deletes categories,
+ * content, or existing associations.
  */
 export async function linkCategories(
   _db: any,
@@ -38,22 +35,27 @@ export async function linkCategories(
   if (!id) throw new Error("Categoria: ID do conteúdo obrigatório.");
   if (!["movie", "series", "channel"].includes(kind)) throw new Error("Categoria: tipo de conteúdo inválido.");
 
-  const cats = categoryEntries(names);
+  const categoryKind = kind === "channel" ? "channel" : "catalog";
+  const cats = categoryEntries(names).map((c) => ({
+    ...c,
+    slug: categorySlugForKind(c.slug, categoryKind),
+  }));
   if (!cats.length) return 0;
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const db = supabaseAdmin as any;
 
   const create = await db.from("categories").upsert(
-    cats.map((c) => ({ ...c, status: "published" })),
+    cats.map((c) => ({ ...c, status: "published", kind: categoryKind })),
     { onConflict: "slug", ignoreDuplicates: true },
   );
   if (create.error) throw new Error(`Categoria: ${create.error.message}`);
 
   const { data: categoryRows, error: lookupError } = await db
     .from("categories")
-    .select("id,slug")
-    .in("slug", cats.map((c) => c.slug));
+    .select("id,slug,kind")
+    .in("slug", cats.map((c) => c.slug))
+    .eq("kind", categoryKind);
   if (lookupError) throw new Error(`Categoria: ${lookupError.message}`);
 
   const idsBySlug = new Map((categoryRows ?? []).map((c: any) => [String(c.slug), String(c.id)]));
@@ -71,7 +73,7 @@ export async function linkCategories(
   const joinTable = kind === "movie" ? "movie_categories" : "series_categories";
   const contentColumn = kind === "movie" ? "movie_id" : "series_id";
 
-  // Preserve any existing primary category; fill it only when empty.
+  // Keep an existing primary category; set it only when empty.
   const primary = await db.from(table).update({ category_id: primaryId }).eq("id", id).is("category_id", null);
   if (primary.error) throw new Error(`Categoria: ${primary.error.message}`);
 

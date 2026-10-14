@@ -700,6 +700,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          kind: string
           name: string
           slug: string
           sort_order: number
@@ -711,6 +712,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          kind?: string
           name: string
           slug: string
           sort_order?: number
@@ -722,6 +724,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          kind?: string
           name?: string
           slug?: string
           sort_order?: number

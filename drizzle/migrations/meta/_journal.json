@@ -330,6 +330,20 @@
       "when": 1791852301868,
       "tag": "0046_separate_channel_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792000000000,
+      "tag": "0047_fix_import_link_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792000001000,
+      "tag": "0048_reset_categories_and_ensure_kind",
+      "breakpoints": true
     }
   ]
 }
