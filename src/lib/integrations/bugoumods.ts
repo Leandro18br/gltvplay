@@ -31,6 +31,29 @@ export function bugouVipEmbedUrl(episodeId: string, ext: string, vtoken: string)
   return `https://cinema.bugoumods.com/player.php?type=vod_streams&id=${encodeURIComponent(episodeId)}&ext=${e}&vtoken=${encodeURIComponent(vtoken)}&embed=vip`;
 }
 
+export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string };
+
+/** Normalizes the provider's VOD detail response while tolerating its common wrapper shapes. */
+export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
+  const data = j?.movie_data ?? j?.data?.movie_data ?? j?.data ?? j?.result ?? j ?? {};
+  const info = j?.info ?? data?.info ?? data;
+  const name = parseBugouName(String(info?.name ?? info?.title ?? data?.name ?? data?.title ?? ""));
+  const rawExt = String(data?.container_extension ?? info?.container_extension ?? j?.container_extension ?? data?.ext ?? info?.ext ?? "mp4").trim().replace(/^\\./, "");
+  const ext = /^[a-z0-9]{2,5}$/i.test(rawExt) ? rawExt : "mp4";
+  const coverValue = info?.movie_image ?? info?.cover_big ?? info?.cover ?? data?.stream_icon ?? data?.cover ?? data?.poster ?? j?.cover;
+  const plotValue = info?.plot ?? info?.description ?? info?.overview ?? data?.plot ?? data?.description ?? data?.overview ?? j?.plot;
+  const cover = https(coverValue);
+  const yearValue = Number(info?.year ?? data?.year) || name.year;
+  return {
+    id: String(data?.stream_id ?? data?.id ?? j?.id ?? id),
+    title: String(info?.title ?? info?.name ?? data?.title ?? data?.name ?? name.title).trim(),
+    year: yearValue || null,
+    plot: typeof plotValue === "string" && plotValue.trim() ? plotValue.trim() : null,
+    cover,
+    ext,
+  };
+}
+
 /** Parses index.php?ajax=1&type=series_info JSON; drops anything without a numeric id/number. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parseBugouDetails(id: string, j: any): BugouDetails {
