@@ -700,8 +700,8 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
-          kind: string
           name: string
+          scope: string
           slug: string
           sort_order: number
           status: Database["public"]["Enums"]["content_status"]
@@ -712,8 +712,8 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
-          kind?: string
           name: string
+          scope?: string
           slug: string
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
@@ -724,8 +724,8 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
-          kind?: string
           name?: string
+          scope?: string
           slug?: string
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
