@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { VideoPlayerFrame } from "./VideoPlayerFrame";
 import { useServerFn } from "@tanstack/react-start";
 import { probePlayerUrl } from "@/lib/playback/playback.functions";
-import { isScriptEndpoint, type ProbeResult } from "@/lib/playback/script-url";
+import { isDirectEmbedEndpoint, isScriptEndpoint, type ProbeResult } from "@/lib/playback/script-url";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
@@ -79,6 +79,8 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
         ) : !source ? (
           <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">Não foi possível carregar o player. Tente novamente.</div>
         ) : source.type === "embed" ? (
+          <EmbedPlayer url={source.url} title={title} />
+        ) : isDirectEmbedEndpoint(source.url) ? (
           <EmbedPlayer url={source.url} title={title} />
         ) : isScriptEndpoint(source.url) ? (
           <ScriptSource key={source.id} source={source} title={title} poster={poster} sources={sources} onServerChange={setServer} />
