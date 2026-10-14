@@ -1,4 +1,12 @@
 /** Player endpoints like `player.php?type=..&id=..&ext=mp4` may return video, HLS, an HTML player or an error. */
+/** BugouMods VIP player.php must be embedded directly: server-side probes can be blocked by the provider even when its browser player works. */
+export function isDirectEmbedEndpoint(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && u.hostname.toLowerCase() === "cinema.bugoumods.com" && /\\.php$/i.test(u.pathname);
+  } catch { return false; }
+}
+
 export function isScriptEndpoint(url: string): boolean {
   try { return /\.(php|aspx?|jsp|cgi)$/i.test(new URL(url).pathname); } catch { return false; }
 }
