@@ -40,7 +40,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
       if (refresh) toast.success("Catálogo atualizado: " + r.total + " filmes.");
     } catch (e) { setError(errMsg(e)); } finally { setBusy(""); }
   }, [search, query, category]);
-  useEffect(() => { void run(0, false, true); }, []);
+  useEffect(() => { void run(0, false, true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function testConnection() {
     setBusy("test"); setError("");
     try {
