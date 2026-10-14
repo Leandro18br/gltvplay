@@ -18,8 +18,8 @@ export const Route = createFileRoute("/canal/$slug")({
   },
   head: ({ loaderData, params }) => {
     if (!loaderData) return { meta: [{ title: "Indisponível — Streaming" }, { name: "robots", content: "noindex" }] };
-    const title = `${loaderData.title} ao vivo — Streaming`;
-    const desc = (loaderData.description ?? `Assista ${loaderData.title} ao vivo.`).slice(0, 160);
+    const title = `${(loaderData as any).title} ao vivo — Streaming`;
+    const desc = ((loaderData as any).description ?? `Assista ${(loaderData as any).title} ao vivo.`).slice(0, 160);
     return {
       meta: [
         { title }, { name: "description", content: desc },

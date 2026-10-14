@@ -796,9 +796,9 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       }
       if (existing) {
         const patch: Record<string, unknown> = {};
-        if (!existing.title && m.title) patch.title = m.title;
-        if (!existing.poster_url && m.poster_url) patch.poster_url = m.poster_url;
-        if (!existing.release_year && m.year) patch.release_year = m.year;
+        if (!existing.title && m.title) patch["title"] = m.title;
+        if (!existing.poster_url && m.poster_url) patch["poster_url"] = m.poster_url;
+        if (!existing.release_year && m.year) patch["release_year"] = m.year;
         if (Object.keys(patch).length) {
           const up = await db.from("movies").update(patch).eq("id", existing.id);
           if (up.error) throw new Error(up.error.message);

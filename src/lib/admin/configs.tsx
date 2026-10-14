@@ -18,8 +18,8 @@ function SourcesCount({ id }: { id: string }) {
 
 const status: Field = { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS, defaultValue: "published", editOnly: true };
 const featured: Field = { name: "featured", label: "Marcar como destaque", type: "boolean" };
-const category: Field = { name: "category_id", label: "Categoria", type: "relation", table: "categories", select: "id,name", relationFilter: { kind: "catalog" }, labelOf: (r) => r.name };
-const channelCategory: Field = { name: "category_id", label: "Categoria de canais", type: "relation", table: "categories", select: "id,name", relationFilter: { kind: "channel" }, labelOf: (r) => r.name };
+const category: Field = { name: "category_id", label: "Categoria", type: "relation", table: "categories", select: "id,name", relationFilter: { scope: "media" }, labelOf: (r) => r.name };
+const channelCategory: Field = { name: "category_id", label: "Categoria de canais", type: "relation", table: "categories", select: "id,name", relationFilter: { scope: "channel" }, labelOf: (r) => r.name };
 const sortOrder: Field = { name: "sort_order", label: "Ordem", type: "number", defaultValue: 0 };
 
 const titleSorts = [
@@ -157,7 +157,7 @@ export const channelsConfig: ResourceConfig = {
 };
 
 export const categoriesConfig: ResourceConfig = {
-  table: "categories", title: "Categorias de filmes e séries", singular: "Categoria", searchCol: "name", hasStatus: true, fixedFilters: { kind: "catalog" },
+  table: "categories", title: "Categorias de filmes e séries", singular: "Categoria", searchCol: "name", hasStatus: true, fixedFilters: { scope: "media" },
   sortOptions: [{ value: "sort_order:asc", label: "Ordem manual" }, { value: "name:asc", label: "Nome A–Z" }],
   columns: [
     { key: "image_url", label: "", render: (r) => <Thumb src={r.image_url} wide />, className: "w-24" },
@@ -175,7 +175,7 @@ export const categoriesConfig: ResourceConfig = {
 
 export const channelCategoriesConfig: ResourceConfig = {
   table: "categories", title: "Categorias de canais", singular: "Categoria de canal", searchCol: "name",
-  hasStatus: true, fixedFilters: { kind: "channel" },
+  hasStatus: true, fixedFilters: { scope: "channel" },
   sortOptions: [{ value: "sort_order:asc", label: "Ordem manual" }, { value: "name:asc", label: "Nome A–Z" }],
   columns: [
     { key: "image_url", label: "", render: (r) => <Thumb src={r.image_url} wide />, className: "w-24" },
