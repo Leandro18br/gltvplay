@@ -753,12 +753,23 @@ export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([
       (byExt ?? []).forEach((x: any) => { existing[x.external_id] = x.id; });
     }
     let categories: string[] = [];
+    const categoryStats: Record<string, { total: number; imported: number }> = {};
     if (data.withCategories) {
-      const { data: catRows, error } = await db.from("bugou_catalog_categories").select("category").eq("kind", "movie").order("category").range(0, 9999);
-      if (error) throw new Error(error.message);
-      categories = [...new Set((catRows ?? []).map((x: any) => String(x.category ?? "")).filter(Boolean))].sort();
+      const catRows = await pageAll(() => db.from("bugou_catalog_categories").select("ext_id,category").eq("kind", "movie").order("category").order("ext_id"));
+      const importedRows = await pageAll(() => db.from("movies").select("external_id").eq("external_source", SOURCE).order("external_id"));
+      const importedIds = new Set((importedRows as any[]).map(x => String(x.external_id)));
+      for (const row of catRows as any[]) {
+        const name = String(row.category ?? "").trim();
+        if (!name) continue;
+        categories.push(name);
+        const stat = categoryStats[name] ?? { total: 0, imported: 0 };
+        stat.total++;
+        if (importedIds.has(String(row.ext_id))) stat.imported++;
+        categoryStats[name] = stat;
+      }
+      categories = [...new Set(categories)].sort((a, b) => a.localeCompare(b, "pt-BR"));
     }
-    return { total: sync.total, synced_at: sync.synced_at, matches: result.count ?? 0, page: data.page, pageSize: PAGE, categories, results, existing };
+    return { total: sync.total, synced_at: sync.synced_at, matches: result.count ?? 0, page: data.page, pageSize: PAGE, categories, categoryStats, results, existing };
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
