@@ -773,8 +773,31 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
     for (const id of data.ids) {
       const m = byId.get(id) as any;
       if (!m) { report.skipped++; continue; }
-      const { data: existing, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+      const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
       if (findErr) throw new Error(findErr.message);
+      let existing = byExternal;
+      if (!existing) {
+        let same = db.from("movies").select("id,title,description,poster_url,release_year").ilike("title", m.title.replace(/[%_\\\\]/g, "\\\\      const { data: existing, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+      if (findErr) throw new Error(findErr.message);
+      if (existing) {
+        const patch: Record<string, unknown> = {};
+        if (!existing.title && m.title) patch.title = m.title;
+        if (!existing.poster_url && m.poster_url) patch.poster_url = m.poster_url;
+        if (!existing.release_year && m.year) patch.release_year = m.year;
+        if (Object.keys(patch).length) {
+          const up = await db.from("movies").update(patch).eq("id", existing.id);
+          if (up.error) throw new Error(up.error.message);
+        }
+        await linkCategories(db, "movie", existing.id, [m.category]);
+        report.updated++;
+        continue;
+      }
+")).limit(2);
+        if (m.year) same = same.eq("release_year", m.year);
+        const { data: matches, error: sameErr } = await same;
+        if (sameErr) throw new Error(sameErr.message);
+        if (matches?.length === 1) existing = matches[0];
+      }
       if (existing) {
         const patch: Record<string, unknown> = {};
         if (!existing.title && m.title) patch.title = m.title;
