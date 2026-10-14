@@ -5,7 +5,7 @@ import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
 import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor } from "./ratelimit";
-import { parseBugouName, parseBugouDetails, bugouVipEmbedUrl, normTitle, compactTitle, type BugouSeries, type BugouDetails } from "./bugoumods";
+import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouVipEmbedUrl, normTitle, compactTitle, type BugouSeries, type BugouDetails, type BugouMovieDetails } from "./bugoumods";
 
 /**
  * BugouMods VIP series. The full list (one request, ~3k rows, no pagination offered by the provider)
@@ -700,6 +700,24 @@ async function loadAllMovies(): Promise<BugouMovie[]> {
   }
 }
 
+/** Fetches one movie's full metadata from BugouMods VIP. A missing detail endpoint must not block importing the catalog row. */
+async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Promise<BugouMovieDetails | null> {
+  const url = new URL("https://cinema.bugoumods.com/index.php");
+  url.search = new URLSearchParams({ ajax: "1", type: "vod_info", vod_id: id, vtoken: tok }).toString();
+  const t0 = Date.now();
+  try {
+    const json = await getJson(url, "detalhes do filme", integ?.timeout_seconds ?? 25);
+    if (!json || typeof json !== "object" || json.Aviso) throw new Error("A API não devolveu detalhes válidos para este filme.");
+    const details = parseBugouMovieDetails(id, json);
+    await logCall(integ, `Detalhes do filme ${id}`, t0, null);
+    return details.plot || details.title || details.cover ? details : null;
+  } catch (e) {
+    const message = scrub((e as Error).message).slice(0, 400);
+    await logCall(integ, `Detalhes do filme ${id}`, t0, message, e instanceof RateLimitedError ? 429 : null);
+    return null;
+  }
+}
+
 async function refreshMovieIndex(ctx: Ctx, force: boolean) {
   const { data } = await ctx.supabase.from("bugou_sync").select("synced_at,total").eq("kind", "movie").maybeSingle();
   if (!force && data) return data as { synced_at: string; total: number };
@@ -773,46 +791,78 @@ export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(100) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\\d+$/)).min(1).max(100) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
     await refreshMovieIndex(ctx, false);
     const { data: items, error } = await db.from("bugou_catalog").select("ext_id,title,year,poster_url,category").eq("kind", "movie").in("ext_id", data.ids);
     if (error) throw new Error(error.message);
     const byId = new Map((items ?? []).map((x: any) => [x.ext_id, x]));
-    const report = { created: 0, updated: 0, skipped: 0 };
+    const { integ, tok } = await seriesIntegration();
+    const report = { created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, playersAdded: 0, detailFailures: 0 };
     for (const id of data.ids) {
       const m = byId.get(id) as any;
       if (!m) { report.skipped++; continue; }
-      const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+
+      // The VOD listing is intentionally lightweight. Resolve the detail endpoint for plot/extension,
+      // but still build the VIP player from the known provider ID if the detail call is unavailable.
+      const detail = await loadMovieDetails(id, tok, integ);
+      if (!detail) report.detailFailures++;
+      const title = detail?.title || m.title;
+      const year = detail?.year ?? m.year;
+      const poster = detail?.cover || m.poster_url;
+      const playerUrl = bugouVipEmbedUrl(id, detail?.ext ?? "mp4", tok);
+
+      const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
       if (findErr) throw new Error(findErr.message);
       let existing = byExternal;
       if (!existing) {
-        let same = db.from("movies").select("id,title,description,poster_url,release_year").ilike("title", m.title.replace(/[%_\\]/g, "\\$&")).limit(2);
-        if (m.year) same = same.eq("release_year", m.year);
+        let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\\\]/g, "\\\\$&")).limit(2);
+        if (year) same = same.eq("release_year", year);
         const { data: matches, error: sameErr } = await same;
         if (sameErr) throw new Error(sameErr.message);
         if (matches?.length === 1) existing = matches[0];
       }
+
+      let movieId: string;
       if (existing) {
+        movieId = existing.id;
         const patch: Record<string, unknown> = {};
-        if (!existing.title && m.title) patch["title"] = m.title;
-        if (!existing.poster_url && m.poster_url) patch["poster_url"] = m.poster_url;
-        if (!existing.release_year && m.year) patch["release_year"] = m.year;
+        if (!existing.title && title) patch.title = title;
+        if (!existing.description && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
+        if (!existing.poster_url && poster) patch.poster_url = poster;
+        if (!existing.release_year && year) patch.release_year = year;
+        if (!existing.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
         if (Object.keys(patch).length) {
-          const up = await db.from("movies").update(patch).eq("id", existing.id);
+          const up = await db.from("movies").update(patch).eq("id", movieId);
           if (up.error) throw new Error(up.error.message);
         }
-        await linkCategories(db, "movie", existing.id, [m.category]);
         report.updated++;
-        continue;
+      } else {
+        const base = normTitle(title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
+        const slug = (base + "-" + id).slice(0, 200);
+        const ins = await db.from("movies").insert({ title, description: detail?.plot ?? null, release_year: year, poster_url: poster, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
+        if (ins.error) throw new Error(ins.error.message);
+        movieId = ins.data.id;
+        if (detail?.plot) report.descriptionsAdded++;
+        report.created++;
       }
-      const base = normTitle(m.title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
-      const slug = (base + "-" + id).slice(0, 200);
-      const ins = await db.from("movies").insert({ title: m.title, release_year: m.year, poster_url: m.poster_url, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
-      if (ins.error) throw new Error(ins.error.message);
-      await linkCategories(db, "movie", ins.data.id, [m.category]);
-      report.created++;
+
+      await linkCategories(db, "movie", movieId, [m.category]);
+
+      // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.
+      const { data: sources, error: sourcesErr } = await db.from("playback_sources").select("id,external_ref").eq("content_kind", "movie").eq("content_id", movieId);
+      if (sourcesErr) throw new Error(sourcesErr.message);
+      const ref = `bugoumods:${id}`;
+      if (!(sources ?? []).some((s: any) => s.external_ref === ref)) {
+        const sourceInsert = await db.from("playback_sources").insert({
+          content_kind: "movie", content_id: movieId, url: playerUrl, source_type: "embed",
+          provider: "BugouMods", label: "BugouMods VIP", external_ref: ref,
+          is_active: true, is_primary: (sources ?? []).length === 0, sort_order: (sources ?? []).length, drm: {},
+        });
+        if (sourceInsert.error) throw new Error(sourceInsert.error.message);
+        report.playersAdded++;
+      }
     }
     return report;
   });
