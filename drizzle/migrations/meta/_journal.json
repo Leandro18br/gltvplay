@@ -344,6 +344,13 @@
       "when": 1792000001000,
       "tag": "0048_reset_categories_and_ensure_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792000002000,
+      "tag": "0049_ensure_category_kind_non_destructive",
+      "breakpoints": true
     }
   ]
 }
