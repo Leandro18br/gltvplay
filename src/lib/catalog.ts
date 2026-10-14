@@ -168,22 +168,22 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
       const categoryKind = want.has("channel") && !want.has("movie") && !want.has("series") ? "channel" : "catalog";
       const { data, error } = await sb.from("categories").select("id,name,slug,description,image_url").eq("status", "published").eq("kind", categoryKind).order("sort_order").order("name");
       if (error) throw error;
-      const [m, s, c] = await Promise.all([
-        want.has("movie") ? sb.from("movies").select("movie_categories!inner(category_id)").eq("status", "published") : null,
-        want.has("series") ? sb.from("series").select("series_categories!inner(category_id)").eq("status", "published") : null,
-        want.has("channel") ? sb.from("channels").select("category_id").eq("status", "published").not("category_id", "is", null) : null,
-      ]);
-      if (m?.error || s?.error || c?.error) throw m?.error ?? s?.error ?? c?.error;
-      const ids = new Set<string>();
       const channelCounts = new Map<string, number>();
-      for (const r of m?.data ?? []) for (const x of r.movie_categories ?? []) ids.add(x.category_id);
-      for (const r of s?.data ?? []) for (const x of r.series_categories ?? []) ids.add(x.category_id);
-      for (const r of c?.data ?? []) {
-        ids.add(r.category_id);
-        channelCounts.set(r.category_id, (channelCounts.get(r.category_id) ?? 0) + 1);
+      if (categoryKind === "channel") {
+        const { data: channels, error: channelError } = await sb
+          .from("channels")
+          .select("category_id")
+          .eq("status", "published")
+          .not("category_id", "is", null);
+        if (channelError) throw channelError;
+        for (const row of channels ?? []) {
+          channelCounts.set(row.category_id, (channelCounts.get(row.category_id) ?? 0) + 1);
+        }
       }
+
+      // Show every published category of the requested kind. Do not hide categories
+      // just because legacy/imported content is missing a join-table association.
       return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[])
-        .filter((cat) => ids.has(cat.id))
         .map((cat) => categoryKind === "channel" ? { ...cat, channels: [{ count: channelCounts.get(cat.id) ?? 0 }] } : cat);
     },
     staleTime: 60_000,
