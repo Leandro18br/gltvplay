@@ -30,6 +30,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [existing, setExisting] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<"" | "search" | "import" | "test">("");
+  const [importProgress, setImportProgress] = useState("");
   const [error, setError] = useState("");
   const run = useCallback(async (nextPage = 0, refresh = false, withCategories = false) => {
     setBusy(refresh ? "test" : "search"); setError("");
@@ -49,17 +50,40 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
       await run(0, true, true);
     } catch (e) { setError(errMsg(e)); setBusy(""); }
   }
+  async function importIds(ids: string[]) {
+    let created = 0, updated = 0, skipped = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      setImportProgress("Importando " + Math.min(i + 100, ids.length) + " de " + ids.length + " filmes…");
+      const r = await importMovies({ data: { ids: ids.slice(i, i + 100) } });
+      created += r.created; updated += r.updated; skipped += r.skipped;
+    }
+    return { created, updated, skipped };
+  }
   async function doImport() {
-    if (!selected.size) return; setBusy("import");
+    if (!selected.size) return; setBusy("import"); setImportProgress("");
     try {
-      const ids = [...selected]; let created = 0, updated = 0, skipped = 0;
-      for (let i = 0; i < ids.length; i += 100) {
-        const r = await importMovies({ data: { ids: ids.slice(i, i + 100) } });
-        created += r.created; updated += r.updated; skipped += r.skipped;
-      }
-      toast.success("Importação concluída: " + created + " novos, " + updated + " atualizados" + (skipped ? ", " + skipped + " ignorados" : "") + ".");
+      const r = await importIds([...selected]);
+      toast.success("Importação concluída: " + r.created + " novos, " + r.updated + " atualizados" + (r.skipped ? ", " + r.skipped + " ignorados" : "") + ".");
       setSelected(new Set()); await run(page);
-    } catch (e) { toast.error(errMsg(e)); } finally { setBusy(""); }
+    } catch (e) { toast.error(errMsg(e)); } finally { setBusy(""); setImportProgress(""); }
+  }
+  async function importWholeCategory() {
+    if (!category) return;
+    setBusy("import"); setImportProgress("Localizando filmes da categoria…"); setError("");
+    try {
+      const first = await search({ data: { query: "", category, page: 0, refresh: false, withCategories: false } });
+      const ids = first.results.map(m => m.id);
+      const pageCount = Math.ceil(first.matches / first.pageSize);
+      for (let p = 1; p < pageCount; p++) {
+        setImportProgress("Preparando lista: página " + (p + 1) + " de " + pageCount + "…");
+        const next = await search({ data: { query: "", category, page: p, refresh: false, withCategories: false } });
+        ids.push(...next.results.map(m => m.id));
+      }
+      if (!ids.length) { toast.info("Não há filmes nesta categoria para importar."); return; }
+      const report = await importIds([...new Set(ids)]);
+      toast.success("Categoria “" + category + "” concluída: " + report.created + " novos, " + report.updated + " atualizados" + (report.skipped ? ", " + report.skipped + " ignorados" : "") + ".");
+      setSelected(new Set()); await run(0, false, true);
+    } catch (e) { setError(errMsg(e)); toast.error(errMsg(e)); } finally { setBusy(""); setImportProgress(""); }
   }
   const items: Movie[] = result?.results ?? [];
   return <Dialog open onOpenChange={v => !v && onClose()}>
@@ -72,7 +96,9 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
         <Button disabled={!!busy} type="button" variant="outline" onClick={testConnection}>{busy === "test" ? <Loader2 className="animate-spin" /> : <RefreshCw />} Testar / sincronizar</Button>
       </form>
       {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-      {result && <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><span>{result.matches} resultados · catálogo com {result.total} filmes</span><span className="ml-auto">{selected.size} selecionados</span><Button type="button" size="sm" variant="ghost" onClick={() => setSelected(new Set())}><X /> Limpar seleção</Button></div>}
+      {result && <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><span>{result.matches} resultados · catálogo com {result.total} filmes</span><span className="ml-auto">{selected.size} selecionados</span><Button type="button" size="sm" variant="outline" disabled={!!busy || !items.length} onClick={() => setSelected(s => { const n = new Set(s); const allSelected = items.every(m => n.has(m.id)); items.forEach(m => allSelected ? n.delete(m.id) : n.add(m.id)); return n; })}>{items.length && items.every(m => selected.has(m.id)) ? "Desmarcar página" : "Selecionar página"}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setSelected(new Set())}><X /> Limpar seleção</Button></div>}
+      {category && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 p-3"><div className="flex-1"><p className="text-sm font-medium">Importação em massa por categoria</p><p className="text-xs text-muted-foreground">Importa todos os filmes de “{category}”, incluindo os que estão em outras páginas.</p></div><Button type="button" disabled={!!busy} onClick={importWholeCategory}><DownloadCloud /> Importar todos da categoria</Button></div>}
+      {importProgress && <p className="text-sm text-muted-foreground" role="status">{importProgress}</p>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {items.map(m => { const checked = selected.has(m.id); return <button key={m.id} type="button" onClick={() => setSelected(s => { const n = new Set(s); n.has(m.id) ? n.delete(m.id) : n.add(m.id); return n; })} className={"relative overflow-hidden rounded-xl border text-left " + (checked ? "border-primary ring-1 ring-primary" : "border-border")}>
           <div className="aspect-[2/3] bg-muted">{m.poster_url && <img src={m.poster_url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
