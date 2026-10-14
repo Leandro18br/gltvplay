@@ -26,7 +26,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryStats, setCategoryStats] = useState<Record<string, { total: number; imported: number }>>({});
-  const [lastImportReport, setLastImportReport] = useState<{ category: string; total: number; created: number; updated: number; skipped: number } | null>(null);
+  const [lastImportReport, setLastImportReport] = useState<{ category: string; total: number; created: number; updated: number; skipped: number; descriptionsAdded: number; playersAdded: number; detailFailures: number } | null>(null);
   const [page, setPage] = useState(0);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -53,20 +53,21 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
     } catch (e) { setError(errMsg(e)); setBusy(""); }
   }
   async function importIds(ids: string[]) {
-    let created = 0, updated = 0, skipped = 0;
+    let created = 0, updated = 0, skipped = 0, descriptionsAdded = 0, playersAdded = 0, detailFailures = 0;
     for (let i = 0; i < ids.length; i += 100) {
       setImportProgress("Importando " + Math.min(i + 100, ids.length) + " de " + ids.length + " filmes…");
       const r = await importMovies({ data: { ids: ids.slice(i, i + 100) } });
-      created += r.created; updated += r.updated; skipped += r.skipped;
+      created += r.created; updated += r.updated; skipped += r.skipped; descriptionsAdded += r.descriptionsAdded; playersAdded += r.playersAdded; detailFailures += r.detailFailures;
     }
-    return { created, updated, skipped };
+    return { created, updated, skipped, descriptionsAdded, playersAdded, detailFailures };
   }
   async function doImport() {
     if (!selected.size) return; setBusy("import"); setImportProgress("");
     try {
       const r = await importIds([...selected]);
       setLastImportReport({ category: category || "Seleção manual", total: selected.size, ...r });
-      toast.success("Importação concluída: " + r.created + " novos, " + r.updated + " atualizados" + (r.skipped ? ", " + r.skipped + " ignorados" : "") + ".");
+      toast.success("Importação concluída: " + r.created + " novos, " + r.updated + " atualizados, " + r.descriptionsAdded + " descrições preenchidas e " + r.playersAdded + " players Bugou VIP adicionados" + (r.skipped ? ", " + r.skipped + " ignorados" : "") + ".");
+      if (r.detailFailures) toast.warning(r.detailFailures + " filme(s) não retornaram detalhes completos pela API; o player Bugou VIP foi cadastrado com o ID disponível.");
       setSelected(new Set()); await run(page);
     } catch (e) { toast.error(errMsg(e)); } finally { setBusy(""); setImportProgress(""); }
   }
@@ -86,14 +87,15 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
       const uniqueIds = [...new Set(ids)];
       const report = await importIds(uniqueIds);
       setLastImportReport({ category, total: uniqueIds.length, ...report });
-      toast.success("Categoria “" + category + "” concluída: " + report.created + " novos, " + report.updated + " atualizados" + (report.skipped ? ", " + report.skipped + " ignorados" : "") + ".");
+      toast.success("Categoria “" + category + "” concluída: " + report.created + " novos, " + report.updated + " atualizados, " + report.descriptionsAdded + " descrições preenchidas e " + report.playersAdded + " players Bugou VIP adicionados" + (report.skipped ? ", " + report.skipped + " ignorados" : "") + ".");
+      if (report.detailFailures) toast.warning(report.detailFailures + " filme(s) não retornaram detalhes completos pela API; o player Bugou VIP foi cadastrado com o ID disponível.");
       setSelected(new Set()); await run(0, false, true);
     } catch (e) { setError(errMsg(e)); toast.error(errMsg(e)); } finally { setBusy(""); setImportProgress(""); }
   }
   const items: Movie[] = result?.results ?? [];
   return <Dialog open onOpenChange={v => !v && onClose()}>
     <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
-      <DialogHeader><DialogTitle>Catálogo de filmes — BugouMods</DialogTitle><DialogDescription>Importa apenas metadados (título, ano, capa e categoria), sem links de reprodução. A credencial é lida no servidor pela integração BugouMods já configurada.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>Catálogo de filmes — BugouMods</DialogTitle><DialogDescription>Busca metadados completos na BugouMods VIP, preenche a descrição quando estiver vazia e cadastra o player VIP sem substituir fontes de reprodução existentes. A credencial é lida no servidor pela integração já configurada.</DialogDescription></DialogHeader>
       <form className="grid gap-2 md:grid-cols-[1fr_200px_auto_auto]" onSubmit={e => { e.preventDefault(); void run(0); }}>
         <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar título do filme" />
         <Select value={category || "__all"} onValueChange={v => { setCategory(v === "__all" ? "" : v); setPage(0); }}><SelectTrigger aria-label="Categoria"><SelectValue placeholder="Todas as categorias" /></SelectTrigger><SelectContent><SelectItem value="__all">Todas as categorias</SelectItem>{categories.map(c => { const s = categoryStats[c]; return <SelectItem key={c} value={c}>{c}{s ? ` · ${s.total} filmes · ${s.imported} importados` : ""}</SelectItem>; })}</SelectContent></Select>

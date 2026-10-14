@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBugouName, parseBugouDetails, bugouEmbedUrl } from "./bugoumods";
+import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouEmbedUrl } from "./bugoumods";
 
 describe("parseBugouName", () => {
   it("separa título e ano", () => expect(parseBugouName("1883 (2021)")).toEqual({ title: "1883", year: 2021 }));
@@ -24,5 +24,27 @@ d2("normTitle", () => {
     e2(nt("  #blackAF:  Série ")).toBe("blackaf serie");
     e2(nt("Ação")).toBe(nt("acao"));
     e2(ct("Black AF")).toBe(ct("#blackAF"));
+  });
+});
+
+
+describe("parseBugouMovieDetails", () => {
+  it("reads movie plot, cover, year, and extension from a VOD detail response", () => {
+    const d = parseBugouMovieDetails("123", {
+      info: { name: "Filme Teste (2024)", plot: "Sinopse do filme", cover: "http://example.com/cover.jpg", year: "2024" },
+      movie_data: { stream_id: 123, container_extension: "mkv" },
+    });
+    expect(d).toEqual({
+      id: "123",
+      title: "Filme Teste",
+      year: 2024,
+      plot: "Sinopse do filme",
+      cover: "https://example.com/cover.jpg",
+      ext: "mkv",
+    });
+  });
+
+  it("uses a safe default extension when provider data is missing or invalid", () => {
+    expect(parseBugouMovieDetails("321", { info: { title: "Outro Filme", plot: "Descrição" } }).ext).toBe("mp4");
   });
 });
