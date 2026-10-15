@@ -41,10 +41,19 @@ describe("parseBugouMovieDetails", () => {
       plot: "Sinopse do filme",
       cover: "https://example.com/cover.jpg",
       ext: "mkv",
+      genres: [],
     });
   });
 
   it("uses a safe default extension when provider data is missing or invalid", () => {
     expect(parseBugouMovieDetails("321", { info: { title: "Outro Filme", plot: "Descrição" } }).ext).toBe("mp4");
+  });
+
+  it("normalizes genre names from strings, arrays, and objects without treating numeric IDs as names", () => {
+    const d = parseBugouMovieDetails("456", {
+      info: { title: "Filme com gêneros", genre: "Ação, Aventura" },
+      data: { genres: [{ name: "Drama" }, { id: 28 }, "Comédia"] },
+    });
+    expect(d.genres).toEqual(["Ação", "Aventura", "Drama", "Comédia"]);
   });
 });

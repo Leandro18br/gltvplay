@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
+import { assertStaff, uniqueSlug, tmdbGet, movieMeta, applyCompletion, linkGenres } from "@/lib/tmdb/tmdb.functions";
 import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor } from "./ratelimit";
 import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouVipEmbedUrl, normTitle, compactTitle, type BugouSeries, type BugouDetails, type BugouMovieDetails } from "./bugoumods";
 
@@ -700,6 +700,42 @@ async function loadAllMovies(): Promise<BugouMovie[]> {
   }
 }
 
+/** Link provider genre names only to existing local genres; never treat provider IDs as TMDB IDs or store arrays as text. */
+async function linkProviderGenreNames(db: any, movieId: string, names: string[]) {
+  if (!names.length) return;
+  const { data, error } = await db.from("genres").select("id,name");
+  if (error) throw new Error(error.message);
+  const wanted = new Set(names.map(normTitle));
+  const matches = (data ?? []).filter((g: any) => wanted.has(normTitle(String(g.name ?? ""))));
+  if (!matches.length) return;
+  const saved = await db.from("movie_genres").upsert(
+    matches.map((g: any) => ({ movie_id: movieId, genre_id: g.id })),
+    { onConflict: "movie_id,genre_id", ignoreDuplicates: true },
+  );
+  if (saved.error) throw new Error(saved.error.message);
+}
+
+/** Use the official TMDB detail record only when the provider title AND year identify exactly one movie. */
+async function exactTmdbMovieMeta(title: string, year: number | null) {
+  if (!title.trim() || !year) return null;
+  try {
+    const result = await tmdbGet("/search/movie", {
+      query: title, language: "pt-BR", year, include_adult: "false",
+    }, { ttl: 86400 });
+    const normalize = (value: unknown) => normTitle(typeof value === "string" ? value : "");
+    const matches = (result.results ?? []).filter((row: any) =>
+      [row.title, row.original_title].some((value: unknown) => normalize(value) === normalize(title)) &&
+      String(row.release_date ?? "").startsWith(String(year))
+    );
+    if (matches.length !== 1 || !Number.isInteger(matches[0]?.id)) return null;
+    return await movieMeta(Number(matches[0].id), false);
+  } catch (error) {
+    // TMDB is an optional metadata source; the provider movie and player can still be imported.
+    console.warn("[BugouMods metadata enrichment] TMDB indisponível", title, year, (error as Error).message);
+    return null;
+  }
+}
+
 /** Fetches one movie's full metadata from BugouMods VIP. A missing detail endpoint must not block importing the catalog row. */
 async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Promise<BugouMovieDetails | null> {
   const url = new URL("https://cinema.bugoumods.com/index.php");
@@ -710,7 +746,7 @@ async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Pr
     if (!json || typeof json !== "object" || json.Aviso) throw new Error("A API não devolveu detalhes válidos para este filme.");
     const details = parseBugouMovieDetails(id, json);
     await logCall(integ, `Detalhes do filme ${id}`, t0, null);
-    return details.plot || details.title || details.cover ? details : null;
+    return details.plot || details.title || details.cover || details.genres.length ? details : null;
   } catch (e) {
     const message = scrub((e as Error).message).slice(0, 400);
     await logCall(integ, `Detalhes do filme ${id}`, t0, message, e instanceof RateLimitedError ? 429 : null);
@@ -791,7 +827,7 @@ export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(100) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(10) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
     await refreshMovieIndex(ctx, false);
@@ -813,11 +849,11 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       const poster = detail?.cover || m.poster_url;
       const playerUrl = bugouVipEmbedUrl(id, detail?.ext ?? "mp4", tok);
 
-      const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+      const { data: byExternal, error: findErr } = await db.from("movies").select("*").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
       if (findErr) throw new Error(findErr.message);
       let existing = byExternal;
       if (!existing) {
-        let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
+        let same = db.from("movies").select("*").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
         if (year) same = same.eq("release_year", year);
         const { data: matches, error: sameErr } = await same;
         if (sameErr) throw new Error(sameErr.message);
@@ -825,13 +861,31 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       }
 
       let movieId: string;
+      let tmdbMeta: Awaited<ReturnType<typeof exactTmdbMovieMeta>> = null;
+      let needsTmdbMetadata = !existing;
+      if (existing) {
+        const { data: linkedGenres, error: linkedError } = await db.from("movie_genres").select("genre_id").eq("movie_id", existing.id).limit(1);
+        if (linkedError) throw new Error(linkedError.message);
+        needsTmdbMetadata = !existing.description?.trim() || !(linkedGenres ?? []).length || !existing.tmdb_id || !existing.original_title || !existing.release_date || !existing.poster_url || !existing.backdrop_url;
+      }
+      if (needsTmdbMetadata) tmdbMeta = await exactTmdbMovieMeta(title, year);
       if (existing) {
         movieId = existing.id;
+        if (tmdbMeta) {
+          try {
+            const enriched = await applyCompletion(ctx, "movie", movieId, existing, tmdbMeta.fields, tmdbMeta.genres);
+            if (enriched.filled > 0 && "description" in enriched.fields) report.descriptionsAdded++;
+          } catch (error) {
+            // Metadata is optional; do not prevent the provider movie/player from importing.
+            console.warn("[BugouMods metadata enrichment] Não foi possível salvar metadados TMDB", movieId, (error as Error).message);
+            tmdbMeta = null;
+          }
+        }
         const patch: Record<string, unknown> = {};
-        if (!existing.title && title) patch.title = title;
-        if (!existing.description && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
-        if (!existing.poster_url && poster) patch.poster_url = poster;
-        if (!existing.release_year && year) patch.release_year = year;
+        if (!existing.title && title && !tmdbMeta?.fields.title) patch.title = title;
+        if (!existing.description && !tmdbMeta?.fields.description && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
+        if (!existing.poster_url && !tmdbMeta?.fields.poster_url && poster) patch.poster_url = poster;
+        if (!existing.release_year && year && !tmdbMeta?.fields.release_year) patch.release_year = year;
         if (!existing.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
         if (Object.keys(patch).length) {
           const up = await db.from("movies").update(patch).eq("id", movieId);
@@ -841,13 +895,30 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       } else {
         const base = normTitle(title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
         const slug = (base + "-" + id).slice(0, 200);
-        const ins = await db.from("movies").insert({ title, description: detail?.plot ?? null, release_year: year, poster_url: poster, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
+        const metadata = tmdbMeta?.fields ?? {};
+        const ins = await db.from("movies").insert({
+          ...metadata,
+          title: metadata.title || title,
+          original_title: metadata.original_title ?? null,
+          description: metadata.description || detail?.plot || null,
+          release_year: metadata.release_year ?? year,
+          poster_url: metadata.poster_url || poster,
+          slug, status: "published", external_source: SOURCE, external_id: id,
+        }).select("id").single();
         if (ins.error) throw new Error(ins.error.message);
         movieId = ins.data.id;
-        if (detail?.plot) report.descriptionsAdded++;
+        if (metadata.description || detail?.plot) report.descriptionsAdded++;
+        if (tmdbMeta?.genres?.length) {
+          try { await linkGenres(ctx, "movie", movieId, tmdbMeta.genres); }
+          catch (error) { console.warn("[BugouMods genres] Não foi possível associar gêneros TMDB", movieId, (error as Error).message); }
+        }
         report.created++;
       }
 
+      if (!tmdbMeta?.genres?.length && detail?.genres?.length) {
+        try { await linkProviderGenreNames(db, movieId, detail.genres); }
+        catch (error) { console.warn("[BugouMods genres] Não foi possível associar gêneros do provedor", movieId, (error as Error).message); }
+      }
       await linkCategories(db, "movie", movieId, [m.category]);
 
       // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.

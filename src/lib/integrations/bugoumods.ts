@@ -31,7 +31,25 @@ export function bugouVipEmbedUrl(episodeId: string, ext: string, vtoken: string)
   return `https://cinema.bugoumods.com/player.php?type=vod_streams&id=${encodeURIComponent(episodeId)}&ext=${e}&vtoken=${encodeURIComponent(vtoken)}&embed=vip`;
 }
 
-export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string };
+export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string; genres: string[] };
+
+/** Normalize provider genres whether the response uses a comma-separated string, names, or objects. */
+function parseGenreNames(...values: unknown[]): string[] {
+  const out: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value === "string") {
+      value.split(/[,;|\/]/).map((x) => x.trim()).filter(Boolean).forEach((x) => out.push(x));
+      return;
+    }
+    if (Array.isArray(value)) { value.forEach(add); return; }
+    if (value && typeof value === "object") {
+      const row = value as Record<string, unknown>;
+      add(row.name ?? row.genre_name ?? row.genre);
+    }
+  };
+  values.forEach(add);
+  return [...new Set(out.map((x) => x.trim()).filter((x) => x.length > 0 && x.length <= 80))].slice(0, 20);
+}
 
 /** Normalizes the provider's VOD detail response while tolerating its common wrapper shapes. */
 export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
@@ -46,11 +64,12 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
   const yearValue = Number(info?.year ?? data?.year) || name.year;
   return {
     id: String(data?.stream_id ?? data?.id ?? j?.id ?? id),
-    title: String(info?.title ?? data?.title ?? name.title ?? data?.name ?? info?.name ?? "").trim(),
+    title: parseBugouName(String(info?.title ?? data?.title ?? name.title ?? data?.name ?? info?.name ?? "")).title.trim(),
     year: yearValue || null,
     plot: typeof plotValue === "string" && plotValue.trim() ? plotValue.trim() : null,
     cover,
     ext,
+    genres: parseGenreNames(info?.genre, info?.genres, data?.genre, data?.genres, j?.genre, j?.genres),
   };
 }
 
