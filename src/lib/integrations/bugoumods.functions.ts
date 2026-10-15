@@ -749,7 +749,7 @@ async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Pr
     if (!json || typeof json !== "object" || json.Aviso) throw new Error("A API não devolveu detalhes válidos para este filme.");
     const details = parseBugouMovieDetails(id, json);
     await logCall(integ, `Detalhes do filme ${id}`, t0, null);
-    return details.plot || details.title || details.cover || details.genres.length ? details : null;
+    return details.plot || details.title || details.cover || details.genres.length || details.providerMetadataPaths.length ? details : null;
   } catch (e) {
     const message = scrub((e as Error).message).slice(0, 400);
     await logCall(integ, `Detalhes do filme ${id}`, t0, message, e instanceof RateLimitedError ? 429 : null);
@@ -779,7 +779,21 @@ export const bugouMoviesTest = createServerFn({ method: "POST" }).middleware([..
   .handler(async ({ context }) => {
     const ctx = context as Ctx; await assertStaff(ctx);
     const all = await loadAllMovies();
-    return { total: all.length, categories: [...new Set(all.map(m => m.category).filter(Boolean))].sort(), sample: all[0] ? { title: all[0].title, year: all[0].year, hasPoster: !!all[0].poster_url } : null };
+    const { integ, tok } = await seriesIntegration();
+    const sample = all[0] ?? null;
+    const detail = sample ? await loadMovieDetails(sample.id, tok, integ) : null;
+    return {
+      total: all.length,
+      categories: [...new Set(all.map(m => m.category).filter(Boolean))].sort(),
+      sample: sample ? { title: sample.title, year: sample.year, hasPoster: !!sample.poster_url } : null,
+      metadataProbe: sample ? {
+        providerId: sample.id,
+        title: sample.title,
+        descriptionAvailable: !!detail?.plot?.trim(),
+        genreNames: detail?.genres ?? [],
+        providerFieldPaths: detail?.providerMetadataPaths ?? [],
+      } : null,
+    };
   });
 
 export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([...auth])
