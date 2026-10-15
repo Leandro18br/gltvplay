@@ -712,21 +712,21 @@ async function linkProviderMovieGenres(db: any, movieId: string, names: string[]
   }).filter(([key, label]) => key && label)).values()];
   if (!clean.length) return 0;
 
-  const slugs = clean.map(providerGenreSlug).filter(Boolean);
+  const slugs = [...new Set(clean.map(providerGenreSlug).filter(Boolean))];
   if (!slugs.length) return 0;
-  const { data: existingGenres, error: genresError } = await db.from("genres").select("id,name,slug").in("slug", slugs);
+  const { data: existingGenres, error: genresError } = await db.from("genres").select("id,name,slug");
   if (genresError) throw new Error(genresError.message);
-  const foundByName = new Map((existingGenres ?? []).map((g: any) => [normTitle(String(g.name ?? "")), g]));
+  const foundByName = new Set((existingGenres ?? []).map((g: any) => normTitle(String(g.name ?? ""))));
   const missing = clean.filter((name) => !foundByName.has(normTitle(name)));
   if (missing.length) {
     const created = await db.from("genres").upsert(missing.map((name) => ({ name, slug: providerGenreSlug(name) })), { onConflict: "slug", ignoreDuplicates: true });
     if (created.error) throw new Error(created.error.message);
   }
 
-  const { data: allGenres, error: allError } = await db.from("genres").select("id,name,slug").in("slug", slugs);
+  const { data: allGenres, error: allError } = await db.from("genres").select("id,name,slug");
   if (allError) throw new Error(allError.message);
   const wanted = new Set(clean.map(normTitle));
-  const genreIds = (allGenres ?? []).filter((g: any) => wanted.has(normTitle(String(g.name ?? ""))).map((g: any) => String(g.id));
+  const genreIds = (allGenres ?? []).filter((g: any) => wanted.has(normTitle(String(g.name ?? "")))).map((g: any) => String(g.id));
   if (!genreIds.length) return 0;
 
   const { data: linked, error: linkedError } = await db.from("movie_genres").select("genre_id").eq("movie_id", movieId).in("genre_id", genreIds);
