@@ -359,9 +359,15 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
         if (!c || c.length < 1000) break;
       }
     } else {
-      const { data: c } = await db.from("bugou_catalog").select("ext_id, title").eq("kind", "series").in("ext_id", data.ids);
-      const t = new Map((c ?? []).map((x: any) => [x.ext_id, x.title]));
-      items = data.ids.map(id => ({ ext_id: id, title: (t.get(id) as string) ?? null }));
+      // Large manual selections are looked up in bounded DB queries, but are not capped by the application.
+      const selectedIds = [...new Set(data.ids)];
+      const t = new Map<string, string>();
+      for (let i = 0; i < selectedIds.length; i += 500) {
+        const { data: c, error } = await db.from("bugou_catalog").select("ext_id, title").eq("kind", "series").in("ext_id", selectedIds.slice(i, i + 500));
+        if (error) throw new Error(error.message);
+        (c ?? []).forEach((x: any) => t.set(x.ext_id, x.title));
+      }
+      items = selectedIds.map(id => ({ ext_id: id, title: t.get(id) ?? null }));
     }
     if (!items.length) throw new Error("Nada para importar.");
     const j = await db.from("bugou_import_jobs").insert({ label: data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
