@@ -95,7 +95,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   const items: Movie[] = result?.results ?? [];
   return <Dialog open onOpenChange={v => !v && onClose()}>
     <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
-      <DialogHeader><DialogTitle>Catálogo de filmes — BugouMods</DialogTitle><DialogDescription>Busca metadados completos na BugouMods VIP, preenche a descrição quando estiver vazia e cadastra o player VIP sem substituir fontes de reprodução existentes. A credencial é lida no servidor pela integração já configurada.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>Catálogo de filmes — BugouMods</DialogTitle><DialogDescription>Busca metadados na BugouMods VIP e, quando há correspondência exata por título e ano, completa sinopse e gêneros pela API oficial do TMDB. Preserva metadados válidos e fontes de reprodução existentes.</DialogDescription></DialogHeader>
       <form className="grid gap-2 md:grid-cols-[1fr_200px_auto_auto]" onSubmit={e => { e.preventDefault(); void run(0); }}>
         <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar título do filme" />
         <Select value={category || "__all"} onValueChange={v => { setCategory(v === "__all" ? "" : v); setPage(0); }}><SelectTrigger aria-label="Categoria"><SelectValue placeholder="Todas as categorias" /></SelectTrigger><SelectContent><SelectItem value="__all">Todas as categorias</SelectItem>{categories.map(c => { const s = categoryStats[c]; return <SelectItem key={c} value={c}>{c}{s ? ` · ${s.total} filmes · ${s.imported} importados` : ""}</SelectItem>; })}</SelectContent></Select>
