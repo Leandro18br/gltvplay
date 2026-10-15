@@ -49,9 +49,10 @@ function SettingsSync() {
   useEffect(() => {
     if (!data) return;
     const root = document.documentElement.style;
-    const c = (data.colors ?? {}) as { primary?: string; background?: string };
-    if (c.primary) { root.setProperty("--primary", c.primary); root.setProperty("--ring", c.primary); } else { root.removeProperty("--primary"); root.removeProperty("--ring"); }
-    if (c.background) root.setProperty("--background", c.background); else root.removeProperty("--background");
+    // Keep the global brand palette fixed; site settings may still control the favicon.
+    root.setProperty("--primary", "#00DDFA");
+    root.setProperty("--ring", "#00DDFA");
+    root.setProperty("--background", "#000000");
     if (data.favicon_url) {
       let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
       if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
