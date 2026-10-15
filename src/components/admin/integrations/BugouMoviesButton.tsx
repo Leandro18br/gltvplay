@@ -69,7 +69,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
       const r = await importIds([...selected]);
       setLastImportReport({ category: category || "Seleção manual", total: selected.size, ...r });
       toast.success("Importação concluída: " + r.created + " novos, " + r.updated + " atualizados, " + r.descriptionsAdded + " descrições preenchidas, " + r.genresAdded + " gêneros associados e " + r.playersAdded + " players Bugou VIP adicionados" + (r.skipped ? ", " + r.skipped + " ignorados" : "") + ".");
-      if (r.detailFailures) toast.warning(r.detailFailures + " filme(s) não retornaram detalhes completos pela API; o player Bugou VIP foi cadastrado com o ID disponível.");
+      if (r.detailFailures) toast.warning(r.detailFailures + " filme(s) não retornaram metadados completos pela API BugouMods; os dados ausentes ficaram sinalizados para recuperação posterior.");
       setSelected(new Set()); await run(page);
     } catch (e) { toast.error(errMsg(e)); } finally { setBusy(""); setImportProgress(""); }
   }
