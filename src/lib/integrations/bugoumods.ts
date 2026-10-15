@@ -70,7 +70,7 @@ export function parseBugouGenreNames(...values: unknown[]): string[] {
   for (const raw of names) {
     const name = raw.replace(/\\s+/g, " ").trim().slice(0, 80);
     const key = normTitle(name);
-    if (key && !unique.has(key)) unique.set(key, name);
+    if (key && !/^\\d+$/.test(name) && !unique.has(key)) unique.set(key, name);
   }
   return [...unique.values()].slice(0, 30);
 }
@@ -85,9 +85,9 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
   const coverValue = info?.movie_image ?? info?.cover_big ?? info?.cover ?? data?.stream_icon ?? data?.cover ?? data?.poster ?? j?.cover;
   const plotValue = info?.plot ?? info?.description ?? info?.overview ?? data?.plot ?? data?.description ?? data?.overview ?? j?.plot;
   const genreValues = [
-    info?.genre, info?.genres, info?.genre_name, info?.genre_names,
-    data?.genre, data?.genres, data?.genre_name, data?.genre_names,
-    j?.genre, j?.genres,
+    info?.genre, info?.genres, info?.genre_name, info?.genre_names, info?.genre_ids,
+    data?.genre, data?.genres, data?.genre_name, data?.genre_names, data?.genre_ids,
+    j?.genre, j?.genres, j?.genre_ids,
   ];
   const genres = parseBugouGenreNames(...genreValues);
   const providerMetadataPaths = findBugouMetadataPaths(j);
