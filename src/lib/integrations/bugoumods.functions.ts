@@ -850,8 +850,13 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       if (existing) {
         movieId = existing.id;
         if (tmdbMeta) {
-          const enriched = await applyCompletion(ctx, "movie", movieId, existing, tmdbMeta.fields, tmdbMeta.genres);
-          if (enriched.filled > 0 && "description" in enriched.fields) report.descriptionsAdded++;
+          try {
+            const enriched = await applyCompletion(ctx, "movie", movieId, existing, tmdbMeta.fields, tmdbMeta.genres);
+            if (enriched.filled > 0 && "description" in enriched.fields) report.descriptionsAdded++;
+          } catch (error) {
+            // Metadata is optional; do not prevent the provider movie/player from importing.
+            console.warn("[BugouMods metadata enrichment] Não foi possível salvar metadados TMDB", movieId, (error as Error).message);
+          }
         }
         const patch: Record<string, unknown> = {};
         if (!existing.title && title && !tmdbMeta?.fields.title) patch.title = title;
