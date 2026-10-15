@@ -64,7 +64,7 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
   const yearValue = Number(info?.year ?? data?.year) || name.year;
   return {
     id: String(data?.stream_id ?? data?.id ?? j?.id ?? id),
-    title: String(info?.title ?? data?.title ?? name.title ?? data?.name ?? info?.name ?? "").trim(),
+    title: parseBugouName(String(info?.title ?? data?.title ?? name.title ?? data?.name ?? info?.name ?? "")).title.trim(),
     year: yearValue || null,
     plot: typeof plotValue === "string" && plotValue.trim() ? plotValue.trim() : null,
     cover,
