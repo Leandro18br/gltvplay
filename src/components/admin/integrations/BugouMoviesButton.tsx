@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 type Movie = { id: string; title: string; year: number | null; poster_url: string | null; category: string };
 type SearchResult = Awaited<ReturnType<typeof bugouSearchMovies>>;
 
-export function BugouMoviesButton({ label = "Importar filmes BugouMods" }: { label?: string }) {
+export function BugouMoviesButton({ label = "Importar filmes completos" }: { label?: string }) {
   const [open, setOpen] = useState(false);
   return <><Button variant="outline" className="rounded-full" onClick={() => setOpen(true)}><DownloadCloud /> {label}</Button>{open && <BugouMoviesDialog onClose={() => setOpen(false)} />}</>;
 }
@@ -33,6 +33,9 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   const [existing, setExisting] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<"" | "search" | "import" | "test">("");
   const [importProgress, setImportProgress] = useState("");
+  const [allIds, setAllIds] = useState<string[]>([]);
+  const [allOffset, setAllOffset] = useState(0);
+  const [allTotals, setAllTotals] = useState({ created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0 });
   const [error, setError] = useState("");
   const run = useCallback(async (nextPage = 0, refresh = false, withCategories = false) => {
     setBusy(refresh ? "test" : "search"); setError("");
@@ -44,6 +47,60 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
     } catch (e) { setError(errMsg(e)); } finally { setBusy(""); }
   }, [search, query, category]);
   useEffect(() => { void run(0, false, true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  async function processAllIds(ids: string[], startAt: number, initial: typeof allTotals) {
+    let totals = { ...initial };
+    for (let i = startAt; i < ids.length; i += 10) {
+      setImportProgress(`Importando filmes completos: ${Math.min(i + 10, ids.length)} de ${ids.length}…`);
+      const r = await importMovies({ data: { ids: ids.slice(i, i + 10) } });
+      totals = {
+        created: totals.created + r.created, updated: totals.updated + r.updated, skipped: totals.skipped + r.skipped,
+        descriptionsAdded: totals.descriptionsAdded + r.descriptionsAdded, genresAdded: totals.genresAdded + r.genresAdded,
+        metadataUnavailable: totals.metadataUnavailable + r.metadataUnavailable, playersAdded: totals.playersAdded + r.playersAdded,
+        detailFailures: totals.detailFailures + r.detailFailures, failed: totals.failed + r.failed,
+      };
+      setAllTotals(totals);
+      setAllOffset(Math.min(i + 10, ids.length));
+    }
+    setLastImportReport({ category: "Catálogo completo BugouMods VIP", total: ids.length, ...totals });
+    setSelected(new Set());
+    toast.success(`Importação completa: ${totals.created} novos, ${totals.updated} atualizados, ${totals.failed} falhas.`);
+    if (totals.detailFailures) toast.warning(`${totals.detailFailures} filme(s) não retornaram detalhes completos pela API; os metadados ausentes foram preservados.`);
+    setAllIds([]); setAllOffset(0); setAllTotals({ created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0 });
+    await run(0, false, true);
+  }
+
+  async function importWholeCatalog() {
+    if (busy) return;
+    setBusy("import"); setError(""); setImportProgress("Atualizando o catálogo BugouMods VIP…");
+    try {
+      const first = await search({ data: { query: "", category: "", page: 0, refresh: true, withCategories: true } });
+      const ids = first.results.map(m => m.id);
+      const pages = Math.ceil(first.matches / first.pageSize);
+      for (let p = 1; p < pages; p++) {
+        setImportProgress(`Lendo catálogo: página ${p + 1} de ${pages}…`);
+        const next = await search({ data: { query: "", category: "", page: p, refresh: false, withCategories: false } });
+        ids.push(...next.results.map(m => m.id));
+      }
+      const unique = [...new Set(ids)];
+      if (!unique.length) { toast.info("A API não retornou filmes para importar."); return; }
+      setAllIds(unique); setAllOffset(0);
+      const zero = { created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0 };
+      setAllTotals(zero);
+      await processAllIds(unique, 0, zero);
+    } catch (e) {
+      setError(errMsg(e));
+      toast.error(errMsg(e) + (allIds.length ? " Você pode retomar a partir do lote pendente." : ""));
+    } finally { setBusy(""); setImportProgress(""); }
+  }
+
+  async function resumeWholeCatalog() {
+    if (busy || !allIds.length || allOffset >= allIds.length) return;
+    setBusy("import");
+    try { await processAllIds(allIds, allOffset, allTotals); }
+    catch (e) { setError(errMsg(e)); toast.error(errMsg(e) + " O progresso anterior foi mantido para retomada."); }
+    finally { setBusy(""); setImportProgress(""); }
+  }
+
   async function testConnection() {
     setBusy("test"); setError("");
     try {
@@ -103,11 +160,13 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
         <Select value={category || "__all"} onValueChange={v => { setCategory(v === "__all" ? "" : v); setPage(0); }}><SelectTrigger aria-label="Categoria"><SelectValue placeholder="Todas as categorias" /></SelectTrigger><SelectContent><SelectItem value="__all">Todas as categorias</SelectItem>{categories.map(c => { const s = categoryStats[c]; return <SelectItem key={c} value={c}>{c}{s ? ` · ${s.total} filmes · ${s.imported} importados` : ""}</SelectItem>; })}</SelectContent></Select>
         <Button disabled={!!busy} type="submit">{busy === "search" ? <Loader2 className="animate-spin" /> : <Search />} Buscar</Button>
         <Button disabled={!!busy} type="button" variant="outline" onClick={testConnection}>{busy === "test" ? <Loader2 className="animate-spin" /> : <RefreshCw />} Testar / sincronizar</Button>
+        <Button disabled={!!busy} type="button" className="bg-[#00DDFA] text-black hover:bg-[#00c8e2]" onClick={importWholeCatalog}>{busy === "import" ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Importar filmes completos</Button>
       </form>
       {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {result && <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><span>{result.matches} resultados · catálogo com {result.total} filmes</span><span className="ml-auto">{selected.size} selecionados</span><Button type="button" size="sm" variant="outline" disabled={!!busy || !items.length} onClick={() => setSelected(s => { const n = new Set(s); const allSelected = items.every(m => n.has(m.id)); items.forEach(m => allSelected ? n.delete(m.id) : n.add(m.id)); return n; })}>{items.length && items.every(m => selected.has(m.id)) ? "Desmarcar página" : "Selecionar página"}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setSelected(new Set())}><X /> Limpar seleção</Button></div>}
       {category && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 p-3"><div className="flex-1"><p className="text-sm font-medium">Importação em massa por categoria</p><p className="text-xs text-muted-foreground">{categoryStats[category] ? `${categoryStats[category].total} filmes na categoria · ${categoryStats[category].imported} já importados. ` : ""}Importa todos os filmes de “{category}”, incluindo os que estão em outras páginas.</p></div><Button type="button" disabled={!!busy} onClick={importWholeCategory}><DownloadCloud /> Importar todos da categoria</Button></div>}
       {importProgress && <p className="text-sm text-muted-foreground" role="status">{importProgress}</p>}
+      {allIds.length > 0 && allOffset < allIds.length && !busy && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3"><p className="flex-1 text-sm">Importação interrompida: {allOffset} de {allIds.length} filmes processados. Você pode continuar sem reiniciar os lotes concluídos.</p><Button type="button" onClick={() => void resumeWholeCatalog()}><RefreshCw /> Retomar importação</Button></div>}
       {lastImportReport && <div className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-sm sm:grid-cols-4"><div><p className="text-muted-foreground">Categoria / seleção</p><p className="font-medium">{lastImportReport.category}</p></div><div><p className="text-muted-foreground">Processados</p><p className="font-medium">{lastImportReport.total}</p></div><div><p className="text-muted-foreground">Novos importados</p><p className="font-medium">{lastImportReport.created}</p></div><div><p className="text-muted-foreground">Atualizados</p><p className="font-medium">{lastImportReport.updated}</p></div><div><p className="text-muted-foreground">Sinopses preenchidas</p><p className="font-medium">{lastImportReport.descriptionsAdded}</p></div><div><p className="text-muted-foreground">Gêneros associados</p><p className="font-medium">{lastImportReport.genresAdded}</p></div><div><p className="text-muted-foreground">Sem metadados completos</p><p className="font-medium">{lastImportReport.metadataUnavailable}</p></div><div><p className="text-muted-foreground">Falhas</p><p className="font-medium">{lastImportReport.failed}</p></div></div>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {items.map(m => { const checked = selected.has(m.id); return <button key={m.id} type="button" onClick={() => setSelected(s => { const n = new Set(s); n.has(m.id) ? n.delete(m.id) : n.add(m.id); return n; })} className={"relative overflow-hidden rounded-xl border text-left " + (checked ? "border-primary ring-1 ring-primary" : "border-border")}>
