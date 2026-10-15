@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { probePlayerUrl } from "@/lib/playback/playback.functions";
 import { isDirectEmbedEndpoint, isScriptEndpoint, type ProbeResult } from "@/lib/playback/script-url";
 import { normalizePlaybackSources, type PlaybackSource } from "@/lib/playback/sources";
+import { requestPlaybackDisplay } from "@/lib/playback/display-mode";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
@@ -29,10 +30,16 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
   const [sources, setSources] = useState<Src[]>([]);
   const [server, setServer] = useState(0);
   const autoStartedId = useRef<string | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const [displayHint, setDisplayHint] = useState(false);
 
   useEffect(() => { setStarted(false); setLoading(false); setError(null); setSources([]); setServer(0); }, [kind, id]);
 
   const start = useCallback(async () => {
+    // Start the display-mode request before any async auth/source lookup so it remains tied to the tap.
+    void requestPlaybackDisplay(stage.current).then(({ fullscreen, orientation }) => {
+      setDisplayHint(!fullscreen || !orientation);
+    });
     setLoading(true);
     setError(null);
     try {
@@ -76,7 +83,7 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
 
   return (
     <div className={`w-full min-w-0 space-y-3 ${className}`}>
-      <div className={`relative w-full ${started ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
+      <div ref={stage} data-playback-stage className={`playback-stage relative w-full ${started ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
         {!started ? (
           <Button type="button" variant="ghost" onClick={start} disabled={loading} aria-label={`Reproduzir ${title}`} className="group relative block h-full w-full rounded-none p-0 [&_svg]:size-9">
             {poster && <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
@@ -101,6 +108,7 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
             <video src={source.url} autoPlay playsInline className="h-full w-full bg-player" />
           </VideoPlayerFrame>
         )}
+        {started && displayHint && <p role="status" className="absolute bottom-3 left-1/2 z-30 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-lg bg-black/75 px-3 py-2 text-center text-xs text-white shadow-lg">Gire o celular para assistir em tela cheia.</p>}
       </div>
     </div>
   );
