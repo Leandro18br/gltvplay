@@ -54,7 +54,7 @@ export const streamBetterTest = createServerFn({ method: "POST" }).middleware([r
   .handler(async ({ context }) => {
     await assertStaff(context);
     const [movies, series] = await Promise.all([getPage("movie", 1), getPage("tv", 1)]);
-    if (movies.status === 429 || series.status === 429) return { ok: false, retryMs: Math.max(movies.retryMs, series.retryMs), message: "Limite temporário do provedor; tente novamente após o tempo indicado." };
+    if (!movies.body || !series.body) return { ok: false, retryMs: Math.max(movies.retryMs, series.retryMs), message: "Limite temporário do provedor; tente novamente após o tempo indicado." };
     return {
       ok: true,
       movieCount: Number(movies.body.pagination.totalItems ?? 0),
@@ -72,7 +72,7 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
     await assertStaff(context);
     const type = data.kind === "movie" ? "movie" : "tv";
     const pageResult = await getPage(type, data.page);
-    if (pageResult.status === 429) return { retryMs: pageResult.retryMs, done: false, retry: true, page: data.page, totalPages: null, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0 };
+    if (!pageResult.body) return { retryMs: pageResult.retryMs, done: false, retry: true, page: data.page, totalPages: null, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0 };
     const body = pageResult.body;
     const totalPages = Number(body.pagination.totalPages);
     const pageItems = (body.titles as any[]).slice(0, data.limit);
@@ -88,12 +88,6 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
       const providerId = cleanText(String(item?.id ?? ""), 100);
       const title = cleanText(item?.title, 200);
       if (!tmdbId || !providerId || !title || !/^\d+$/.test(tmdbId)) { skipped++; continue; }
-      const patch: Record<string, unknown> = {
-        streambetter_id: providerId,
-        streambetter_tmdb_id: tmdbId,
-        external_source: "streambetter",
-        external_id: providerId,
-      };
       const poster = posterUrl(item?.poster_path);
       const description = cleanText(item?.overview);
       const year = yearFrom(item?.release_date ?? item?.first_air_date);
