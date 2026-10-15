@@ -67,7 +67,7 @@ export const streamBetterTest = createServerFn({ method: "POST" }).middleware([r
   });
 
 export const streamBetterImportStep = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
-  .inputValidator(z.object({ kind: z.enum(["movie", "series"]), page: z.number().int().min(1).max(100000), limit: z.number().int().min(1).max(10).default(10) }))
+  .inputValidator(z.object({ kind: z.enum(["movie", "series"]), page: z.number().int().min(1).max(100000), limit: z.number().int().min(1).max(10).default(10), mode: z.enum(["sync", "new_only"]).default("sync") }))
   .handler(async ({ data, context }) => {
     await assertStaff(context);
     const type = data.kind === "movie" ? "movie" : "tv";
@@ -96,7 +96,7 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
       const description = cleanText(item?.overview);
       const year = yearFrom(item?.release_date ?? item?.first_air_date);
       // Only write provider fields when present; never erase an existing non-empty value.
-      const { data: existing, error: findError } = await db.from(table).select("*").eq("streambetter_tmdb_id", tmdbId).maybeSingle();
+      let { data: existing, error: findError } = await db.from(table).select("*").eq("streambetter_tmdb_id", tmdbId).maybeSingle();
       if (findError) { errors++; continue; }
       let rowId: string | null = existing?.id ?? null;
       if (!rowId) {
@@ -104,13 +104,14 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
         const tmdbExternal = `${data.kind === "movie" ? "movie" : "tv"}:${tmdbId}`;
         const match = await db.from(table).select("*").eq("external_source", "tmdb").eq("external_id", tmdbExternal).maybeSingle();
         if (match.error) { errors++; continue; }
-        if (match.data) { rowId = match.data.id; }
+        if (match.data) { existing = match.data; rowId = match.data.id; }
       }
+      if (rowId && data.mode === "new_only") { skipped++; continue; }
       const nonEmptyPatch: Record<string, unknown> = { streambetter_id: providerId, streambetter_tmdb_id: tmdbId };
-      if (title) nonEmptyPatch.title = existing?.title?.trim() ? existing.title : title;
-      if (poster) nonEmptyPatch.poster_url = existing?.poster_url?.trim() ? existing.poster_url : poster;
-      if (description) nonEmptyPatch.description = existing?.description?.trim() ? existing.description : description;
-      if (year) nonEmptyPatch.release_year = existing?.release_year ?? year;
+      if (title) nonEmptyPatch.title = title;
+      if (poster) nonEmptyPatch.poster_url = poster;
+      if (description) nonEmptyPatch.description = description;
+      if (year) nonEmptyPatch.release_year = year;
       if (!rowId) {
         const insertRow = {
           ...nonEmptyPatch,
