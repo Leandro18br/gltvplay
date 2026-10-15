@@ -1,6 +1,7 @@
 type OrientationScreen = Screen & { orientation?: ScreenOrientation & { lock?: (orientation: "landscape") => Promise<void>; unlock?: () => void } };
 
 let listeningForFullscreen = false;
+let orientationAttempted = false;
 
 function unlockOrientation() {
   try {
@@ -24,6 +25,7 @@ export function requestPlaybackDisplay(target: HTMLElement | null): Promise<{ fu
     listeningForFullscreen = true;
     document.addEventListener("fullscreenchange", () => {
       if (!document.fullscreenElement) unlockOrientation();
+      orientationAttempted = false;
     });
   }
 
@@ -41,11 +43,14 @@ export function requestPlaybackDisplay(target: HTMLElement | null): Promise<{ fu
     .catch(() => undefined)
     .then(async () => {
       let orientation = false;
+      const api = (screen as OrientationScreen).orientation;
       try {
-        const api = (screen as OrientationScreen).orientation;
-        if (api?.lock) {
+        if (api?.lock && !orientationAttempted) {
+          orientationAttempted = true;
           await api.lock("landscape");
           orientation = true;
+        } else {
+          orientation = !!api?.type.startsWith("landscape");
         }
       } catch {
         // Orientation is optional: never interrupt playback if the browser refuses.
