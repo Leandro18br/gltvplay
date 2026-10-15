@@ -15,7 +15,7 @@ export function TmdbMovieRepairBatch() {
   const qc = useQueryClient();
   const stop = useRef(false);
   const [running, setRunning] = useState(false);
-  const [offset, setOffset] = useState(0);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [totals, setTotals] = useState<Totals>(empty);
   const [message, setMessage] = useState("");
   const [finished, setFinished] = useState(false);
@@ -24,15 +24,17 @@ export function TmdbMovieRepairBatch() {
     stop.current = false;
     setRunning(true);
     setMessage("");
-    if (finished) { setOffset(0); setTotals(empty); setFinished(false); }
-    let cursor = finished ? 0 : offset;
+    if (finished) { setCursor(null); setTotals(empty); setFinished(false); }
+    let nextCursor = finished ? null : cursor;
+    let scannedTotal = finished ? 0 : totals.scanned;
     let done = false;
     try {
       while (!done && !stop.current) {
-        const r = await repair({ data: { offset: cursor, limit: 5 } });
-        cursor = r.nextOffset;
+        const r = await repair({ data: { after: nextCursor, limit: 5 } });
+        nextCursor = r.nextCursor;
         done = r.done;
-        setOffset(cursor);
+        setCursor(nextCursor);
+        scannedTotal += r.scanned;
         setTotals((old) => ({
           scanned: old.scanned + r.scanned,
           corrected: old.corrected + r.corrected,
@@ -40,7 +42,7 @@ export function TmdbMovieRepairBatch() {
           unavailable: old.unavailable + r.unavailable,
           failed: old.failed + r.failed,
         }));
-        setMessage(`Verificados nesta etapa: ${r.scanned}. Total analisado nesta execução: ${cursor} de ${r.total}.`);
+        setMessage(`Verificados neste lote: ${r.scanned}. Total analisado nesta execução: ${scannedTotal}.`);
         await qc.invalidateQueries({ queryKey: ["admin", "movies"] });
         await qc.invalidateQueries({ queryKey: ["catalog"] });
         if (!r.scanned) done = true;
@@ -65,13 +67,13 @@ export function TmdbMovieRepairBatch() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <h2 className="font-semibold">Corrigir descrições e gêneros via TMDB</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Verifica filmes em lotes de 5. Só preenche metadados ausentes, preserva sinopses válidas, categorias e fontes de reprodução. Correspondências automáticas exigem identificação confiável.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Verifica apenas filmes com metadados incompletos, em lotes de 5. Só preenche dados ausentes, preserva sinopses válidas, categorias e fontes de reprodução. Correspondências automáticas exigem identificação confiável.</p>
       </div>
       {running
         ? <Button size="sm" variant="outline" onClick={() => { stop.current = true; }}><Pause /> Pausar após o lote</Button>
-        : <Button size="sm" onClick={run}><RefreshCw /> {finished ? "Executar nova verificação" : offset ? "Continuar correção" : "Iniciar correção em lote"}</Button>}
+        : <Button size="sm" onClick={run}><RefreshCw /> {finished ? "Executar nova verificação" : cursor ? "Continuar correção" : "Iniciar correção em lote"}</Button>}
     </div>
-    {(running || offset > 0 || message) && <div className="space-y-1 text-sm">
+    {(running || cursor || message) && <div className="space-y-1 text-sm">
       <p role="status" className="text-muted-foreground">{running && <Loader2 className="mr-1 inline size-4 animate-spin" />}{message}</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {([["Verificados", totals.scanned], ["Corrigidos", totals.corrected], ["Já completos", totals.alreadyComplete], ["Sem correspondência/dados", totals.unavailable], ["Falhas", totals.failed]] as const).map(([label, value]) =>
