@@ -29,7 +29,7 @@ export function TmdbMovieRepairBatch() {
     let done = false;
     try {
       while (!done && !stop.current) {
-        const r = await repair({ data: { offset: cursor, limit: 10 } });
+        const r = await repair({ data: { offset: cursor, limit: 5 } });
         cursor = r.nextOffset;
         done = r.done;
         setOffset(cursor);
