@@ -27,6 +27,7 @@ export const Route = createFileRoute("/canais-categorias")({
 
 function Page() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const { data } = useSuspenseQuery(kindCategoriesQuery(["channel"]));
 
   // This file route is also the layout parent of /canais-categorias/$slug.
   // Render the child route instead of keeping the category grid mounted over it.
@@ -34,7 +35,6 @@ function Page() {
     return <Outlet />;
   }
 
-  const { data } = useSuspenseQuery(kindCategoriesQuery(["channel"]));
   return (
     <SiteShell>
       <PageTitle title="Categorias de canais" subtitle="Escolha uma categoria e assista aos canais ao vivo." />
