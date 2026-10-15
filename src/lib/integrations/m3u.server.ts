@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createParser, lines, itemKey, seriesItemKey, seriesKey, categoryName, norm, slugify, assertSafeListUrl, type M3uEntry } from "./m3u";
-import { tmdbGet, movieMeta, seriesMeta, linkGenres, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
+import { tmdbGet, movieMeta, seriesMeta, linkGenres, uniqueSlug, applyCompletion } from "@/lib/tmdb/tmdb.functions";
 import { categorySlugForKind, linkCategories } from "./categories";
 
 /**
@@ -468,11 +468,30 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
     return m;
   };
 
+  async function enrichExistingMovie(id: string, title: string, year: number | null) {
+    if (!list.enrich_tmdb) return;
+    try {
+      const { data: current, error } = await db.from("movies").select("*").eq("id", id).maybeSingle();
+      if (error || !current) return;
+      const { data: linked, error: genreError } = await db.from("movie_genres").select("genre_id").eq("movie_id", id).limit(1);
+      if (genreError) throw genreError;
+      if (current.description?.trim() && (linked ?? []).length) return;
+      let tmdbId = Number.isInteger(current.tmdb_id) && current.tmdb_id > 0 ? current.tmdb_id : null;
+      if (!tmdbId) tmdbId = await tmdbFind("movie", title, year);
+      if (!tmdbId) return;
+      const meta = await movieMeta(tmdbId, false);
+      await applyCompletion(ctx, "movie", id, current, meta.fields, meta.genres);
+    } catch (error) {
+      // Optional metadata must never block a valid M3U import or source update.
+      console.warn("[M3U metadata enrichment] Não foi possível completar o filme", id, msg(error));
+    }
+  }
+
   async function importMovie(it: Item) {
     let id = await exists("movies", it.content_id);
-    if (id) { await linkCategories(db, "movie", id, [it.group_title]); await source("movie", id, it); return { id, skipped: true }; }
+    if (id) { await enrichExistingMovie(id, it.title, it.year); await linkCategories(db, "movie", id, [it.group_title]); await source("movie", id, it); return { id, skipped: true }; }
     id = (await byTmdb("movies", it.tmdb_id)) ?? (await byTitle("movies", "title", it.title, it.year)) ?? (await byUrl("movie", it.url));
-    if (id) await fillMissing("movies", id, "poster_url", it);
+    if (id) { await fillMissing("movies", id, "poster_url", it); await enrichExistingMovie(id, it.title, it.year); }
     else {
       const tmdbId = it.tmdb_id ?? (await tmdbFind("movie", it.title, it.year));
       let meta: Awaited<ReturnType<typeof movieMeta>> | null = null;
