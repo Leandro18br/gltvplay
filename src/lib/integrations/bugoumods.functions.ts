@@ -700,6 +700,45 @@ async function loadAllMovies(): Promise<BugouMovie[]> {
   }
 }
 
+/** Match BugouMods genre labels to existing system genres and create only genuinely missing names. */
+function providerGenreSlug(name: string) {
+  return normTitle(name).replace(/\s+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
+}
+
+async function linkProviderMovieGenres(db: any, movieId: string, names: string[]): Promise<number> {
+  const clean = [...new Map(names.map((name) => {
+    const label = name.replace(/\s+/g, " ").trim().slice(0, 80);
+    return [normTitle(label), label] as const;
+  }).filter(([key, label]) => key && label)).values()];
+  if (!clean.length) return 0;
+
+  const slugs = clean.map(providerGenreSlug).filter(Boolean);
+  if (!slugs.length) return 0;
+  const { data: existingGenres, error: genresError } = await db.from("genres").select("id,name,slug").in("slug", slugs);
+  if (genresError) throw new Error(genresError.message);
+  const foundByName = new Map((existingGenres ?? []).map((g: any) => [normTitle(String(g.name ?? "")), g]));
+  const missing = clean.filter((name) => !foundByName.has(normTitle(name)));
+  if (missing.length) {
+    const created = await db.from("genres").upsert(missing.map((name) => ({ name, slug: providerGenreSlug(name) })), { onConflict: "slug", ignoreDuplicates: true });
+    if (created.error) throw new Error(created.error.message);
+  }
+
+  const { data: allGenres, error: allError } = await db.from("genres").select("id,name,slug").in("slug", slugs);
+  if (allError) throw new Error(allError.message);
+  const wanted = new Set(clean.map(normTitle));
+  const genreIds = (allGenres ?? []).filter((g: any) => wanted.has(normTitle(String(g.name ?? ""))).map((g: any) => String(g.id));
+  if (!genreIds.length) return 0;
+
+  const { data: linked, error: linkedError } = await db.from("movie_genres").select("genre_id").eq("movie_id", movieId).in("genre_id", genreIds);
+  if (linkedError) throw new Error(linkedError.message);
+  const linkedIds = new Set((linked ?? []).map((x: any) => String(x.genre_id)));
+  const newIds = genreIds.filter((id: string) => !linkedIds.has(id));
+  if (!newIds.length) return 0;
+  const saved = await db.from("movie_genres").upsert(newIds.map((genre_id: string) => ({ movie_id: movieId, genre_id })), { onConflict: "movie_id,genre_id", ignoreDuplicates: true });
+  if (saved.error) throw new Error(saved.error.message);
+  return newIds.length;
+}
+
 /** Fetches one movie's full metadata from BugouMods VIP. A missing detail endpoint must not block importing the catalog row. */
 async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Promise<BugouMovieDetails | null> {
   const url = new URL("https://cinema.bugoumods.com/index.php");
@@ -710,7 +749,7 @@ async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Pr
     if (!json || typeof json !== "object" || json.Aviso) throw new Error("A API não devolveu detalhes válidos para este filme.");
     const details = parseBugouMovieDetails(id, json);
     await logCall(integ, `Detalhes do filme ${id}`, t0, null);
-    return details.plot || details.title || details.cover ? details : null;
+    return details.plot || details.title || details.cover || details.genres.length ? details : null;
   } catch (e) {
     const message = scrub((e as Error).message).slice(0, 400);
     await logCall(integ, `Detalhes do filme ${id}`, t0, message, e instanceof RateLimitedError ? 429 : null);
@@ -791,7 +830,7 @@ export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(100) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(10) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
     await refreshMovieIndex(ctx, false);
@@ -799,69 +838,75 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
     if (error) throw new Error(error.message);
     const byId = new Map((items ?? []).map((x: any) => [x.ext_id, x]));
     const { integ, tok } = await seriesIntegration();
-    const report = { created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, playersAdded: 0, detailFailures: 0 };
+    const report = { created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0 };
+
     for (const id of data.ids) {
       const m = byId.get(id) as any;
       if (!m) { report.skipped++; continue; }
+      try {
+        // BugouMods VIP is the sole source of movie synopsis and genres; no external metadata fallback.
+        const detail = await loadMovieDetails(id, tok, integ);
+        if (!detail) report.detailFailures++;
+        const title = detail?.title || m.title;
+        const year = detail?.year ?? m.year;
+        const poster = detail?.cover || m.poster_url;
+        const playerUrl = bugouVipEmbedUrl(id, detail?.ext ?? "mp4", tok);
 
-      // The VOD listing is intentionally lightweight. Resolve the detail endpoint for plot/extension,
-      // but still build the VIP player from the known provider ID if the detail call is unavailable.
-      const detail = await loadMovieDetails(id, tok, integ);
-      if (!detail) report.detailFailures++;
-      const title = detail?.title || m.title;
-      const year = detail?.year ?? m.year;
-      const poster = detail?.cover || m.poster_url;
-      const playerUrl = bugouVipEmbedUrl(id, detail?.ext ?? "mp4", tok);
-
-      const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
-      if (findErr) throw new Error(findErr.message);
-      let existing = byExternal;
-      if (!existing) {
-        let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
-        if (year) same = same.eq("release_year", year);
-        const { data: matches, error: sameErr } = await same;
-        if (sameErr) throw new Error(sameErr.message);
-        if (matches?.length === 1) existing = matches[0];
-      }
-
-      let movieId: string;
-      if (existing) {
-        movieId = existing.id;
-        const patch: Record<string, unknown> = {};
-        if (!existing.title && title) patch.title = title;
-        if (!existing.description && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
-        if (!existing.poster_url && poster) patch.poster_url = poster;
-        if (!existing.release_year && year) patch.release_year = year;
-        if (!existing.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
-        if (Object.keys(patch).length) {
-          const up = await db.from("movies").update(patch).eq("id", movieId);
-          if (up.error) throw new Error(up.error.message);
+        const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+        if (findErr) throw new Error(findErr.message);
+        let existing = byExternal;
+        if (!existing) {
+          let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
+          if (year) same = same.eq("release_year", year);
+          const { data: matches, error: sameErr } = await same;
+          if (sameErr) throw new Error(sameErr.message);
+          if (matches?.length === 1) existing = matches[0];
         }
-        report.updated++;
-      } else {
-        const base = normTitle(title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
-        const slug = (base + "-" + id).slice(0, 200);
-        const ins = await db.from("movies").insert({ title, description: detail?.plot ?? null, release_year: year, poster_url: poster, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
-        if (ins.error) throw new Error(ins.error.message);
-        movieId = ins.data.id;
-        if (detail?.plot) report.descriptionsAdded++;
-        report.created++;
-      }
 
-      await linkCategories(db, "movie", movieId, [m.category]);
+        let movieId: string;
+        if (existing) {
+          movieId = existing.id;
+          const patch: Record<string, unknown> = {};
+          if (!String(existing.title ?? "").trim() && title) patch.title = title;
+          if (!String(existing.description ?? "").trim() && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
+          if (!existing.poster_url && poster) patch.poster_url = poster;
+          if (!existing.release_year && year) patch.release_year = year;
+          if (!existing.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
+          if (Object.keys(patch).length) {
+            const up = await db.from("movies").update(patch).eq("id", movieId);
+            if (up.error) throw new Error(up.error.message);
+          }
+          report.updated++;
+        } else {
+          const base = normTitle(title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
+          const slug = (base + "-" + id).slice(0, 200);
+          const ins = await db.from("movies").insert({ title, description: detail?.plot ?? null, release_year: year, poster_url: poster, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
+          if (ins.error) throw new Error(ins.error.message);
+          movieId = ins.data.id;
+          if (detail?.plot) report.descriptionsAdded++;
+          report.created++;
+        }
 
-      // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.
-      const { data: sources, error: sourcesErr } = await db.from("playback_sources").select("id,external_ref").eq("content_kind", "movie").eq("content_id", movieId);
-      if (sourcesErr) throw new Error(sourcesErr.message);
-      const ref = `bugoumods:${id}`;
-      if (!(sources ?? []).some((s: any) => s.external_ref === ref)) {
-        const sourceInsert = await db.from("playback_sources").insert({
-          content_kind: "movie", content_id: movieId, url: playerUrl, source_type: "embed",
-          provider: "BugouMods", label: "BugouMods VIP", external_ref: ref,
-          is_active: true, is_primary: (sources ?? []).length === 0, sort_order: (sources ?? []).length, drm: {},
-        });
-        if (sourceInsert.error) throw new Error(sourceInsert.error.message);
-        report.playersAdded++;
+        if (detail?.genres.length) report.genresAdded += await linkProviderMovieGenres(db, movieId, detail.genres);
+        if (!detail?.plot?.trim() || !detail.genres.length) report.metadataUnavailable++;
+        await linkCategories(db, "movie", movieId, [m.category]);
+
+        // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.
+        const { data: sources, error: sourcesErr } = await db.from("playback_sources").select("id,external_ref").eq("content_kind", "movie").eq("content_id", movieId);
+        if (sourcesErr) throw new Error(sourcesErr.message);
+        const ref = \`bugoumods:\${id}\`;
+        if (!(sources ?? []).some((s: any) => s.external_ref === ref)) {
+          const sourceInsert = await db.from("playback_sources").insert({
+            content_kind: "movie", content_id: movieId, url: playerUrl, source_type: "embed",
+            provider: "BugouMods", label: "BugouMods VIP", external_ref: ref,
+            is_active: true, is_primary: (sources ?? []).length === 0, sort_order: (sources ?? []).length, drm: {},
+          });
+          if (sourceInsert.error) throw new Error(sourceInsert.error.message);
+          report.playersAdded++;
+        }
+      } catch (error) {
+        report.failed++;
+        console.warn("[BugouMods movie import] Falha ao importar filme", id, scrub(error instanceof Error ? error.message : String(error)).slice(0, 250));
       }
     }
     return report;
