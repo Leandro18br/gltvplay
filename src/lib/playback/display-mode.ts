@@ -16,7 +16,7 @@ export function releasePlaybackDisplay() {
   unlockOrientation();
 }
 
-export function requestPlaybackDisplay(target: HTMLElement | null): Promise<{ fullscreen: boolean; orientation: boolean }> {
+export function requestPlaybackDisplay(target: HTMLElement | null, forceTarget = false): Promise<{ fullscreen: boolean; orientation: boolean }> {
   if (typeof document === "undefined" || typeof screen === "undefined") {
     return Promise.resolve({ fullscreen: false, orientation: false });
   }
@@ -30,7 +30,7 @@ export function requestPlaybackDisplay(target: HTMLElement | null): Promise<{ fu
   }
 
   let fullscreenRequest: Promise<void> = Promise.resolve();
-  if (!document.fullscreenElement && document.fullscreenEnabled && target?.requestFullscreen) {
+  if ((!document.fullscreenElement || (forceTarget && document.fullscreenElement !== target)) && document.fullscreenEnabled && target?.requestFullscreen) {
     try {
       // Invoke synchronously from the real user gesture; do not await before calling it.
       fullscreenRequest = target.requestFullscreen();
