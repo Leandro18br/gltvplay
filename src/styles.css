@@ -10,12 +10,11 @@
  * The @theme inline block maps CSS custom properties to Tailwind utility
  * classes (e.g. --color-primary -> bg-primary, text-primary).
  *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
+ * The :root block centralizes the GLTV Play palette and semantic colors.
+ * Brand colors are kept as exact hex values to match the requested identity.
+ * Semantic tokens map these values to Tailwind utilities throughout the app.
  *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * To add a new semantic color, define it here and register it in @theme inline.
  */
 
 @theme inline {
@@ -67,43 +66,46 @@
 
 :root {
   --radius: 0.875rem;
-  --background: oklch(0.08 0 0);
-  --foreground: oklch(0.98 0 0);
-  --player: oklch(0 0 0);
-  --player-foreground: oklch(0.98 0 0);
-  --card: oklch(0.13 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.13 0 0);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.62 0.24 25);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.19 0 0);
-  --secondary-foreground: oklch(0.96 0 0);
-  --muted: oklch(0.17 0 0);
-  --muted-foreground: oklch(0.68 0 0);
-  --accent: oklch(0.24 0.08 25);
-  --accent-foreground: oklch(0.96 0.04 25);
-  --destructive: oklch(0.65 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.62 0.24 25);
-  --chart-1: oklch(0.62 0.24 25);
-  --chart-2: oklch(0.68 0.2 25);
-  --chart-3: oklch(0.55 0.19 25);
-  --chart-4: oklch(0.76 0.16 25);
-  --chart-5: oklch(0.42 0.16 25);
-  --sidebar: oklch(0.06 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.62 0.24 25);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.2 0.06 25);
-  --sidebar-accent-foreground: oklch(0.96 0 0);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.62 0.24 25);
-  --gradient-fade: linear-gradient(to top, var(--background) 8%, oklch(0.08 0 0 / 0.6) 45%, transparent);
-  --gradient-side: linear-gradient(to right, var(--background) 10%, oklch(0.08 0 0 / 0.4) 55%, transparent);
-  --glow: 0 0 0 1px oklch(0.62 0.24 25 / 0.35), 0 12px 40px -12px oklch(0.62 0.24 25 / 0.45);
+  --brand-black: #000000;
+  --brand-cyan: #00DDFA;
+  --brand-white: #FFFFFF;
+  --background: var(--brand-black);
+  --foreground: var(--brand-white);
+  --player: var(--brand-black);
+  --player-foreground: var(--brand-white);
+  --card: #080808;
+  --card-foreground: var(--brand-white);
+  --popover: #080808;
+  --popover-foreground: var(--brand-white);
+  --primary: var(--brand-cyan);
+  --primary-foreground: var(--brand-black);
+  --secondary: #111111;
+  --secondary-foreground: var(--brand-white);
+  --muted: #161616;
+  --muted-foreground: #B3B3B3;
+  --accent: color-mix(in srgb, var(--brand-cyan) 14%, var(--brand-black));
+  --accent-foreground: var(--brand-cyan);
+  --destructive: #FF4545;
+  --destructive-foreground: var(--brand-white);
+  --border: #262626;
+  --input: #161616;
+  --ring: var(--brand-cyan);
+  --chart-1: var(--brand-cyan);
+  --chart-2: oklch(0.78 0.12 209);
+  --chart-3: oklch(0.68 0.10 209);
+  --chart-4: oklch(0.90 0.07 209);
+  --chart-5: oklch(0.58 0.11 209);
+  --sidebar: var(--brand-black);
+  --sidebar-foreground: var(--brand-white);
+  --sidebar-primary: var(--brand-cyan);
+  --sidebar-primary-foreground: var(--brand-black);
+  --sidebar-accent: color-mix(in srgb, var(--brand-cyan) 14%, var(--brand-black));
+  --sidebar-accent-foreground: var(--brand-cyan);
+  --sidebar-border: #262626;
+  --sidebar-ring: var(--brand-cyan);
+  --gradient-fade: linear-gradient(to top, var(--background) 8%, rgb(0 0 0 / 0.6) 45%, transparent);
+  --gradient-side: linear-gradient(to right, var(--background) 10%, rgb(0 0 0 / 0.4) 55%, transparent);
+  --glow: 0 0 0 1px color-mix(in srgb, var(--brand-cyan) 35%, transparent), 0 12px 40px -12px color-mix(in srgb, var(--brand-cyan) 45%, transparent);
   --font-display: "Maven Pro", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Maven Pro", ui-sans-serif, system-ui, sans-serif;
 }
