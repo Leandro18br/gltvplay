@@ -65,7 +65,7 @@ export function TmdbMovieRepairBatch() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <h2 className="font-semibold">Corrigir descrições e gêneros via TMDB</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Verifica filmes em lotes de 10. Só preenche metadados ausentes, preserva sinopses válidas, categorias e fontes de reprodução. Correspondências automáticas exigem identificação confiável.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Verifica filmes em lotes de 5. Só preenche metadados ausentes, preserva sinopses válidas, categorias e fontes de reprodução. Correspondências automáticas exigem identificação confiável.</p>
       </div>
       {running
         ? <Button size="sm" variant="outline" onClick={() => { stop.current = true; }}><Pause /> Pausar após o lote</Button>
