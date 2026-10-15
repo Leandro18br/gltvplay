@@ -31,7 +31,21 @@ export function bugouVipEmbedUrl(episodeId: string, ext: string, vtoken: string)
   return `https://cinema.bugoumods.com/player.php?type=vod_streams&id=${encodeURIComponent(episodeId)}&ext=${e}&vtoken=${encodeURIComponent(vtoken)}&embed=vip`;
 }
 
-export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string; genres: string[] };
+export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string; genres: string[]; providerMetadataPaths: string[] };
+
+/** Return only JSON key paths for metadata audit; never return tokens or arbitrary field values. */
+export function findBugouMetadataPaths(value: unknown, path = "", depth = 0): string[] {
+  if (!value || typeof value !== "object" || depth > 5) return [];
+  const targets = new Set(["plot", "description", "overview", "genre", "genres", "genre_name", "genre_names", "genre_ids"]);
+  const found: string[] = [];
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const next = path ? path + "." + key : key;
+    if (targets.has(key.toLowerCase()) && child != null && child !== "") found.push(next);
+    if (child && typeof child === "object") found.push(...findBugouMetadataPaths(child, next, depth + 1));
+    if (found.length >= 30) break;
+  }
+  return [...new Set(found)].slice(0, 30);
+}
 
 /** Read genre labels only from the provider payload; numeric-only IDs cannot safely be resolved to names. */
 export function parseBugouGenreNames(...values: unknown[]): string[] {
@@ -76,6 +90,7 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
     j?.genre, j?.genres,
   ];
   const genres = parseBugouGenreNames(...genreValues);
+  const providerMetadataPaths = findBugouMetadataPaths(j);
   const cover = https(coverValue);
   const yearValue = Number(info?.year ?? data?.year) || name.year;
   return {
@@ -86,6 +101,7 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
     cover,
     ext,
     genres,
+    providerMetadataPaths,
   };
 }
 
