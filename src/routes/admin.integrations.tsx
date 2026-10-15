@@ -15,6 +15,7 @@ import { TesterDialog } from "@/components/admin/integrations/TesterDialog";
 import { EmbedSettings } from "@/components/admin/EmbedSettings";
 import { TmdbIntegrationCard } from "@/components/admin/tmdb/TmdbTools";
 import { MegaEmbedCard } from "@/components/admin/integrations/MegaEmbedCard";
+import { StreamBetterCard } from "@/components/admin/integrations/StreamBetterCard";
 import { M3uListsCard } from "@/components/admin/integrations/M3uListsCard";
 import { LiveChannelsCard } from "@/components/admin/integrations/LiveChannelsCard";
 import { SeriesApiCard } from "@/components/admin/integrations/SeriesApiCard";
@@ -60,6 +61,7 @@ function IntegrationsPage() {
           <SeriesApiCard />
           <div className="rounded-2xl border border-primary/30 bg-card p-4"><div className="mb-3"><h2 className="font-semibold">BugouMods — Catálogo de filmes</h2><p className="mt-1 text-sm text-muted-foreground">Pesquisa e importação de filmes usando a credencial BugouMods já configurada. O catálogo de séries permanece separado.</p></div><BugouMoviesButton label="Pesquisar e importar filmes" /></div>
           <TmdbIntegrationCard />
+          <StreamBetterCard />
           <MegaEmbedCard />
           <M3uListsCard />
           {list.isPending && <Loader2 className="animate-spin text-primary" />}
