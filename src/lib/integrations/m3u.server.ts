@@ -475,7 +475,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
       if (error || !current) return;
       const { data: linked, error: genreError } = await db.from("movie_genres").select("genre_id").eq("movie_id", id).limit(1);
       if (genreError) throw genreError;
-      if (current.description?.trim() && (linked ?? []).length) return;
+      if (current.description?.trim() && (linked ?? []).length && current.tmdb_id && current.original_title && current.release_date && current.poster_url && current.backdrop_url) return;
       let tmdbId = Number.isInteger(current.tmdb_id) && current.tmdb_id > 0 ? current.tmdb_id : null;
       if (!tmdbId) tmdbId = await tmdbFind("movie", title, year);
       if (!tmdbId) return;
