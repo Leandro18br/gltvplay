@@ -79,6 +79,8 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
     const table = data.kind === "movie" ? "movies" : "series";
+    const { data: settings } = await db.from("site_settings").select("streambetter_public_key").eq("id", 1).maybeSingle();
+    const publicKey = typeof settings?.streambetter_public_key === "string" && /^sb_pk_[A-Za-z0-9_-]{8,200}$/.test(settings.streambetter_public_key.trim()) ? settings.streambetter_public_key.trim() : null;
     let processed = 0, imported = 0, updated = 0, skipped = 0, errors = 0;
     for (const item of pageItems) {
       processed++;
@@ -130,9 +132,15 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
         updated++;
       }
       if (data.kind === "movie") {
-        const embedUrl = `${BASE}/filme/${encodeURIComponent(tmdbId)}`;
-        const { data: currentSources, error: sourceError } = await db.from("playback_sources").select("id,is_primary").eq("content_kind", "movie").eq("content_id", rowId).eq("external_ref", `streambetter:${tmdbId}`).limit(1);
-        if (!sourceError && !(currentSources ?? []).length) {
+        const embedUrl = `${BASE}/filme/${encodeURIComponent(tmdbId)}${publicKey ? `?key=${encodeURIComponent(publicKey)}` : ""}`;
+        const { data: currentSources, error: sourceError } = await db.from("playback_sources").select("id,url").eq("content_kind", "movie").eq("content_id", rowId).eq("external_ref", `streambetter:${tmdbId}`).limit(1);
+        if (sourceError) { errors++; continue; }
+        if ((currentSources ?? []).length) {
+          if (currentSources[0].url !== embedUrl) {
+            const sourceUpdate = await db.from("playback_sources").update({ url: embedUrl, is_active: true }).eq("id", currentSources[0].id);
+            if (sourceUpdate.error) errors++;
+          }
+        } else {
           const { count } = await db.from("playback_sources").select("id", { count: "exact", head: true }).eq("content_kind", "movie").eq("content_id", rowId).eq("is_active", true);
           const source = await db.from("playback_sources").insert({
             content_kind: "movie", content_id: rowId, url: embedUrl, source_type: "embed",
