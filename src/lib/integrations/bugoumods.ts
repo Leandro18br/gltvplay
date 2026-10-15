@@ -31,7 +31,49 @@ export function bugouVipEmbedUrl(episodeId: string, ext: string, vtoken: string)
   return `https://cinema.bugoumods.com/player.php?type=vod_streams&id=${encodeURIComponent(episodeId)}&ext=${e}&vtoken=${encodeURIComponent(vtoken)}&embed=vip`;
 }
 
-export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string };
+export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string; genres: string[]; providerMetadataPaths: string[] };
+
+/** Return only JSON key paths for metadata audit; never return tokens or arbitrary field values. */
+export function findBugouMetadataPaths(value: unknown, path = "", depth = 0): string[] {
+  if (!value || typeof value !== "object" || depth > 5) return [];
+  const targets = new Set(["plot", "description", "overview", "genre", "genres", "genre_name", "genre_names", "genre_ids"]);
+  const found: string[] = [];
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const next = path ? path + "." + key : key;
+    if (targets.has(key.toLowerCase()) && child != null && child !== "") found.push(next);
+    if (child && typeof child === "object") found.push(...findBugouMetadataPaths(child, next, depth + 1));
+    if (found.length >= 30) break;
+  }
+  return [...new Set(found)].slice(0, 30);
+}
+
+/** Read genre labels only from the provider payload; numeric-only IDs cannot safely be resolved to names. */
+export function parseBugouGenreNames(...values: unknown[]): string[] {
+  const names: string[] = [];
+  const visit = (value: unknown) => {
+    if (typeof value === "string") {
+      value.split(/[,;|]/).map((part) => part.trim()).filter(Boolean).forEach((part) => names.push(part));
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value && typeof value === "object") {
+      const row = value as Record<string, unknown>;
+      // Xtream-like providers may use {name}, {genre_name}, or {genre}; don't infer a name from a numeric ID.
+      visit(row.name ?? row.genre_name ?? row.genre ?? row.label ?? row.title);
+    }
+  };
+  values.forEach(visit);
+  const unique = new Map<string, string>();
+  for (const raw of names) {
+    const name = raw.replace(/\\s+/g, " ").trim().slice(0, 80);
+    const key = normTitle(name);
+    if (key && !/^\d+$/.test(name) && !unique.has(key)) unique.set(key, name);
+  }
+  return [...unique.values()].slice(0, 30);
+}
 
 /** Normalizes the provider's VOD detail response while tolerating its common wrapper shapes. */
 export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
@@ -42,6 +84,13 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
   const ext = /^[a-z0-9]{2,5}$/i.test(rawExt) ? rawExt : "mp4";
   const coverValue = info?.movie_image ?? info?.cover_big ?? info?.cover ?? data?.stream_icon ?? data?.cover ?? data?.poster ?? j?.cover;
   const plotValue = info?.plot ?? info?.description ?? info?.overview ?? data?.plot ?? data?.description ?? data?.overview ?? j?.plot;
+  const genreValues = [
+    info?.genre, info?.genres, info?.genre_name, info?.genre_names, info?.genre_ids,
+    data?.genre, data?.genres, data?.genre_name, data?.genre_names, data?.genre_ids,
+    j?.genre, j?.genres, j?.genre_ids,
+  ];
+  const genres = parseBugouGenreNames(...genreValues);
+  const providerMetadataPaths = findBugouMetadataPaths(j);
   const cover = https(coverValue);
   const yearValue = Number(info?.year ?? data?.year) || name.year;
   return {
@@ -51,6 +100,8 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
     plot: typeof plotValue === "string" && plotValue.trim() ? plotValue.trim() : null,
     cover,
     ext,
+    genres,
+    providerMetadataPaths,
   };
 }
 

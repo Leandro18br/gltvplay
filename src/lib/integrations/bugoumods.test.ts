@@ -41,10 +41,23 @@ describe("parseBugouMovieDetails", () => {
       plot: "Sinopse do filme",
       cover: "https://example.com/cover.jpg",
       ext: "mkv",
+      genres: [],
+      providerMetadataPaths: ["info.plot"],
     });
   });
 
   it("uses a safe default extension when provider data is missing or invalid", () => {
     expect(parseBugouMovieDetails("321", { info: { title: "Outro Filme", plot: "Descrição" } }).ext).toBe("mp4");
+  });
+
+  it("reads provider genres from strings, arrays and objects while ignoring numeric-only IDs", () => {
+    const d = parseBugouMovieDetails("456", {
+      info: { name: "Filme (2024)", plot: "Sinopse", genre: "Ação, Aventura" },
+      movie_data: { stream_id: 456, genres: [{ name: "Drama" }, { id: 28 }, "Comédia"], genre_ids: [28, 12] },
+    });
+    expect(d.genres).toEqual(["Ação", "Aventura", "Drama", "Comédia"]);
+    expect(d.providerMetadataPaths).toContain("info.plot");
+    expect(d.providerMetadataPaths).toContain("info.genre");
+    expect(d.genres).not.toContain("28");
   });
 });
