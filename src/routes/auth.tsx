@@ -6,7 +6,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/site/SiteHeader";
 import { PasswordInput, FieldError } from "@/components/site/PasswordInput";
 import { accessLogin } from "@/lib/access/access.functions";
@@ -82,24 +81,22 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">
-      <div className="w-full max-w-sm animate-rise rounded-2xl border border-border bg-card p-8 shadow-glow">
+    <div className="flex min-h-screen items-center justify-center bg-[#000000] px-4 py-6 sm:px-6 sm:py-10">
+      <div className="w-full max-w-sm animate-rise rounded-2xl border border-[#00DDFA]/35 bg-[#080808] p-6 shadow-[0_0_32px_rgba(0,221,250,0.10)] sm:p-8">
         <Logo />
-        <h1 className="mt-6 text-2xl font-semibold">Entrar</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Use o login e a senha de 6 números fornecidos pelo seu revendedor.</p>
-        <form onSubmit={submit} noValidate className="mt-6 space-y-4">
+        <h1 className="mt-5 text-2xl font-semibold">Entrar</h1>
+        <p className="mt-1 text-sm text-[#B3B3B3]">Digite seu código de acesso e sua senha.</p>
+        <form onSubmit={submit} noValidate autoComplete="off" className="mt-5 space-y-3.5">
           <div className="space-y-1.5">
-            <Label htmlFor="l">Usuário</Label>
-            <Input id="l" inputMode="numeric" autoComplete="username" pattern="\d{6}" maxLength={6} value={form.login} onChange={set("login")} aria-invalid={!!errors.login} className="font-mono tracking-widest" />
+            <Input id="l" type="text" name="user_code" placeholder="Usuário" aria-label="Usuário" inputMode="numeric" autoComplete="off" autoCapitalize="off" spellCheck={false} pattern="\d{6}" maxLength={6} value={form.login} onChange={set("login")} aria-invalid={!!errors.login} className="h-12 rounded-xl border-[#333333] bg-[#111111] px-4 font-mono tracking-widest placeholder:font-sans placeholder:tracking-normal placeholder:text-[#A3A3A3] focus-visible:border-[#00DDFA] focus-visible:ring-[#00DDFA]" />
             <FieldError msg={errors.login} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="p">Senha</Label>
-            <PasswordInput id="p" inputMode="numeric" autoComplete="current-password" maxLength={6} value={form.password} onChange={set("password")} aria-invalid={!!errors.password} className="font-mono tracking-widest" />
+            <PasswordInput id="p" name="access_password" placeholder="Senha" aria-label="Senha" inputMode="numeric" autoComplete="current-password" maxLength={6} value={form.password} onChange={set("password")} aria-invalid={!!errors.password} className="h-12 rounded-xl border-[#333333] bg-[#111111] px-4 font-mono tracking-widest placeholder:font-sans placeholder:tracking-normal placeholder:text-[#A3A3A3] focus-visible:border-[#00DDFA] focus-visible:ring-[#00DDFA]" />
             <FieldError msg={errors.password} />
           </div>
           <FieldError msg={errors.form} />
-          <Button type="submit" className="w-full rounded-full" disabled={loading}>
+          <Button type="submit" className="mt-1 h-12 w-full rounded-xl bg-[#00DDFA] font-semibold text-[#000000] hover:bg-[#00c7e2] focus-visible:ring-2 focus-visible:ring-[#00DDFA] focus-visible:ring-offset-2 focus-visible:ring-offset-black" disabled={loading}>
             {loading && <Loader2 className="animate-spin" />}
             Entrar
           </Button>
