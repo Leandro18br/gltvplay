@@ -939,11 +939,24 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         if (findErr) throw new Error(findErr.message);
         let existing = byExternal;
         if (!existing) {
+          const selectFields = "id,title,original_title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,language,country,external_source,external_id";
+          const same = year
+            ? db.from("movies").select(selectFields).eq("release_year", year).limit(1000)
+            : db.from("movies").select(selectFields).ilike("title", title.replace(/[%_\\]/g, "\\        if (!existing) {
           let same = db.from("movies").select("id,title,original_title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,language,country,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
           if (year) same = same.eq("release_year", year);
           const { data: matches, error: sameErr } = await same;
           if (sameErr) throw new Error(sameErr.message);
           if (matches?.length === 1) existing = matches[0];
+        }")).limit(20);
+          const { data: matches, error: sameErr } = await same;
+          if (sameErr) throw new Error(sameErr.message);
+          const normalized = (matches ?? []).filter((movie: any) =>
+            normTitle(String(movie.title ?? "")) === normTitle(title) &&
+            (!year || !movie.release_year || Number(movie.release_year) === Number(year))
+          );
+          if (normalized.length === 1) existing = normalized[0];
+          else if (normalized.length > 1) throw new Error("Correspondência de título ambígua; filme não importado para evitar duplicidade.");
         }
 
         let movieId: string;
