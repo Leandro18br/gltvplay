@@ -34,13 +34,11 @@ function Page() {
         <ul className="mx-auto grid max-w-[1600px] grid-cols-2 gap-3 px-4 md:grid-cols-3 md:px-10 lg:grid-cols-4">
           {data.map((c) => (
             <li key={c.id}>
-              <Link to="/canais-categorias/$slug" params={{ slug: c.slug }} className="group relative flex aspect-[16/9] items-end overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent to-card p-4 transition hover:border-primary/70 hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]">
+              <Link to="/canais-categorias/$slug" params={{ slug: c.slug }} className="group relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent to-card p-4 text-center transition hover:border-primary/70 hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]">
                 {c.image_url && <img src={c.image_url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-60 transition duration-500 group-hover:scale-105" />}
                 <div className="absolute inset-0 bg-fade" />
-                <div className="relative min-w-0">
-                  <h2 className="truncate text-lg font-semibold">{c.name}</h2>
-                  {(c as any).channels?.[0]?.count != null && <p className="text-xs text-muted-foreground">{(c as any).channels[0].count} {(c as any).channels[0].count === 1 ? "canal disponível" : "canais disponíveis"}</p>}
-                  {c.description && <p className="line-clamp-1 text-xs text-muted-foreground">{c.description}</p>}
+                <div className="relative z-10 flex min-w-0 w-full items-center justify-center">
+                  <h2 className="max-w-full whitespace-normal break-words text-center text-lg font-semibold leading-snug">{c.name}</h2>
                 </div>
               </Link>
             </li>
