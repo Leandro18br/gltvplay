@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
+import { assertStaff, uniqueSlug, tmdbGet, movieMeta, applyCompletion, linkGenres } from "@/lib/tmdb/tmdb.functions";
 import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor } from "./ratelimit";
 import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouVipEmbedUrl, normTitle, compactTitle, type BugouSeries, type BugouDetails, type BugouMovieDetails } from "./bugoumods";
 
@@ -700,6 +700,27 @@ async function loadAllMovies(): Promise<BugouMovie[]> {
   }
 }
 
+/** Use the official TMDB detail record only when the provider title AND year identify exactly one movie. */
+async function exactTmdbMovieMeta(title: string, year: number | null) {
+  if (!title.trim() || !year) return null;
+  try {
+    const result = await tmdbGet("/search/movie", {
+      query: title, language: "pt-BR", year, include_adult: "false",
+    }, { ttl: 86400 });
+    const normalize = (value: unknown) => normTitle(typeof value === "string" ? value : "");
+    const matches = (result.results ?? []).filter((row: any) =>
+      [row.title, row.original_title].some((value: unknown) => normalize(value) === normalize(title)) &&
+      String(row.release_date ?? "").startsWith(String(year))
+    );
+    if (matches.length !== 1 || !Number.isInteger(matches[0]?.id)) return null;
+    return await movieMeta(Number(matches[0].id), false);
+  } catch (error) {
+    // TMDB is an optional metadata source; the provider movie and player can still be imported.
+    console.warn("[BugouMods metadata enrichment] TMDB indisponível", title, year, (error as Error).message);
+    return null;
+  }
+}
+
 /** Fetches one movie's full metadata from BugouMods VIP. A missing detail endpoint must not block importing the catalog row. */
 async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Promise<BugouMovieDetails | null> {
   const url = new URL("https://cinema.bugoumods.com/index.php");
@@ -811,13 +832,14 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       const title = detail?.title || m.title;
       const year = detail?.year ?? m.year;
       const poster = detail?.cover || m.poster_url;
+      const tmdbMeta = await exactTmdbMovieMeta(title, year);
       const playerUrl = bugouVipEmbedUrl(id, detail?.ext ?? "mp4", tok);
 
-      const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+      const { data: byExternal, error: findErr } = await db.from("movies").select("*").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
       if (findErr) throw new Error(findErr.message);
       let existing = byExternal;
       if (!existing) {
-        let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
+        let same = db.from("movies").select("*").ilike("title", title.replace(/[%_\\]/g, "\\        let same = db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);")).limit(2);
         if (year) same = same.eq("release_year", year);
         const { data: matches, error: sameErr } = await same;
         if (sameErr) throw new Error(sameErr.message);
@@ -827,11 +849,15 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       let movieId: string;
       if (existing) {
         movieId = existing.id;
+        if (tmdbMeta) {
+          const enriched = await applyCompletion(ctx, "movie", movieId, existing, tmdbMeta.fields, tmdbMeta.genres);
+          if (enriched.filled > 0 && "description" in enriched.fields) report.descriptionsAdded++;
+        }
         const patch: Record<string, unknown> = {};
-        if (!existing.title && title) patch.title = title;
-        if (!existing.description && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
-        if (!existing.poster_url && poster) patch.poster_url = poster;
-        if (!existing.release_year && year) patch.release_year = year;
+        if (!existing.title && title && !tmdbMeta?.fields.title) patch.title = title;
+        if (!existing.description && !tmdbMeta?.fields.description && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
+        if (!existing.poster_url && !tmdbMeta?.fields.poster_url && poster) patch.poster_url = poster;
+        if (!existing.release_year && year && !tmdbMeta?.fields.release_year) patch.release_year = year;
         if (!existing.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
         if (Object.keys(patch).length) {
           const up = await db.from("movies").update(patch).eq("id", movieId);
@@ -841,10 +867,20 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       } else {
         const base = normTitle(title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
         const slug = (base + "-" + id).slice(0, 200);
-        const ins = await db.from("movies").insert({ title, description: detail?.plot ?? null, release_year: year, poster_url: poster, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
+        const metadata = tmdbMeta?.fields ?? {};
+        const ins = await db.from("movies").insert({
+          ...metadata,
+          title: metadata.title || title,
+          original_title: metadata.original_title ?? null,
+          description: metadata.description || detail?.plot || null,
+          release_year: metadata.release_year ?? year,
+          poster_url: metadata.poster_url || poster,
+          slug, status: "published", external_source: SOURCE, external_id: id,
+        }).select("id").single();
         if (ins.error) throw new Error(ins.error.message);
         movieId = ins.data.id;
-        if (detail?.plot) report.descriptionsAdded++;
+        if (metadata.description || detail?.plot) report.descriptionsAdded++;
+        if (tmdbMeta?.genres?.length) await linkGenres(ctx, "movie", movieId, tmdbMeta.genres);
         report.created++;
       }
 
