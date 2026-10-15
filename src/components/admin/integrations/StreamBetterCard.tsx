@@ -90,7 +90,12 @@ export function StreamBetterCard() {
     }
   }
 
-  async function runFullCatalog() {\n    await run("movie", false, "sync");\n    if (!stop.current) await run("series", false, "sync");\n  }\n\n  async function savePublicKey() {
+  async function runFullCatalog() {
+    await run("movie", false, "sync");
+    if (!stop.current) await run("series", false, "sync");
+  }
+
+  async function savePublicKey() {
     const cleaned = publicKey.trim();
     if (cleaned && !/^sb_pk_[A-Za-z0-9_-]{8,200}$/.test(cleaned)) { toast.error("A chave pública deve começar com sb_pk_."); return; }
     setSavingKey(true);
@@ -129,10 +134,11 @@ export function StreamBetterCard() {
         <Button type="button" variant="outline" disabled={testing || running} onClick={testConnection}>{testing ? <Loader2 className="animate-spin" /> : <RefreshCw />} Testar conexão</Button>
         <Button type="button" variant="outline" disabled={running} onClick={() => run("movie", false, "sync", true)}><Play /> Testar 10 filmes</Button>
         <Button type="button" variant="outline" disabled={running} onClick={() => run("series", false, "sync", true)}><Play /> Testar 10 séries</Button>
-        <Button type="button" disabled={running} onClick={() => run("movie", false, "sync")}><RefreshCw /> Sincronizar filmes</Button>
-        <Button type="button" disabled={running} onClick={() => run("series", false, "sync")}><RefreshCw /> Sincronizar séries</Button>
-        <Button type="button" variant="outline" disabled={running} onClick={() => run("movie", false, "new_only")}><Play /> Apenas novos filmes</Button>
-        <Button type="button" variant="outline" disabled={running} onClick={() => run("series", false, "new_only")}><Play /> Apenas novas séries</Button>
+        <Button type="button" disabled={running} onClick={() => run("movie", false, "new_only")}><Play /> Importar filmes novos</Button>
+        <Button type="button" disabled={running} onClick={() => run("series", false, "new_only")}><Play /> Importar séries novas</Button>
+        <Button type="button" variant="outline" disabled={running} onClick={() => run("movie", false, "sync")}><RefreshCw /> Atualizar/sincronizar filmes</Button>
+        <Button type="button" variant="outline" disabled={running} onClick={() => run("series", false, "sync")}><RefreshCw /> Atualizar/sincronizar séries</Button>
+        <Button type="button" variant="outline" disabled={running} onClick={runFullCatalog}><RefreshCw /> Sincronizar catálogo completo</Button>
         {job && !running && <Button type="button" variant="outline" onClick={() => run(job.kind, true, job.mode)}><RefreshCw /> Retomar importação</Button>}
         {running && <Button type="button" variant="outline" onClick={() => { stop.current = true; }}><Pause /> Pausar</Button>}
         {job && !running && <Button type="button" variant="ghost" onClick={() => { if (confirm("Apagar somente o marcador local de progresso? Os títulos já importados serão mantidos.")) saveJob(null); }}>Limpar progresso</Button>}
