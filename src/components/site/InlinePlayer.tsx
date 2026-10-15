@@ -8,11 +8,12 @@ import { VideoPlayerFrame } from "./VideoPlayerFrame";
 import { useServerFn } from "@tanstack/react-start";
 import { probePlayerUrl } from "@/lib/playback/playback.functions";
 import { isDirectEmbedEndpoint, isScriptEndpoint, type ProbeResult } from "@/lib/playback/script-url";
+import { normalizePlaybackSources, type PlaybackSource } from "@/lib/playback/sources";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb: any = supabase;
 
-type Src = { id: string; url: string; type: "url" | "embed" | "hls"; label: string | null };
+type Src = PlaybackSource;
 
 /**
  * Compact public player block: cover + centered Play; nothing external loads
@@ -41,13 +42,22 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
         return;
       }
       const res = await sb.rpc("get_playback_sources", { _kind: kind, _content_id: id });
-      if (res.error) throw new Error(res.error.message);
-      const list = (res.data ?? []) as Src[];
-      if (list.length === 0) throw new Error("empty");
+      if (res.error) {
+        console.error("get_playback_sources failed", { kind, contentId: id, code: res.error.code, message: res.error.message });
+        throw new Error("query");
+      }
+      const list = normalizePlaybackSources(res.data);
+      if (list.length === 0) {
+        console.warn("get_playback_sources returned no usable sources", { kind, contentId: id, resultShape: Array.isArray(res.data) ? "array" : typeof res.data });
+        setError("Nenhuma fonte de reprodução ativa foi encontrada para este conteúdo.");
+        return;
+      }
       setSources(list);
+      setServer(0);
       setStarted(true);
-    } catch {
-      setError("Não foi possível carregar o player. Tente novamente.");
+    } catch (cause) {
+      console.error("Playback source loading failed", { kind, contentId: id, reason: cause instanceof Error ? cause.message : "unknown" });
+      setError("Não foi possível consultar as fontes de reprodução. Tente novamente.");
     } finally {
       setLoading(false);
     }
