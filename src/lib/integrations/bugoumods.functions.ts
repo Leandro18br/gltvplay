@@ -927,7 +927,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         const poster = detail?.cover || m.poster_url;
         const playerUrl = bugouVipEmbedUrl(id, detail?.ext ?? "mp4", tok);
 
-        const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,description,poster_url,release_year,external_source,external_id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+        const { data: byExternal, error: findErr } = await db.from("movies").select("id,title,original_title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,language,country,external_source,external_id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
         if (findErr) throw new Error(findErr.message);
         let existing = byExternal;
         if (!existing) {
@@ -943,9 +943,16 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
           movieId = existing.id;
           const patch: Record<string, unknown> = {};
           if (!String(existing.title ?? "").trim() && title) patch.title = title;
+          if (!String(existing.original_title ?? "").trim() && detail?.originalTitle) patch.original_title = detail.originalTitle;
           if (!String(existing.description ?? "").trim() && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
           if (!existing.poster_url && poster) patch.poster_url = poster;
+          if (!existing.backdrop_url && detail?.backdrop) patch.backdrop_url = detail.backdrop;
           if (!existing.release_year && year) patch.release_year = year;
+          if (!existing.duration_minutes && detail?.durationMinutes) patch.duration_minutes = detail.durationMinutes;
+          if (!String(existing.age_rating ?? "").trim() && detail?.ageRating) patch.age_rating = detail.ageRating;
+          if (!String(existing.quality ?? "").trim() && detail?.quality) patch.quality = detail.quality;
+          if (!String(existing.language ?? "").trim() && detail?.language) patch.language = detail.language;
+          if (!String(existing.country ?? "").trim() && detail?.country) patch.country = detail.country;
           if (!existing.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
           if (Object.keys(patch).length) {
             const up = await db.from("movies").update(patch).eq("id", movieId);
@@ -955,7 +962,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         } else {
           const base = normTitle(title).replace(/ /g, "-").replace(/^-|-$/g, "").slice(0, 160) || "filme";
           const slug = (base + "-" + id).slice(0, 200);
-          const ins = await db.from("movies").insert({ title, description: detail?.plot ?? null, release_year: year, poster_url: poster, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
+          const ins = await db.from("movies").insert({ title, original_title: detail?.originalTitle ?? null, description: detail?.plot ?? null, release_year: year, poster_url: poster, backdrop_url: detail?.backdrop ?? null, duration_minutes: detail?.durationMinutes ?? null, age_rating: detail?.ageRating ?? null, quality: detail?.quality ?? null, language: detail?.language ?? null, country: detail?.country ?? null, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
           if (ins.error) throw new Error(ins.error.message);
           movieId = ins.data.id;
           if (detail?.plot) report.descriptionsAdded++;
