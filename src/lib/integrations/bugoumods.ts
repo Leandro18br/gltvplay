@@ -31,12 +31,18 @@ export function bugouVipEmbedUrl(episodeId: string, ext: string, vtoken: string)
   return `https://cinema.bugoumods.com/player.php?type=vod_streams&id=${encodeURIComponent(episodeId)}&ext=${e}&vtoken=${encodeURIComponent(vtoken)}&embed=vip`;
 }
 
-export type BugouMovieDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; ext: string; genres: string[]; providerMetadataPaths: string[] };
+export type BugouMovieDetails = {
+  id: string; title: string; originalTitle: string | null; year: number | null;
+  plot: string | null; cover: string | null; backdrop: string | null;
+  releaseDate: string | null; durationMinutes: number | null; ageRating: string | null;
+  quality: string | null; language: string | null; country: string | null;
+  ext: string; genres: string[]; providerMetadataPaths: string[];
+};
 
 /** Return only JSON key paths for metadata audit; never return tokens or arbitrary field values. */
 export function findBugouMetadataPaths(value: unknown, path = "", depth = 0): string[] {
   if (!value || typeof value !== "object" || depth > 5) return [];
-  const targets = new Set(["plot", "description", "overview", "genre", "genres", "genre_name", "genre_names", "genre_ids"]);
+  const targets = new Set(["plot", "description", "overview", "genre", "genres", "genre_name", "genre_names", "genre_ids", "movie_image", "cover_big", "backdrop_path", "releasedate", "release_date", "duration", "duration_secs", "duration_seconds", "mpaa_rating", "age_rating", "language", "country", "director", "cast", "original_title", "container_extension"]);
   const found: string[] = [];
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const next = path ? path + "." + key : key;
@@ -83,6 +89,7 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
   const rawExt = String(data?.container_extension ?? info?.container_extension ?? j?.container_extension ?? data?.ext ?? info?.ext ?? "mp4").trim().replace(/^\\./, "");
   const ext = /^[a-z0-9]{2,5}$/i.test(rawExt) ? rawExt : "mp4";
   const coverValue = info?.movie_image ?? info?.cover_big ?? info?.cover ?? data?.stream_icon ?? data?.cover ?? data?.poster ?? j?.cover;
+  const backdropValue = info?.backdrop_path ?? info?.backdrop ?? info?.background ?? data?.backdrop_path ?? data?.backdrop ?? data?.background ?? j?.backdrop_path;
   const plotValue = info?.plot ?? info?.description ?? info?.overview ?? data?.plot ?? data?.description ?? data?.overview ?? j?.plot;
   const genreValues = [
     info?.genre, info?.genres, info?.genre_name, info?.genre_names, info?.genre_ids,
@@ -92,13 +99,40 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
   const genres = parseBugouGenreNames(...genreValues);
   const providerMetadataPaths = findBugouMetadataPaths(j);
   const cover = https(coverValue);
+  const backdropRaw = Array.isArray(backdropValue) ? backdropValue.find((x: unknown) => typeof x === "string" && /^https?:\/\//i.test(x as string)) : backdropValue;
+  const backdrop = https(typeof backdropRaw === "object" && backdropRaw ? (backdropRaw as any).url ?? (backdropRaw as any).file_path : backdropRaw);
   const yearValue = Number(info?.year ?? data?.year) || name.year;
+  const releaseDateRaw = info?.releasedate ?? info?.release_date ?? data?.releasedate ?? data?.release_date ?? j?.releasedate ?? j?.release_date;
+  const releaseDate = typeof releaseDateRaw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(releaseDateRaw.trim()) ? releaseDateRaw.trim() : null;
+  const durationRaw = Number(info?.duration_secs ?? info?.duration_seconds ?? data?.duration_secs ?? data?.duration_seconds);
+  const durationText = String(info?.duration ?? data?.duration ?? "").trim();
+  const durationClock = durationText.match(/^(?:(\d{1,3}):)?(\d{1,2}):(\d{2})$/);
+  const durationMinutes = Number.isFinite(durationRaw) && durationRaw > 0
+    ? Math.round(durationRaw / 60)
+    : durationClock ? Number(durationClock[1] ?? 0) * 60 + Number(durationClock[2]) + Math.floor(Number(durationClock[3]) / 60) : null;
+  const textValue = (...values: unknown[]) => {
+    const value = values.find((x) => typeof x === "string" && x.trim());
+    return typeof value === "string" ? value.trim().slice(0, 200) : null;
+  };
+  const originalTitle = textValue(info?.original_title, data?.original_title, j?.original_title);
+  const ageRating = textValue(info?.age_rating, info?.mpaa_rating, info?.certification, data?.age_rating, data?.mpaa_rating, data?.certification);
+  const quality = textValue(info?.quality, data?.quality, j?.quality);
+  const language = textValue(info?.language, info?.audio_language, data?.language, data?.audio_language, j?.language);
+  const country = textValue(info?.country, info?.country_name, data?.country, data?.country_name, j?.country);
   return {
     id: String(data?.stream_id ?? data?.id ?? j?.id ?? id),
     title: String(info?.title ?? data?.title ?? name.title ?? data?.name ?? info?.name ?? "").trim(),
+    originalTitle,
     year: yearValue || null,
     plot: typeof plotValue === "string" && plotValue.trim() ? plotValue.trim() : null,
     cover,
+    backdrop,
+    releaseDate,
+    durationMinutes: durationMinutes && durationMinutes > 0 ? Math.round(durationMinutes) : null,
+    ageRating,
+    quality,
+    language,
+    country,
     ext,
     genres,
     providerMetadataPaths,
