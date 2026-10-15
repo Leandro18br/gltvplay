@@ -758,6 +758,9 @@ async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Pr
   } catch (e) {
     const message = scrub((e as Error).message).slice(0, 400);
     await logCall(integ, `Detalhes do filme ${id}`, t0, message, e instanceof RateLimitedError ? 429 : null);
+    // A 429 must stop this batch so the caller can back off and retry the same id;
+    // silently treating it as missing metadata would keep calling the provider too quickly.
+    if (e instanceof RateLimitedError) throw e;
     return null;
   }
 }
@@ -994,6 +997,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
           report.playersAdded++;
         }
       } catch (error) {
+        if (error instanceof RateLimitedError) throw error;
         report.failed++;
         console.warn("[BugouMods movie import] Falha ao importar filme", id, scrub(error instanceof Error ? error.message : String(error)).slice(0, 250));
       }
