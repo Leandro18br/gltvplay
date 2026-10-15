@@ -405,7 +405,7 @@ export async function importItems(listId: string, ids: number[], jobStart: strin
   const ctx = { supabase: db, userId: "" };
   const now = () => new Date().toISOString();
   const cats = new Map<string, string | null>();
-  let tmdbBudget = list.enrich_tmdb ? 8 : 0;
+  let tmdbBudget = list.enrich_tmdb ? 10 : 0;
 
   const category = async (group: string | null, kind: "catalog" | "channel" = "catalog") => {
     const name = categoryName(group); if (!name) return null;
