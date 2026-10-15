@@ -42,6 +42,7 @@ describe("parseBugouMovieDetails", () => {
       cover: "https://example.com/cover.jpg",
       ext: "mkv",
       genres: [],
+      providerMetadataPaths: ["info.plot"],
     });
   });
 
@@ -55,5 +56,7 @@ describe("parseBugouMovieDetails", () => {
       movie_data: { stream_id: 456, genres: [{ name: "Drama" }, { id: 28 }, "Comédia"] },
     });
     expect(d.genres).toEqual(["Ação", "Aventura", "Drama", "Comédia"]);
+    expect(d.providerMetadataPaths).toContain("info.plot");
+    expect(d.providerMetadataPaths).toContain("info.genre");
   });
 });
