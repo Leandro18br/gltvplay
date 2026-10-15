@@ -7,6 +7,9 @@ import { errMsg } from "@/lib/admin/db";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { db } from "@/lib/admin/db";
 
 type TestResult = Awaited<ReturnType<typeof streamBetterTest>>;
 type StepResult = Awaited<ReturnType<typeof streamBetterImportStep>>;
@@ -20,12 +23,16 @@ export function StreamBetterCard() {
   const stepFn = useServerFn(streamBetterImportStep);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<TestResult | null>(null);
+  const [publicKey, setPublicKey] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
+  const [keyLoaded, setKeyLoaded] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
   const [running, setRunning] = useState(false);
   const stop = useRef(false);
   const key = "streambetter-import-progress-v1";
 
   useEffect(() => {
+    void db.from("site_settings").select("streambetter_public_key").eq("id", 1).maybeSingle().then((r: any) => { if (!r.error) setPublicKey(typeof r.data?.streambetter_public_key === "string" ? r.data.streambetter_public_key : ""); setKeyLoaded(true); });
     try {
       const saved = localStorage.getItem(key);
       if (saved) setJob(JSON.parse(saved) as Job);
@@ -79,6 +86,17 @@ export function StreamBetterCard() {
     }
   }
 
+  async function savePublicKey() {
+    const cleaned = publicKey.trim();
+    if (cleaned && !/^sb_pk_[A-Za-z0-9_-]{8,200}$/.test(cleaned)) { toast.error("A chave pública deve começar com sb_pk_."); return; }
+    setSavingKey(true);
+    try {
+      const r = await db.from("site_settings").update({ streambetter_public_key: cleaned || null }).eq("id", 1);
+      if (r.error) throw r.error;
+      setPublicKey(cleaned); toast.success("Chave pública StreamBetter salva. Sincronize os filmes para atualizar as URLs de reprodução.");
+    } catch (e) { toast.error(errMsg(e)); } finally { setSavingKey(false); }
+  }
+
   async function testConnection() {
     setTesting(true);
     try {
@@ -99,6 +117,10 @@ export function StreamBetterCard() {
         <Badge variant={test?.ok ? "default" : "secondary"}>{test?.ok ? "Conectado" : "Catálogo público"}</Badge>
       </div>
       <p className="text-sm text-muted-foreground">Importa filmes e séries do catálogo público em lotes de 10. O player de filmes usa o iframe oficial do StreamBetter e não substitui as fontes já cadastradas.</p>
+      <div className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div className="space-y-1.5"><Label htmlFor="streambetter-public-key">Chave pública Creator (opcional)</Label><Input id="streambetter-public-key" value={publicKey} onChange={e => setPublicKey(e.target.value)} placeholder="sb_pk_..." autoComplete="off" disabled={!keyLoaded || savingKey} /><p className="text-xs text-muted-foreground">Use somente a chave pública do plano Creator, nunca uma chave secreta sb_sk_. Cadastre também o domínio público do GLTV Play no perfil StreamBetter. A chave pública aparece na URL do iframe por projeto do provedor.</p></div>
+        <Button type="button" variant="outline" disabled={!keyLoaded || savingKey} onClick={savePublicKey}>{savingKey ? <Loader2 className="animate-spin" /> : null} Salvar chave</Button>
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" disabled={testing || running} onClick={testConnection}>{testing ? <Loader2 className="animate-spin" /> : <RefreshCw />} Testar conexão</Button>
         <Button type="button" disabled={running} onClick={() => run("movie", false, "sync")}><RefreshCw /> Sincronizar filmes</Button>
