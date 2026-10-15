@@ -664,7 +664,7 @@ export const bugouCategoryStats = createServerFn({ method: "POST" })
   });
 
 // ---------- BugouMods movie catalog (metadata only; no player URLs are imported) ----------
-type BugouMovie = { id: string; title: string; year: number | null; poster_url: string | null; category: string };
+type BugouMovie = { id: string; title: string; year: number | null; poster_url: string | null; category: string; categories?: string[] };
 
 async function loadAllMovies(): Promise<BugouMovie[]> {
   const { integ, tok } = await seriesIntegration();
@@ -675,21 +675,26 @@ async function loadAllMovies(): Promise<BugouMovie[]> {
     const json = await getJson(url, "lista de filmes", integ?.timeout_seconds ?? 25);
     if (!json || typeof json !== "object" || Array.isArray(json)) throw new Error("Formato inesperado: a API de filmes não devolveu categorias.");
     if (json.Aviso) throw new Error("BugouMods informou um aviso; verifique se o token está válido.");
-    const seen = new Set<string>();
-    const items: BugouMovie[] = [];
+    const byId = new Map<string, BugouMovie>();
     for (const [categoryName, list] of Object.entries(json)) {
       if (!Array.isArray(list)) continue;
       for (const raw of list as any[]) {
         const id = String(raw?.id ?? "").trim();
-        if (!/^\d+$/.test(id) || seen.has(id)) continue;
+        if (!/^\d+$/.test(id)) continue;
         const parsed = parseBugouName(String(raw?.nome ?? raw?.name ?? raw?.title ?? ""));
         if (!parsed.title) continue;
-        seen.add(id);
+        const category = String(raw?.categoria ?? categoryName).trim().slice(0, 120);
+        const existing = byId.get(id);
+        if (existing) {
+          if (category && !existing.categories?.some(x => normTitle(x) === normTitle(category))) existing.categories = [...(existing.categories ?? []), category];
+          continue;
+        }
         const image = String(raw?.capa ?? raw?.cover ?? raw?.poster ?? "").trim();
         const poster_url = /^https?:\/\//i.test(image) ? image.replace(/^http:\/\//i, "https://") : null;
-        items.push({ id, title: parsed.title.slice(0, 200), year: parsed.year, poster_url, category: String(raw?.categoria ?? categoryName).trim().slice(0, 120) });
+        byId.set(id, { id, title: parsed.title.slice(0, 200), year: parsed.year, poster_url, category, categories: category ? [category] : [] });
       }
     }
+    const items = [...byId.values()];
     if (!items.length) throw new Error("A resposta não contém filmes reconhecíveis. Nenhum dado foi alterado.");
     await logCall(integ, "Catálogo de filmes", t0, null);
     return items;
@@ -767,7 +772,7 @@ async function refreshMovieIndex(ctx: Ctx, force: boolean) {
     const rows = chunk.map(m => ({ kind: "movie", ext_id: m.id, title: m.title, title_norm: normTitle(m.title), title_compact: compactTitle(m.title), year: m.year, poster_url: m.poster_url, category: m.category, seen_at: now }));
     const up = await ctx.supabase.from("bugou_catalog").upsert(rows, { onConflict: "kind,ext_id" });
     if (up.error) throw new Error(up.error.message);
-    const cats = await ctx.supabase.from("bugou_catalog_categories").upsert(chunk.map(m => ({ kind: "movie", ext_id: m.id, category: m.category, seen_at: now })).filter(m => !!m.category), { onConflict: "kind,ext_id,category" });
+    const cats = await ctx.supabase.from("bugou_catalog_categories").upsert(chunk.flatMap(m => (m.categories?.length ? m.categories : [m.category]).filter(Boolean).map(category => ({ kind: "movie", ext_id: m.id, category, seen_at: now }))), { onConflict: "kind,ext_id,category" });
     if (cats.error) throw new Error(cats.error.message);
   }
   const sync = await ctx.supabase.from("bugou_sync").upsert({ kind: "movie", synced_at: now, total: all.length });
