@@ -65,6 +65,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --radius: 0.875rem;
   --brand-black: #000000;
   --brand-cyan: #00DDFA;
@@ -113,6 +114,11 @@
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+
+  ::selection {
+    background: var(--brand-cyan);
+    color: var(--brand-black);
   }
 
   body {
