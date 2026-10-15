@@ -54,9 +54,9 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   }
   async function importIds(ids: string[]) {
     let created = 0, updated = 0, skipped = 0, descriptionsAdded = 0, playersAdded = 0, detailFailures = 0;
-    for (let i = 0; i < ids.length; i += 100) {
-      setImportProgress("Importando " + Math.min(i + 100, ids.length) + " de " + ids.length + " filmes…");
-      const r = await importMovies({ data: { ids: ids.slice(i, i + 100) } });
+    for (let i = 0; i < ids.length; i += 10) {
+      setImportProgress("Importando " + Math.min(i + 10, ids.length) + " de " + ids.length + " filmes…");
+      const r = await importMovies({ data: { ids: ids.slice(i, i + 10) } });
       created += r.created; updated += r.updated; skipped += r.skipped; descriptionsAdded += r.descriptionsAdded; playersAdded += r.playersAdded; detailFailures += r.detailFailures;
     }
     return { created, updated, skipped, descriptionsAdded, playersAdded, detailFailures };
