@@ -320,26 +320,35 @@ export const tmdbRefresh = createServerFn({ method: "POST" })
     return { ok: true, ...result, filledFields: Object.keys(result.fields ?? {}), empty, dateConfirmed };
   }));
 
-/** Repairs existing movies in small, resumable batches. Only fills missing metadata and never touches playback/categories/publication. */
+/** Repairs only incomplete existing movies in small, resumable keyset batches. */
 export const tmdbRepairMoviesBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
-    offset: z.number().int().min(0).max(10_000_000).default(0),
-    limit: z.number().int().min(1).max(25).default(10),
+    after: z.string().uuid().nullable().optional(),
+    limit: z.number().int().min(1).max(25).default(5),
   }).parse(d))
   .handler(({ data, context }) => wrap(async () => {
     const ctx = context as Ctx;
     await assertStaff(ctx);
-    const { data: rows, error, count } = await ctx.supabase
-      .from("movies")
-      .select("*", { count: "exact" })
-      .order("id")
-      .range(data.offset, data.offset + data.limit - 1);
-    if (error) throw new Error("Não foi possível listar os filmes para correção.");
-    const report = { scanned: (rows ?? []).length, corrected: 0, alreadyComplete: 0, unavailable: 0, failed: 0 };
-    for (const row of (rows ?? []) as any[]) {
+    const db = await admin();
+    const { data: candidates, error: candidateError } = await db.rpc("tmdb_movies_needing_metadata_batch", {
+      _after: data.after ?? null,
+      _limit: data.limit,
+    });
+    if (candidateError) throw new Error("Não foi possível localizar filmes com metadados incompletos.");
+    const ids = (candidates ?? []).map((row: any) => String(row.id));
+    const report = { scanned: 0, corrected: 0, alreadyComplete: 0, unavailable: 0, failed: 0 };
+    if (!ids.length) {
+      return { ...report, nextCursor: data.after ?? null, done: true };
+    }
+    const { data: rows, error } = await db.from("movies").select("*").in("id", ids);
+    if (error) throw new Error("Não foi possível carregar os filmes para correção.");
+    const order = new Map(ids.map((id: string, index: number) => [id, index]));
+    const orderedRows = ((rows ?? []) as any[]).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    report.scanned = orderedRows.length;
+    for (const row of orderedRows) {
       try {
-        const { data: linked, error: genreError } = await ctx.supabase
+        const { data: linked, error: genreError } = await db
           .from("movie_genres").select("genre_id").eq("movie_id", row.id).limit(1);
         if (genreError) throw genreError;
         const missingDescription = isMissing(row.description);
@@ -358,19 +367,19 @@ export const tmdbRepairMoviesBatch = createServerFn({ method: "POST" })
         const meta = await movieMeta(resolved.tmdbId, false);
         const saved = await applyCompletion(ctx, "movie", row.id, row, meta.fields, meta.genres);
         if (saved.filled > 0 || saved.genres > 0) report.corrected++;
-        else { report.unavailable++; console.info("[TMDB metadata repair] A fonte não retornou metadados úteis", row.id, row.title); }
+        else {
+          report.unavailable++;
+          console.info("[TMDB metadata repair] A fonte não retornou metadados úteis", row.id, row.title);
+        }
       } catch (error) {
         report.failed++;
         console.warn("[TMDB metadata repair] Falha ao corrigir filme", row.id, error instanceof Error ? error.message : error);
       }
     }
-    const nextOffset = data.offset + report.scanned;
     return {
       ...report,
-      offset: data.offset,
-      nextOffset,
-      total: count ?? nextOffset,
-      done: report.scanned < data.limit || nextOffset >= (count ?? nextOffset),
+      nextCursor: ids[ids.length - 1] ?? data.after ?? null,
+      done: ids.length < data.limit,
     };
   }));
 
