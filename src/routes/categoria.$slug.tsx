@@ -11,7 +11,7 @@ const pageParam = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) > 1 
 export const Route = createFileRoute("/categoria/$slug")({
   ssr: false,
   beforeLoad: requireSiteAccess,
-  validateSearch: (s: Record<string, unknown>): { pf?: number | undefined; ps?: number | undefined } => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]) }),
+  validateSearch: (s: Record<string, unknown>): { pf?: number | undefined; ps?: number | undefined; tipo?: "movie" | "series" } => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]), tipo: s["tipo"] === "movie" || s["tipo"] === "series" ? s["tipo"] : undefined }),
   loader: async ({ context, params }) => {
     const d = await context.queryClient.ensureQueryData(categoryQuery(params.slug));
     if (!d) throw notFound();
@@ -38,12 +38,12 @@ export const Route = createFileRoute("/categoria/$slug")({
 
 function Page() {
   const { slug } = Route.useParams();
-  const { pf, ps } = Route.useSearch();
+  const { pf, ps, tipo } = Route.useSearch();
   const navigate = useNavigate({ from: "/categoria/$slug" });
   const go = (key: "pf" | "ps") => (n: number) => navigate({ search: (prev) => ({ ...prev, [key]: n > 1 ? n : undefined }), replace: true });
   const { data } = useSuspenseQuery(categoryQuery(slug));
   if (!data) return null;
-  const empty = !data.movies.length && !data.series.length;
+  const empty = tipo === "movie" ? !data.movies.length : tipo === "series" ? !data.series.length : !data.movies.length && !data.series.length;
   return (
     <SiteShell>
       <PageTitle title={data.category.name} subtitle={data.category.description} />

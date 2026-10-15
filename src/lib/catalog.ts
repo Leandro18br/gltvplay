@@ -181,10 +181,28 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
         }
       }
 
-      // Show every published category of the requested kind. Do not hide categories
-      // just because legacy/imported content is missing a join-table association.
-      return ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[])
-        .map((cat) => categoryKind === "channel" ? { ...cat, channels: [{ count: channelCounts.get(cat.id) ?? 0 }] } : cat);
+      // Media categories are classified by their actual associations to published
+      // items. This keeps movie and series category tabs separate without changing
+      // any category records or their relationships.
+      const mediaCategoryIds = new Set<string>();
+      if (categoryKind !== "channel") {
+        const queries = [];
+        if (want.has("movie")) {
+          queries.push(sb.from("movie_categories").select("category_id,movies!inner(status)").eq("movies.status", "published"));
+        }
+        if (want.has("series")) {
+          queries.push(sb.from("series_categories").select("category_id,series!inner(status)").eq("series.status", "published"));
+        }
+        const results = await Promise.all(queries);
+        for (const result of results) {
+          if (result.error) throw result.error;
+          for (const row of result.data ?? []) mediaCategoryIds.add(row.category_id);
+        }
+      }
+
+      const categories = ((data ?? []) as { id: string; name: string; slug: string; description: string | null; image_url: string | null }[])
+        .filter((cat) => categoryKind === "channel" || mediaCategoryIds.has(cat.id));
+      return categories.map((cat) => categoryKind === "channel" ? { ...cat, channels: [{ count: channelCounts.get(cat.id) ?? 0 }] } : cat);
     },
     staleTime: 60_000,
   });
