@@ -90,7 +90,7 @@ export function StreamBetterCard() {
     }
   }
 
-  async function savePublicKey() {
+  async function runFullCatalog() {\n    await run("movie", false, "sync");\n    if (!stop.current) await run("series", false, "sync");\n  }\n\n  async function savePublicKey() {
     const cleaned = publicKey.trim();
     if (cleaned && !/^sb_pk_[A-Za-z0-9_-]{8,200}$/.test(cleaned)) { toast.error("A chave pública deve começar com sb_pk_."); return; }
     setSavingKey(true);
@@ -117,7 +117,7 @@ export function StreamBetterCard() {
     <section className="space-y-4 rounded-2xl border border-primary/30 bg-card p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Clapperboard className="size-5 text-primary" />
-        <h2 className="font-semibold">StreamBetter</h2>
+        <h2 className="font-semibold">StreamBetter VIP</h2>
         <Badge variant={test?.ok ? "default" : "secondary"}>{test?.ok ? "Conectado" : "Catálogo público"}</Badge>
       </div>
       <p className="text-sm text-muted-foreground">Importa filmes e séries do catálogo público em lotes de 10. Os embeds oficiais são adicionados sem substituir outras fontes e são vinculados aos episódios que já existem no GLTV Play.</p>
@@ -149,7 +149,7 @@ export function StreamBetterCard() {
         </div>
       </div>}
       <div className="rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
-        <p className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0" /> A importação é manual, idempotente e retomável no mesmo navegador. Não apaga conteúdos antigos nem sobrescreve descrições/capas já preenchidas.</p>
+        <p className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0" /> A importação é manual, idempotente e retomável no mesmo navegador. Não apaga conteúdos antigos; metadados ausentes na resposta não são usados para apagar dados existentes.</p>
         <p className="mt-2 flex items-start gap-2"><CircleAlert className="mt-0.5 size-4 shrink-0" /> A API pública de títulos não lista todas as temporadas e episódios. Não são criados episódios fictícios; o embed de série é vinculado apenas a episódios já cadastrados no GLTV Play.</p>
       </div>
     </section>
