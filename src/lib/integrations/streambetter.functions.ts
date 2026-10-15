@@ -104,6 +104,9 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
       }
       if (rowId && data.mode === "new_only") { skipped++; continue; }
       const nonEmptyPatch: Record<string, unknown> = { streambetter_id: providerId, streambetter_tmdb_id: tmdbId };
+      // Preserve an existing canonical ID; fill it only when missing.
+      if (!existing?.tmdb_id) nonEmptyPatch.tmdb_id = Number(tmdbId);
+      else if (String(existing.tmdb_id) !== tmdbId) { errors++; continue; }
       if (title) nonEmptyPatch.title = title;
       if (poster) nonEmptyPatch.poster_url = poster;
       if (description) nonEmptyPatch.description = description;
@@ -142,6 +145,58 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
             is_active: true, is_primary: (count ?? 0) === 0, sort_order: 50, drm: {},
           });
           if (source.error) errors++;
+        }
+      } else {
+        // /api/titles does not enumerate all seasons or episodes. Attach the provider embed
+        // only to episode records that already exist in GLTV Play; never fabricate episodes.
+        const { data: seasons, error: seasonError } = await db
+          .from("seasons")
+          .select("id,season_number,episodes(id,episode_number)")
+          .eq("series_id", rowId);
+        if (seasonError) { errors++; continue; }
+        for (const season of seasons ?? []) {
+          const seasonNumber = Number(season.season_number);
+          if (!Number.isInteger(seasonNumber) || seasonNumber < 0) continue;
+          for (const episode of season.episodes ?? []) {
+            const episodeNumber = Number(episode.episode_number);
+            if (!episode.id || !Number.isInteger(episodeNumber) || episodeNumber < 0) continue;
+            const externalRef = `streambetter:${tmdbId}:${seasonNumber}:${episodeNumber}`;
+            const episodeUrl = `${BASE}/serie/${encodeURIComponent(tmdbId)}/${seasonNumber}/${episodeNumber}${publicKey ? `?key=${encodeURIComponent(publicKey)}` : ""}`;
+            const { data: currentEpisodeSources, error: episodeSourceError } = await db
+              .from("playback_sources")
+              .select("id,url")
+              .eq("content_kind", "episode")
+              .eq("content_id", episode.id)
+              .eq("external_ref", externalRef)
+              .limit(1);
+            if (episodeSourceError) { errors++; continue; }
+            if ((currentEpisodeSources ?? []).length) {
+              if (currentEpisodeSources[0].url !== episodeUrl) {
+                const updSource = await db.from("playback_sources").update({ url: episodeUrl }).eq("id", currentEpisodeSources[0].id);
+                if (updSource.error) errors++;
+              }
+              continue;
+            }
+            const { count } = await db.from("playback_sources")
+              .select("id", { count: "exact", head: true })
+              .eq("content_kind", "episode")
+              .eq("content_id", episode.id)
+              .eq("is_active", true);
+            const source = await db.from("playback_sources").insert({
+              content_kind: "episode",
+              content_id: episode.id,
+              url: episodeUrl,
+              source_type: "embed",
+              provider: "StreamBetter",
+              label: "StreamBetter",
+              external_ref: externalRef,
+              is_active: true,
+              is_primary: (count ?? 0) === 0,
+              sort_order: 50,
+              drm: {},
+            });
+            if (source.error) errors++;
+          }
         }
       }
     }
