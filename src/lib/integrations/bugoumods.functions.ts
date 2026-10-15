@@ -908,7 +908,10 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         if (ins.error) throw new Error(ins.error.message);
         movieId = ins.data.id;
         if (metadata.description || detail?.plot) report.descriptionsAdded++;
-        if (tmdbMeta?.genres?.length) await linkGenres(ctx, "movie", movieId, tmdbMeta.genres);
+        if (tmdbMeta?.genres?.length) {
+          try { await linkGenres(ctx, "movie", movieId, tmdbMeta.genres); }
+          catch (error) { console.warn("[BugouMods genres] Não foi possível associar gêneros TMDB", movieId, (error as Error).message); }
+        }
         report.created++;
       }
 
