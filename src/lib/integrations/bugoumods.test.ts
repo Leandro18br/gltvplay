@@ -53,10 +53,11 @@ describe("parseBugouMovieDetails", () => {
   it("reads provider genres from strings, arrays and objects while ignoring numeric-only IDs", () => {
     const d = parseBugouMovieDetails("456", {
       info: { name: "Filme (2024)", plot: "Sinopse", genre: "Ação, Aventura" },
-      movie_data: { stream_id: 456, genres: [{ name: "Drama" }, { id: 28 }, "Comédia"] },
+      movie_data: { stream_id: 456, genres: [{ name: "Drama" }, { id: 28 }, "Comédia"], genre_ids: [28, 12] },
     });
     expect(d.genres).toEqual(["Ação", "Aventura", "Drama", "Comédia"]);
     expect(d.providerMetadataPaths).toContain("info.plot");
     expect(d.providerMetadataPaths).toContain("info.genre");
+    expect(d.genres).not.toContain("28");
   });
 });
