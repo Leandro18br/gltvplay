@@ -70,7 +70,7 @@ export function parseBugouGenreNames(...values: unknown[]): string[] {
   for (const raw of names) {
     const name = raw.replace(/\\s+/g, " ").trim().slice(0, 80);
     const key = normTitle(name);
-    if (key && !/^\\d+$/.test(name) && !unique.has(key)) unique.set(key, name);
+    if (key && !/^\d+$/.test(name) && !unique.has(key)) unique.set(key, name);
   }
   return [...unique.values()].slice(0, 30);
 }
