@@ -320,6 +320,58 @@ export const tmdbRefresh = createServerFn({ method: "POST" })
     return { ok: true, ...result, filledFields: Object.keys(result.fields ?? {}), empty, dateConfirmed };
   }));
 
+/** Repairs existing movies in small, resumable batches. Only fills missing metadata and never touches playback/categories/publication. */
+export const tmdbRepairMoviesBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    offset: z.number().int().min(0).max(10_000_000).default(0),
+    limit: z.number().int().min(1).max(25).default(10),
+  }).parse(d))
+  .handler(({ data, context }) => wrap(async () => {
+    const ctx = context as Ctx;
+    await assertStaff(ctx);
+    const { data: rows, error, count } = await ctx.supabase
+      .from("movies")
+      .select("*", { count: "exact" })
+      .order("id")
+      .range(data.offset, data.offset + data.limit - 1);
+    if (error) throw new Error("Não foi possível listar os filmes para correção.");
+    const report = { scanned: (rows ?? []).length, corrected: 0, alreadyComplete: 0, unavailable: 0, failed: 0 };
+    for (const row of (rows ?? []) as any[]) {
+      try {
+        const { data: linked, error: genreError } = await ctx.supabase
+          .from("movie_genres").select("genre_id").eq("movie_id", row.id).limit(1);
+        if (genreError) throw genreError;
+        const missingDescription = isMissing(row.description);
+        const missingGenres = !(linked ?? []).length;
+        if (!missingDescription && !missingGenres) {
+          report.alreadyComplete++;
+          continue;
+        }
+        const resolved = await resolveCompletion("movie", row);
+        if (!resolved.tmdbId) {
+          report.unavailable++;
+          continue;
+        }
+        const meta = await movieMeta(resolved.tmdbId, false);
+        const saved = await applyCompletion(ctx, "movie", row.id, row, meta.fields, meta.genres);
+        if (saved.filled > 0 || saved.genres > 0) report.corrected++;
+        else report.unavailable++;
+      } catch (error) {
+        report.failed++;
+        console.warn("[TMDB metadata repair] Falha ao corrigir filme", row.id, error instanceof Error ? error.message : error);
+      }
+    }
+    const nextOffset = data.offset + report.scanned;
+    return {
+      ...report,
+      offset: data.offset,
+      nextOffset,
+      total: count ?? nextOffset,
+      done: report.scanned < data.limit || nextOffset >= (count ?? nextOffset),
+    };
+  }));
+
 /** One existing season per request. No imports, removals or renumbering. */
 export const tmdbCompleteSeasonEpisodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
