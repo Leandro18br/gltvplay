@@ -260,7 +260,7 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
     if (document.fullscreenElement) await document.exitFullscreen();
     else await wrap.current?.requestFullscreen?.().catch(() => {});
   };
-  const goNext = () => { if (next) { persist(); navigate({ to: "/assistir/$kind/$id", params: { kind: "episode", id: next.id }, replace: true }); } };
+  const goNext = () => { if (next) { if (document.fullscreenElement) void requestPlaybackDisplay(document.documentElement, true); persist(); navigate({ to: "/assistir/$kind/$id", params: { kind: "episode", id: next.id }, replace: true }); } };
 
   useEffect(() => {
     if (!live || embed) return;
@@ -305,7 +305,7 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
     </VideoPlayerFrame>
     <Sheet open={epOpen} onOpenChange={setEpOpen}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md"><SheetTitle>Episódios</SheetTitle>
-        <ol className="mt-4 space-y-2">{data.episodes.map(e => <li key={e.id}><Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} replace onClick={() => { persist(); setEpOpen(false); }} className={`flex items-center gap-3 rounded-xl p-2 transition hover:bg-accent ${e.id === id ? "bg-accent ring-1 ring-primary/50" : ""}`}>
+        <ol className="mt-4 space-y-2">{data.episodes.map(e => <li key={e.id}><Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} replace onClick={() => { if (document.fullscreenElement) void requestPlaybackDisplay(document.documentElement, true); persist(); setEpOpen(false); }} className={`flex items-center gap-3 rounded-xl p-2 transition hover:bg-accent ${e.id === id ? "bg-accent ring-1 ring-primary/50" : ""}`}>
           <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-muted">{safeImageUrl(e.thumbnail_url) && <img src={safeImageUrl(e.thumbnail_url)!} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
           <div className="min-w-0"><p className="text-xs text-primary">T{e.season_number}:E{e.episode_number}</p><p className="truncate text-sm font-medium">{e.title}</p></div>
         </Link></li>)}</ol>
@@ -395,7 +395,7 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
           <ol className="mt-4 space-y-2">
             {data.episodes.map((e) => (
               <li key={e.id}>
-                <Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} replace onClick={() => { persist(); setEpOpen(false); }}
+                <Link to="/assistir/$kind/$id" params={{ kind: "episode", id: e.id }} replace onClick={() => { if (document.fullscreenElement) void requestPlaybackDisplay(document.documentElement, true); persist(); setEpOpen(false); }}
                   className={`flex items-center gap-3 rounded-xl p-2 transition hover:bg-accent ${e.id === id ? "bg-accent ring-1 ring-primary/50" : ""}`}>
                   <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-muted">{safeImageUrl(e.thumbnail_url) && <img src={safeImageUrl(e.thumbnail_url)!} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
                   <div className="min-w-0">
