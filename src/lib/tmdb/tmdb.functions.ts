@@ -351,12 +351,13 @@ export const tmdbRepairMoviesBatch = createServerFn({ method: "POST" })
         const resolved = await resolveCompletion("movie", row);
         if (!resolved.tmdbId) {
           report.unavailable++;
+          console.info("[TMDB metadata repair] Sem correspondência confiável", row.id, row.title);
           continue;
         }
         const meta = await movieMeta(resolved.tmdbId, false);
         const saved = await applyCompletion(ctx, "movie", row.id, row, meta.fields, meta.genres);
         if (saved.filled > 0 || saved.genres > 0) report.corrected++;
-        else report.unavailable++;
+        else { report.unavailable++; console.info("[TMDB metadata repair] A fonte não retornou metadados úteis", row.id, row.title); }
       } catch (error) {
         report.failed++;
         console.warn("[TMDB metadata repair] Falha ao corrigir filme", row.id, error instanceof Error ? error.message : error);
