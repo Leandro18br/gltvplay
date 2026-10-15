@@ -37,9 +37,17 @@ describe("parseBugouMovieDetails", () => {
     expect(d).toEqual({
       id: "123",
       title: "Filme Teste",
+      originalTitle: null,
       year: 2024,
       plot: "Sinopse do filme",
       cover: "https://example.com/cover.jpg",
+      backdrop: null,
+      releaseDate: null,
+      durationMinutes: null,
+      ageRating: null,
+      quality: null,
+      language: null,
+      country: null,
       ext: "mkv",
       genres: [],
       providerMetadataPaths: ["info.plot"],
@@ -48,6 +56,26 @@ describe("parseBugouMovieDetails", () => {
 
   it("uses a safe default extension when provider data is missing or invalid", () => {
     expect(parseBugouMovieDetails("321", { info: { title: "Outro Filme", plot: "Descrição" } }).ext).toBe("mp4");
+  });
+
+  it("maps optional metadata only when the provider actually supplies it", () => {
+    const d = parseBugouMovieDetails("654", {
+      info: {
+        name: "Filme Completo (2022)", original_title: "Original Movie", plot: "Sinopse",
+        movie_image: "https://example.com/poster.jpg", backdrop_path: "https://example.com/backdrop.jpg",
+        releasedate: "2022-04-03", duration_secs: "7200", age_rating: "12", quality: "1080p",
+        language: "pt-BR", country: "BR", genre: "Ação, Drama",
+      },
+      movie_data: { stream_id: "654", container_extension: "mp4" },
+    });
+    expect(d.originalTitle).toBe("Original Movie");
+    expect(d.backdrop).toBe("https://example.com/backdrop.jpg");
+    expect(d.durationMinutes).toBe(120);
+    expect(d.ageRating).toBe("12");
+    expect(d.quality).toBe("1080p");
+    expect(d.language).toBe("pt-BR");
+    expect(d.country).toBe("BR");
+    expect(d.genres).toEqual(["Ação", "Drama"]);
   });
 
   it("reads provider genres from strings, arrays and objects while ignoring numeric-only IDs", () => {
