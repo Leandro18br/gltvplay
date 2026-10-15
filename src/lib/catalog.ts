@@ -189,7 +189,7 @@ export const kindCategoriesQuery = (kinds: Kind[]) =>
     staleTime: 60_000,
   });
 
-/** Category meta for the channel-categories area; null when the category is missing or has no published channels. */
+/** Published channel-category metadata and count. Empty categories remain valid pages with an informative empty state. */
 export const channelCategoryMetaQuery = (slug: string) =>
   queryOptions({
     queryKey: ["catalog", "channel-category", slug],
@@ -199,7 +199,10 @@ export const channelCategoryMetaQuery = (slug: string) =>
       if (!cat) return null;
       const { count, error: e2 } = await sb.from("channels").select("id", { count: "exact", head: true }).eq("status", "published").eq("category_id", cat.id);
       if (e2) throw e2;
-      return (count ?? 0) > 0 ? { category: cat as { id: string; name: string; slug: string; description: string | null; image_url: string | null } } : null;
+      return {
+        category: cat as { id: string; name: string; slug: string; description: string | null; image_url: string | null },
+        channelCount: count ?? 0,
+      };
     },
     staleTime: 30_000,
   });
