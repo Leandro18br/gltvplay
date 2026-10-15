@@ -344,7 +344,8 @@ export const tmdbRepairMoviesBatch = createServerFn({ method: "POST" })
         if (genreError) throw genreError;
         const missingDescription = isMissing(row.description);
         const missingGenres = !(linked ?? []).length;
-        if (!missingDescription && !missingGenres) {
+        const missingCoreFields = ["tmdb_id", "original_title", "release_date", "poster_url", "backdrop_url"].some((key) => isMissing(row[key]));
+        if (!missingDescription && !missingGenres && !missingCoreFields) {
           report.alreadyComplete++;
           continue;
         }
