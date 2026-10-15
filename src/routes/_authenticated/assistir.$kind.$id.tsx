@@ -276,7 +276,7 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
       <div className="min-h-svh bg-background px-2 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] md:px-8">
         <header className="mx-auto flex max-w-6xl items-center gap-3 py-5">{backLink}<div className="min-w-0"><h1 className="break-words font-semibold">{data.title}</h1>{data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}</div></header>
         <main className="mx-auto max-w-6xl space-y-5">
-          <div className={live ? "w-full max-w-[380px]" : "w-full"}><EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} /></div>
+          <div className={`watch-embed-stage ${live ? "w-full max-w-[380px]" : "w-full"}`}><EmbedPlayer url={url} title={data.title} onFailure={event=>{if(data.source)sb.rpc("report_playback_error",{_source_id:data.source.id,_event:event}).then(()=>{});}} onLoaded={()=>{if(user&&!profileLoading)getProgress(user.id,profileId,kind,id).then(p=>{if(!p)saveProgress(user.id,profileId,kind,id,0,0);});}} /></div>
         </main>
       </div>
     );
