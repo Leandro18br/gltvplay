@@ -55,7 +55,7 @@ function Page() {
       </div>
       <PageTitle title={data.category.name} subtitle={data.category.description} />
       {data.channelCount === 0 ? (
-        <EmptyState icon={<MonitorPlay />} title="Nenhum canal publicado nesta categoria" description="Volte mais tarde ou escolha outra categoria." />
+        <EmptyState icon={<MonitorPlay />} title="Nenhum canal publicado nesta categoria" text="Volte mais tarde ou escolha outra categoria." />
       ) : (
         <PagedGridSection title="Canais" kind="channel" filter={{ categoryId: data.category.id }} page={p ?? 1} onChange={go} />
       )}
