@@ -308,7 +308,7 @@ async function globalThrottle(ctx: Ctx): Promise<number> {
 
 export const bugouCreateJob = createServerFn({ method: "POST" })
   .middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).max(500).default([]), allMissing: z.boolean().default(false), category: z.string().max(200).optional(), repairEmpty: z.boolean().default(false) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).default([]), allMissing: z.boolean().default(false), category: z.string().max(200).optional(), repairEmpty: z.boolean().default(false) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
@@ -370,8 +370,8 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
       const r = await db.from("bugou_import_items").insert(items.slice(i, i + 500).map(x => ({ job_id: j.data.id, ext_id: x.ext_id, title: x.title })));
       if (r.error) throw new Error(r.error.message);
     }
-    await armWorker();
-    return { ...(await jobView(ctx, j.data.id)), unmatched };
+    const workerArmed = await armWorker();
+    return { ...(await jobView(ctx, j.data.id)), unmatched, workerArmed };
   });
 
 /**
@@ -497,16 +497,21 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
 
 const PROJECT_ID = "a60e024f-d8d7-4202-815f-86d1103dd07c";
 /** Arms the background worker schedule (removed by the worker when the queue drains). Preview runs target the preview build. */
-async function armWorker() {
+async function armWorker(): Promise<boolean> {
   try {
     const { getRequest } = await import("@tanstack/react-start/server");
     const host = new URL(getRequest().url).host;
-    const dev = /localhost|preview|-dev\.|127\.0\.0\.1|sandbox/.test(host);
+    const dev = /localhost|preview|-dev\\.|127\\.0\\.1|sandbox/.test(host);
     const url = `https://project--${PROJECT_ID}${dev ? "-dev" : ""}.lovable.app/api/public/hooks/bugou-import`;
     const key = process.env["SUPABASE_PUBLISHABLE_KEY"] ?? "";
-    if (!key) return;
-    await (await admin()).rpc("bugou_worker_arm", { _url: url, _key: key });
-  } catch (e) { console.error("bugou worker arm failed", (e as Error).message); }
+    if (!key) throw new Error("SUPABASE_PUBLISHABLE_KEY não configurada");
+    const { error } = await (await admin()).rpc("bugou_worker_arm", { _url: url, _key: key });
+    if (error) throw new Error(error.message);
+    return true;
+  } catch (e) {
+    console.error("bugou worker arm failed", (e as Error).message);
+    return false;
+  }
 }
 
 export const bugouRunJob = createServerFn({ method: "POST" })
