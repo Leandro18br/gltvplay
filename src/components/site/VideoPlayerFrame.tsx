@@ -101,13 +101,10 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
       if (document.fullscreenElement) {
         await document.exitFullscreen();
         releasePlaybackDisplay();
-      } else if (wrap.current?.requestFullscreen && document.fullscreenEnabled) {
+      } else {
         const result = await requestPlaybackDisplay(wrap.current);
         if (!result.fullscreen) media.current?.webkitEnterFullscreen?.();
         if (!result.orientation) setNotice("Gire o celular para assistir em tela cheia.");
-      } else {
-        media.current?.webkitEnterFullscreen?.();
-        setNotice("Gire o celular para assistir em tela cheia.");
       }
     } catch { setNotice("Não foi possível abrir a tela cheia neste navegador."); }
     reveal();
