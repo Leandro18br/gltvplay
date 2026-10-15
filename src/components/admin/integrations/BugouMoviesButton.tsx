@@ -49,9 +49,22 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => { void run(0, false, true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function processAllIds(ids: string[], startAt: number, initial: typeof allTotals) {
     let totals = { ...initial };
-    for (let i = startAt; i < ids.length; i += 10) {
-      setImportProgress(`Importando filmes completos: ${Math.min(i + 10, ids.length)} de ${ids.length}…`);
-      const r = await importMovies({ data: { ids: ids.slice(i, i + 10) } });
+    // One film per server call keeps each operation small and makes retrying a 429 idempotent.
+    for (let i = startAt; i < ids.length; i++) {
+      let r: Awaited<ReturnType<typeof importMovies>>;
+      for (let attempt = 0; ; attempt++) {
+        setImportProgress(`Importando filmes completos: ${i + 1} de ${ids.length}${attempt ? ` · nova tentativa ${attempt + 1}/4` : ""}…`);
+        try {
+          r = await importMovies({ data: { ids: [ids[i]!] } });
+          break;
+        } catch (error) {
+          const message = errMsg(error);
+          if (!/429|limite de requisições/i.test(message) || attempt >= 3) throw error;
+          const waitMs = 5000 * 2 ** attempt;
+          setImportProgress(`Limite da API (HTTP 429). Aguardando ${Math.round(waitMs / 1000)}s antes de tentar novamente o filme ${i + 1} de ${ids.length}…`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+        }
+      }
       totals = {
         created: totals.created + r.created, updated: totals.updated + r.updated, skipped: totals.skipped + r.skipped,
         descriptionsAdded: totals.descriptionsAdded + r.descriptionsAdded, genresAdded: totals.genresAdded + r.genresAdded,
@@ -59,7 +72,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
         detailFailures: totals.detailFailures + r.detailFailures, failed: totals.failed + r.failed,
       };
       setAllTotals(totals);
-      setAllOffset(Math.min(i + 10, ids.length));
+      setAllOffset(i + 1);
     }
     setLastImportReport({ category: "Catálogo completo BugouMods VIP", total: ids.length, ...totals });
     setSelected(new Set());
@@ -89,7 +102,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
       await processAllIds(unique, 0, zero);
     } catch (e) {
       setError(errMsg(e));
-      toast.error(errMsg(e) + (allIds.length ? " Você pode retomar a partir do lote pendente." : ""));
+      toast.error(errMsg(e) + " O lote atual ficou pendente; use Retomar importação para continuar.");
     } finally { setBusy(""); setImportProgress(""); }
   }
 
