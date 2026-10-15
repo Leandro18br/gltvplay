@@ -866,7 +866,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       if (existing) {
         const { data: linkedGenres, error: linkedError } = await db.from("movie_genres").select("genre_id").eq("movie_id", existing.id).limit(1);
         if (linkedError) throw new Error(linkedError.message);
-        needsTmdbMetadata = !existing.description?.trim() || !(linkedGenres ?? []).length;
+        needsTmdbMetadata = !existing.description?.trim() || !(linkedGenres ?? []).length || !existing.tmdb_id || !existing.original_title || !existing.release_date || !existing.poster_url || !existing.backdrop_url;
       }
       if (needsTmdbMetadata) tmdbMeta = await exactTmdbMovieMeta(title, year);
       if (existing) {
