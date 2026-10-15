@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
 import { VideoPlayerFrame } from "@/components/site/VideoPlayerFrame";
 import { attachMpegTs, usesLiveMpegTs, resolveSecureUrl, MIXED_CONTENT_MESSAGE } from "@/lib/playback/mpegts";
+import { requestPlaybackDisplay, releasePlaybackDisplay } from "@/lib/playback/display-mode";
 
 type PKind = "movie" | "episode" | "channel";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,7 +78,16 @@ function PlayerPage() {
   const router = useRouter();
   const [server, setServer] = useState(0);
   const [started, setStarted] = useState(kind === "channel");
-  useEffect(() => { setServer(0); setStarted(kind === "channel"); }, [kind, id]);
+  const [displayHint, setDisplayHint] = useState(false);
+  useEffect(() => { setServer(0); setStarted(kind === "channel"); setDisplayHint(false); }, [kind, id]);
+  useEffect(() => () => { releasePlaybackDisplay(); }, []);
+  const startPlayback = () => {
+    // Invoke both browser APIs from the Play tap before changing the player view.
+    void requestPlaybackDisplay(document.documentElement).then(({ fullscreen, orientation }) => {
+      setDisplayHint(!fullscreen || !orientation);
+    });
+    setStarted(true);
+  };
 
   if (info.isPending) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="size-10 animate-spin text-primary" /></div>;
   if (info.isError || !info.data?.url) {
@@ -98,8 +108,8 @@ function PlayerPage() {
       {all.map((s, n) => <Button key={s.id} size="sm" variant={s.id === source?.id ? "default" : "secondary"} className="rounded-full" aria-pressed={s.id === source?.id} onClick={() => setServer(n)}>Servidor {n + 1}{s.label && !/^Servidor \d+$/i.test(s.label) ? ` · ${s.label}` : ""}</Button>)}
     </div>
   ) : null;
-  if (!started) return <PlayGate data={data} onPlay={() => setStarted(true)} />;
-  return <Player key={`${kind}-${id}-${source?.id}-${data.url}-${source?.type}`} kind={kind} id={id} data={data} servers={servers} onServerChange={setServer} />;
+  if (!started) return <PlayGate data={data} onPlay={startPlayback} />;
+  return <Player key={`${kind}-${id}-${source?.id}-${data.url}-${source?.type}`} kind={kind} id={id} data={data} servers={servers} onServerChange={setServer} displayHint={displayHint} />;
 }
 
 /** Cover + centered Play; nothing external loads until the viewer clicks. */
@@ -123,7 +133,7 @@ function PlayGate({ data, onPlay }: { data: NonNullable<ReturnType<typeof usePla
   );
 }
 
-function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]>; servers: React.ReactNode; onServerChange: (index: number) => void }) {
+function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind: PKind; id: string; data: NonNullable<ReturnType<typeof usePlaybackInfo>["data"]>; servers: React.ReactNode; onServerChange: (index: number) => void; displayHint?: boolean }) {
   const { user, profileId, loading: profileLoading } = useActiveProfile();
   const navigate = useNavigate();
   const video = useRef<HTMLVideoElement>(null);
@@ -291,6 +301,7 @@ function Player({ kind, id, data, servers, onServerChange }: { kind: PKind; id: 
   return (
     <div ref={wrap} onMouseMove={poke} onTouchStart={poke} className={`fixed inset-0 select-none bg-background ${ui ? "" : "cursor-none"}`}>
       {servers && <div className={`absolute right-4 top-16 z-20 transition-opacity ${ui ? "opacity-100" : "pointer-events-none opacity-0"}`}>{servers}</div>}
+      {displayHint && <p role="status" className="pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-30 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-lg bg-black/75 px-3 py-2 text-center text-xs text-white shadow-lg">Gire o celular para assistir em tela cheia.</p>}
       <video
         ref={video}
         className="h-full w-full bg-background object-contain"
