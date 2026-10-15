@@ -969,7 +969,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.
         const { data: sources, error: sourcesErr } = await db.from("playback_sources").select("id,external_ref").eq("content_kind", "movie").eq("content_id", movieId);
         if (sourcesErr) throw new Error(sourcesErr.message);
-        const ref = \`bugoumods:\${id}\`;
+        const ref = `bugoumods:${id}`;
         if (!(sources ?? []).some((s: any) => s.external_ref === ref)) {
           const sourceInsert = await db.from("playback_sources").insert({
             content_kind: "movie", content_id: movieId, url: playerUrl, source_type: "embed",
