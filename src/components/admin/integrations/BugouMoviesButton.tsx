@@ -36,6 +36,7 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
   const [allIds, setAllIds] = useState<string[]>([]);
   const [allOffset, setAllOffset] = useState(0);
   const [allTotals, setAllTotals] = useState({ created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0 });
+  const [bulkRestored, setBulkRestored] = useState(false);
   const [error, setError] = useState("");
   const run = useCallback(async (nextPage = 0, refresh = false, withCategories = false) => {
     setBusy(refresh ? "test" : "search"); setError("");
@@ -46,6 +47,30 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
       if (refresh) toast.success("Catálogo atualizado: " + r.total + " filmes.");
     } catch (e) { setError(errMsg(e)); } finally { setBusy(""); }
   }, [search, query, category]);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("gltvplay:bugou-movie-import-progress");
+      if (saved) {
+        const value = JSON.parse(saved) as { ids?: unknown; offset?: unknown; totals?: unknown };
+        if (Array.isArray(value.ids) && value.ids.every(x => typeof x === "string" && /^\\d+$/.test(x))) {
+          setAllIds(value.ids as string[]);
+          setAllOffset(typeof value.offset === "number" ? Math.max(0, Math.min(value.offset, value.ids.length)) : 0);
+          if (value.totals && typeof value.totals === "object") setAllTotals(prev => ({ ...prev, ...(value.totals as Partial<typeof prev>) }));
+        }
+      }
+    } catch { /* Storage may be unavailable; the import still works for this session. */ }
+    setBulkRestored(true);
+  }, []);
+  useEffect(() => {
+    if (!bulkRestored) return;
+    try {
+      if (allIds.length && allOffset < allIds.length) {
+        localStorage.setItem("gltvplay:bugou-movie-import-progress", JSON.stringify({ ids: allIds, offset: allOffset, totals: allTotals }));
+      } else {
+        localStorage.removeItem("gltvplay:bugou-movie-import-progress");
+      }
+    } catch { /* Storage limits do not interrupt the import. */ }
+  }, [bulkRestored, allIds, allOffset, allTotals]);
   useEffect(() => { void run(0, false, true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function processAllIds(ids: string[], startAt: number, initial: typeof allTotals) {
     let totals = { ...initial };
