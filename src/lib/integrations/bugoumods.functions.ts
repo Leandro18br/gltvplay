@@ -953,13 +953,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
           const selectFields = "id,title,original_title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,language,country,external_source,external_id";
           const same = year
             ? db.from("movies").select(selectFields).or(`release_year.eq.${year},release_year.is.null`).limit(1000)
-            : db.from("movies").select(selectFields).ilike("title", title.replace(/[%_\\]/g, "\\        if (!existing) {
-          let same = db.from("movies").select("id,title,original_title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,language,country,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
-          if (year) same = same.eq("release_year", year);
-          const { data: matches, error: sameErr } = await same;
-          if (sameErr) throw new Error(sameErr.message);
-          if (matches?.length === 1) existing = matches[0];
-        }")).limit(20);
+            : db.from("movies").select(selectFields).ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(20);
           const { data: matches, error: sameErr } = await same;
           if (sameErr) throw new Error(sameErr.message);
           const normalized = (matches ?? []).filter((movie: any) =>
