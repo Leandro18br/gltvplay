@@ -832,7 +832,6 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       const title = detail?.title || m.title;
       const year = detail?.year ?? m.year;
       const poster = detail?.cover || m.poster_url;
-      const tmdbMeta = await exactTmdbMovieMeta(title, year);
       const playerUrl = bugouVipEmbedUrl(id, detail?.ext ?? "mp4", tok);
 
       const { data: byExternal, error: findErr } = await db.from("movies").select("*").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
@@ -847,6 +846,14 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       }
 
       let movieId: string;
+      let tmdbMeta: Awaited<ReturnType<typeof exactTmdbMovieMeta>> = null;
+      let needsTmdbMetadata = !existing;
+      if (existing) {
+        const { data: linkedGenres, error: linkedError } = await db.from("movie_genres").select("genre_id").eq("movie_id", existing.id).limit(1);
+        if (linkedError) throw new Error(linkedError.message);
+        needsTmdbMetadata = !existing.description?.trim() || !(linkedGenres ?? []).length;
+      }
+      if (needsTmdbMetadata) tmdbMeta = await exactTmdbMovieMeta(title, year);
       if (existing) {
         movieId = existing.id;
         if (tmdbMeta) {
