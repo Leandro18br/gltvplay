@@ -10,6 +10,7 @@ import { DetailHero } from "@/components/site/DetailHero";
 import { InlinePlayer } from "@/components/site/InlinePlayer";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { requestPlaybackDisplay } from "@/lib/playback/display-mode";
 
 export const Route = createFileRoute("/serie/$slug")({
   ssr: false,
@@ -89,7 +90,7 @@ function SeriesPage() {
                 const thumbnail = safeImageUrl(e.thumbnail_url);
                 return (
                 <li key={e.id}>
-                  <Button type="button" variant="ghost" onClick={() => setEpisodeId(e.id)}
+                  <Button type="button" variant="ghost" onClick={() => { void requestPlaybackDisplay(document.documentElement); setEpisodeId(e.id); }}
                     aria-current={e.id === current?.id}
                     className={`group grid h-auto w-full grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-3 whitespace-normal rounded-lg p-2 text-left transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] md:gap-4 ${e.id === current?.id ? "bg-card ring-1 ring-primary/40" : ""}`}>
                     <span className="hidden text-center font-display text-2xl text-muted-foreground md:block">{e.episode_number}</span>
