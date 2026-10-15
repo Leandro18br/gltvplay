@@ -700,6 +700,21 @@ async function loadAllMovies(): Promise<BugouMovie[]> {
   }
 }
 
+/** Link provider genre names only to existing local genres; never treat provider IDs as TMDB IDs or store arrays as text. */
+async function linkProviderGenreNames(db: any, movieId: string, names: string[]) {
+  if (!names.length) return;
+  const { data, error } = await db.from("genres").select("id,name");
+  if (error) throw new Error(error.message);
+  const wanted = new Set(names.map(normTitle));
+  const matches = (data ?? []).filter((g: any) => wanted.has(normTitle(String(g.name ?? ""))));
+  if (!matches.length) return;
+  const saved = await db.from("movie_genres").upsert(
+    matches.map((g: any) => ({ movie_id: movieId, genre_id: g.id })),
+    { onConflict: "movie_id,genre_id", ignoreDuplicates: true },
+  );
+  if (saved.error) throw new Error(saved.error.message);
+}
+
 /** Use the official TMDB detail record only when the provider title AND year identify exactly one movie. */
 async function exactTmdbMovieMeta(title: string, year: number | null) {
   if (!title.trim() || !year) return null;
@@ -863,6 +878,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
           } catch (error) {
             // Metadata is optional; do not prevent the provider movie/player from importing.
             console.warn("[BugouMods metadata enrichment] Não foi possível salvar metadados TMDB", movieId, (error as Error).message);
+            tmdbMeta = null;
           }
         }
         const patch: Record<string, unknown> = {};
@@ -896,6 +912,10 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         report.created++;
       }
 
+      if (!tmdbMeta?.genres?.length && detail?.genres?.length) {
+        try { await linkProviderGenreNames(db, movieId, detail.genres); }
+        catch (error) { console.warn("[BugouMods genres] Não foi possível associar gêneros do provedor", movieId, (error as Error).message); }
+      }
       await linkCategories(db, "movie", movieId, [m.category]);
 
       // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.
