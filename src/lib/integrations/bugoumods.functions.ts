@@ -941,7 +941,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         if (!existing) {
           const selectFields = "id,title,original_title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,language,country,external_source,external_id";
           const same = year
-            ? db.from("movies").select(selectFields).eq("release_year", year).limit(1000)
+            ? db.from("movies").select(selectFields).or(`release_year.eq.${year},release_year.is.null`).limit(1000)
             : db.from("movies").select(selectFields).ilike("title", title.replace(/[%_\\]/g, "\\        if (!existing) {
           let same = db.from("movies").select("id,title,original_title,description,poster_url,backdrop_url,release_year,duration_minutes,age_rating,quality,language,country,external_source,external_id").ilike("title", title.replace(/[%_\\]/g, "\\$&")).limit(2);
           if (year) same = same.eq("release_year", year);
