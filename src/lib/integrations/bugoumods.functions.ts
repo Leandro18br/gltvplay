@@ -501,7 +501,7 @@ async function armWorker(): Promise<boolean> {
   try {
     const { getRequest } = await import("@tanstack/react-start/server");
     const host = new URL(getRequest().url).host;
-    const dev = /localhost|preview|-dev\\.|127\\.0\\.1|sandbox/.test(host);
+    const dev = /localhost|preview|-dev\.|127\.0\.0\.1|sandbox/.test(host);
     const url = `https://project--${PROJECT_ID}${dev ? "-dev" : ""}.lovable.app/api/public/hooks/bugou-import`;
     const key = process.env["SUPABASE_PUBLISHABLE_KEY"] ?? "";
     if (!key) throw new Error("SUPABASE_PUBLISHABLE_KEY não configurada");
