@@ -38,7 +38,7 @@ function parseGenreNames(...values: unknown[]): string[] {
   const out: string[] = [];
   const add = (value: unknown) => {
     if (typeof value === "string") {
-      value.split(/[,;|\\/]/).map((x) => x.trim()).filter(Boolean).forEach((x) => out.push(x));
+      value.split(/[,;|\/]/).map((x) => x.trim()).filter(Boolean).forEach((x) => out.push(x));
       return;
     }
     if (Array.isArray(value)) { value.forEach(add); return; }
