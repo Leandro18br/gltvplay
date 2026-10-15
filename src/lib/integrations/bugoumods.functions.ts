@@ -746,7 +746,7 @@ async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Pr
     if (!json || typeof json !== "object" || json.Aviso) throw new Error("A API não devolveu detalhes válidos para este filme.");
     const details = parseBugouMovieDetails(id, json);
     await logCall(integ, `Detalhes do filme ${id}`, t0, null);
-    return details.plot || details.title || details.cover ? details : null;
+    return details.plot || details.title || details.cover || details.genres.length ? details : null;
   } catch (e) {
     const message = scrub((e as Error).message).slice(0, 400);
     await logCall(integ, `Detalhes do filme ${id}`, t0, message, e instanceof RateLimitedError ? 429 : null);
