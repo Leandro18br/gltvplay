@@ -869,9 +869,11 @@ export const bugouRepairMovieMetadataBatch = createServerFn({ method: "POST" }).
         if (!detail) { report.unavailable++; continue; }
         let changed = false;
         if (!String(row.description ?? "").trim() && detail.plot?.trim()) {
-          const saved = await db.from("movies").update({ description: detail.plot }).eq("id", row.id).is("description", row.description);
+          let saveQuery = db.from("movies").update({ description: detail.plot }).eq("id", row.id);
+          saveQuery = row.description == null ? saveQuery.is("description", null) : saveQuery.eq("description", row.description);
+          const saved = await saveQuery.select("id").maybeSingle();
           if (saved.error) throw new Error(saved.error.message);
-          if (saved.data !== null) { report.descriptionsAdded++; changed = true; }
+          if (saved.data) { report.descriptionsAdded++; changed = true; }
         }
         if (detail.genres.length) {
           const added = await linkProviderMovieGenres(db, row.id, detail.genres);
