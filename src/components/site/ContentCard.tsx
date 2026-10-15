@@ -5,15 +5,15 @@ import { toast } from "sonner";
 import { formatDuration, itemParam, type Item } from "@/lib/catalog";
 import { useWatchlist } from "@/lib/user-data";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requestPlaybackDisplay } from "@/lib/playback/display-mode";
 
 export function DetailLink({ item, children, className }: { item: Item; children: ReactNode; className?: string }) {
   const p = { slug: itemParam(item) };
   if (item.kind === "movie") return <Link to="/filme/$slug" params={p} className={className}>{children}</Link>;
   if (item.kind === "series") return <Link to="/serie/$slug" params={p} className={className}>{children}</Link>;
   const requestPlayerFullscreen = () => {
-    // Use the channel-card tap as the explicit gesture; fullscreen may be denied on mobile.
-    if (typeof document === "undefined" || !document.fullscreenEnabled || !document.documentElement.requestFullscreen) return;
-    void document.documentElement.requestFullscreen().catch(() => {});
+    // The channel-card tap is the explicit gesture; the destination keeps playback independent of API support.
+    void requestPlaybackDisplay(document.documentElement);
   };
   return <Link to="/assistir/$kind/$id" params={{ kind: "channel", id: item.id }} onClick={requestPlayerFullscreen} className={className}>{children}</Link>;
 }
