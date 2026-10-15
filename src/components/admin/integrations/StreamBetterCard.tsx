@@ -10,9 +10,9 @@ import { Badge } from "@/components/ui/badge";
 
 type TestResult = Awaited<ReturnType<typeof streamBetterTest>>;
 type StepResult = Awaited<ReturnType<typeof streamBetterImportStep>>;
-type Job = { kind: "movie" | "series"; page: number; totalPages: number | null; processed: number; imported: number; updated: number; skipped: number; errors: number; totalItems: number | null };
+type Job = { kind: "movie" | "series"; mode: "sync" | "new_only"; page: number; totalPages: number | null; processed: number; imported: number; updated: number; skipped: number; errors: number; totalItems: number | null };
 
-const initial = (kind: "movie" | "series"): Job => ({ kind, page: 1, totalPages: null, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0, totalItems: null });
+const initial = (kind: "movie" | "series", mode: "sync" | "new_only" = "sync"): Job => ({ kind, mode, page: 1, totalPages: null, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0, totalItems: null });
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function StreamBetterCard() {
@@ -37,15 +37,15 @@ export function StreamBetterCard() {
     try { if (next) localStorage.setItem(key, JSON.stringify(next)); else localStorage.removeItem(key); } catch { /* Storage may be disabled. */ }
   }
 
-  async function run(kind: "movie" | "series", resume: boolean) {
+  async function run(kind: "movie" | "series", resume: boolean, mode: "sync" | "new_only" = "sync") {
     stop.current = false;
     setRunning(true);
-    let current = resume && job?.kind === kind ? job : initial(kind);
+    let current = resume && job?.kind === kind ? job : initial(kind, mode);
     saveJob(current);
     try {
       for (;;) {
         if (stop.current) break;
-        const r = await stepFn({ data: { kind, page: current.page, limit: 10 } }) as StepResult;
+        const r = await stepFn({ data: { kind, page: current.page, limit: 10, mode: current.mode } }) as StepResult;
         if (r.retry) {
           toast.message("StreamBetter limitou as requisições. A importação aguardará o tempo indicado e tentará novamente.");
           await wait(r.retryMs);
@@ -101,9 +101,11 @@ export function StreamBetterCard() {
       <p className="text-sm text-muted-foreground">Importa filmes e séries do catálogo público em lotes de 10. O player de filmes usa o iframe oficial do StreamBetter e não substitui as fontes já cadastradas.</p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" disabled={testing || running} onClick={testConnection}>{testing ? <Loader2 className="animate-spin" /> : <RefreshCw />} Testar conexão</Button>
-        <Button type="button" disabled={running} onClick={() => run("movie", false)}><Play /> Importar filmes</Button>
-        <Button type="button" disabled={running} onClick={() => run("series", false)}><Play /> Importar séries</Button>
-        {job && !running && <Button type="button" variant="outline" onClick={() => run(job.kind, true)}><RefreshCw /> Retomar importação</Button>}
+        <Button type="button" disabled={running} onClick={() => run("movie", false, "sync")}><RefreshCw /> Sincronizar filmes</Button>
+        <Button type="button" disabled={running} onClick={() => run("series", false, "sync")}><RefreshCw /> Sincronizar séries</Button>
+        <Button type="button" variant="outline" disabled={running} onClick={() => run("movie", false, "new_only")}><Play /> Apenas novos filmes</Button>
+        <Button type="button" variant="outline" disabled={running} onClick={() => run("series", false, "new_only")}><Play /> Apenas novas séries</Button>
+        {job && !running && <Button type="button" variant="outline" onClick={() => run(job.kind, true, job.mode)}><RefreshCw /> Retomar importação</Button>}
         {running && <Button type="button" variant="outline" onClick={() => { stop.current = true; }}><Pause /> Pausar</Button>}
         {job && !running && <Button type="button" variant="ghost" onClick={() => { if (confirm("Apagar somente o marcador local de progresso? Os títulos já importados serão mantidos.")) saveJob(null); }}>Limpar progresso</Button>}
       </div>
@@ -112,7 +114,7 @@ export function StreamBetterCard() {
         <div className="rounded-lg bg-muted/40 p-3"><p className="text-muted-foreground">Séries no provedor</p><p className="text-lg font-semibold">{test.seriesCount.toLocaleString("pt-BR")}</p><p className="text-xs text-muted-foreground">{test.seriesPages} páginas{test.sampleSeries ? ` · Ex.: ${test.sampleSeries}` : ""}</p></div>
       </div>}
       {job && <div className="space-y-2 rounded-xl border border-border p-3">
-        <div className="flex items-center justify-between gap-2 text-sm"><span>{job.kind === "movie" ? "Importação de filmes" : "Importação de séries"}</span><span>{job.totalPages ? `Página ${Math.min(job.page, job.totalPages)} de ${job.totalPages}` : `Página ${job.page}`}</span></div>
+        <div className="flex items-center justify-between gap-2 text-sm"><span>{job.kind === "movie" ? "Importação de filmes" : "Importação de séries"}{job.mode === "new_only" ? " · somente novos" : " · sincronização"}</span><span>{job.totalPages ? `Página ${Math.min(job.page, job.totalPages)} de ${job.totalPages}` : `Página ${job.page}`}</span></div>
         <Progress value={pct} />
         <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
           <div>Processados: <b>{job.processed}</b></div><div>Novos: <b>{job.imported}</b></div><div>Atualizados: <b>{job.updated}</b></div><div>Ignorados: <b>{job.skipped}</b></div><div>Erros: <b>{job.errors}</b></div>
