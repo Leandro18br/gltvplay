@@ -48,7 +48,9 @@ function BugouMoviesDialog({ onClose }: { onClose: () => void }) {
     setBusy("test"); setError("");
     try {
       const r = await test(); setCategories(r.categories);
-      toast.success("Conexão OK: " + r.total + " filmes e " + r.categories.length + " categorias.");
+      const probe = r.metadataProbe;
+      const probeText = probe ? ` · teste de metadados: sinopse ${probe.descriptionAvailable ? "presente" : "ausente"}, ${probe.genreNames.length} gênero(s); campos: ${probe.providerFieldPaths.join(", ") || "nenhum campo reconhecido"}` : "";
+      toast.success("Conexão OK: " + r.total + " filmes e " + r.categories.length + " categorias." + probeText, { duration: 12000 });
       await run(0, true, true);
     } catch (e) { setError(errMsg(e)); setBusy(""); }
   }
