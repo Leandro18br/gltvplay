@@ -80,6 +80,20 @@ function PlayerPage() {
   const [started, setStarted] = useState(kind === "channel");
   const [displayHint, setDisplayHint] = useState(false);
   useEffect(() => { setServer(0); setStarted(kind === "channel"); setDisplayHint(false); }, [kind, id]);
+  useEffect(() => {
+    if (kind !== "channel") return;
+    const updateHint = () => {
+      const orientation = typeof screen !== "undefined" ? screen.orientation?.type ?? "" : "";
+      setDisplayHint(!document.fullscreenElement || !orientation.startsWith("landscape"));
+    };
+    updateHint();
+    document.addEventListener("fullscreenchange", updateHint);
+    screen.orientation?.addEventListener("change", updateHint);
+    return () => {
+      document.removeEventListener("fullscreenchange", updateHint);
+      screen.orientation?.removeEventListener("change", updateHint);
+    };
+  }, [kind, id]);
   useEffect(() => () => { releasePlaybackDisplay(); }, []);
   const startPlayback = () => {
     // Invoke both browser APIs from the Play tap before changing the player view.
