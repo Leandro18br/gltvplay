@@ -100,7 +100,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     run(0, { withCategories: true }); loadCats();
-    overview().then(o => { setOv(o); const open = (o.jobs as Job[]).find(j => j.status !== "cancelled" && (j.status !== "done" || j.failed > 0)); if (open) showJob(open); }).catch(() => {});
+    overview().then(o => { setOv(o); const open = (o.jobs as Job[]).find(j => j.status !== "cancelled" && (j.status !== "done" || j.failed > 0)); if (open) { showJob(open); if (open.status === "running" && open.pending > 0) void drive(open); } }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -108,7 +108,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
 
   async function start(data: { ids?: string[]; allMissing?: boolean; category?: string; repairEmpty?: boolean }) {
     setBusy("import");
-    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); if (apiTerm != null) searchApi(apiTerm); else run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); loadCats(); }
+    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.workerArmed === false) toast.warning("A fila foi salva, mas o agendador de segundo plano não confirmou a ativação. Mantenha o painel aberto e verifique os logs da integração."); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); if (apiTerm != null) searchApi(apiTerm); else run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); loadCats(); }
     catch (x) { toast.error(errMsg(x)); setBusy(null); }
   }
   const missing = ov ? Math.max(0, ov.indexTotal - ov.imported) : null;
@@ -151,7 +151,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
           <section aria-label="Progresso da importação" className={`space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm ${later}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="min-w-0 flex-1 truncate font-medium" title={job.label}>{job.label}</span>
-              <Badge variant={job.status === "paused" ? "outline" : "secondary"}>{job.status === "paused" ? "Pausada" : job.status === "done" ? "Concluída" : jobActive ? "Em andamento" : "Parada"}</Badge>
+              <Badge variant={job.status === "paused" ? "outline" : "secondary"}>{job.throttled ? "Aguardando API" : job.status === "paused" ? "Pausada" : job.status === "done" ? "Concluída" : jobActive || job.status === "running" ? "Em andamento" : "Parada"}</Badge>
             </div>
             <Progress value={pct} />
             <div className="grid grid-cols-3 gap-1.5 text-center text-xs sm:grid-cols-6">
@@ -208,7 +208,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
         {meta && apiTerm == null && <p className="text-xs text-muted-foreground">Navegando pelo índice da API: {meta.matches} resultado(s) de {meta.total} séries no índice · atualizado {new Date(meta.synced_at).toLocaleString("pt-BR")}{ov ? ` · ${ov.imported} já importadas` : ""}</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {items.map(r => { const has = !!existing[r.id]; const on = sel.has(r.id); return (
-            <button key={r.id} type="button" onClick={() => setSel(s => { const x = new Set(s); if (x.has(r.id)) x.delete(r.id); else if (x.size < 500) x.add(r.id); return x; })}
+            <button key={r.id} type="button" onClick={() => setSel(s => { const x = new Set(s); if (x.has(r.id)) x.delete(r.id); else x.add(r.id); return x; })}
               className={`relative overflow-hidden rounded-xl border text-left transition ${on ? "border-primary shadow-glow" : "border-border"}`}>
               <div className="aspect-[2/3] bg-muted">{r.poster_url && <img src={r.poster_url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
               <div className="p-2"><p className="truncate text-sm font-medium">{r.title}</p><p className="truncate text-xs text-muted-foreground">{r.year ?? "—"} · {r.category}</p></div>
