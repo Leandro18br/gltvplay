@@ -827,7 +827,7 @@ export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(100) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(10) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
     await refreshMovieIndex(ctx, false);
