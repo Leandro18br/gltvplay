@@ -1,5 +1,5 @@
 import { requireSiteAccess } from "@/lib/access/gate";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { MonitorPlay } from "lucide-react";
 import { kindCategoriesQuery } from "@/lib/catalog";
@@ -26,6 +26,14 @@ export const Route = createFileRoute("/canais-categorias")({
 });
 
 function Page() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+
+  // This file route is also the layout parent of /canais-categorias/$slug.
+  // Render the child route instead of keeping the category grid mounted over it.
+  if (pathname !== "/canais-categorias" && pathname !== "/canais-categorias/") {
+    return <Outlet />;
+  }
+
   const { data } = useSuspenseQuery(kindCategoriesQuery(["channel"]));
   return (
     <SiteShell>
