@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { CONTROLS_IDLE_MS, PLAYBACK_RATES, isTextEntry, playbackTime, seekTarget } from "@/lib/playback/controls";
+import { requestPlaybackDisplay, releasePlaybackDisplay } from "@/lib/playback/display-mode";
 
 export type PlayerServer = { id: string; label: string | null };
 function Slider({ className, "aria-label": label, ...props }: ComponentProps<typeof SliderPrimitive.Root>) {
@@ -97,9 +98,17 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
   };
   const toggleFullscreen = async () => {
     try {
-      if (document.fullscreenElement === wrap.current) await document.exitFullscreen();
-      else if (wrap.current?.requestFullscreen && document.fullscreenEnabled) await wrap.current.requestFullscreen();
-      else media.current?.webkitEnterFullscreen?.();
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        releasePlaybackDisplay();
+      } else if (wrap.current?.requestFullscreen && document.fullscreenEnabled) {
+        const result = await requestPlaybackDisplay(wrap.current);
+        if (!result.fullscreen) media.current?.webkitEnterFullscreen?.();
+        if (!result.orientation) setNotice("Gire o celular para assistir em tela cheia.");
+      } else {
+        media.current?.webkitEnterFullscreen?.();
+        setNotice("Gire o celular para assistir em tela cheia.");
+      }
     } catch { setNotice("Não foi possível abrir a tela cheia neste navegador."); }
     reveal();
   };
@@ -132,7 +141,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     };
     const events: [string, EventListener][] = [["timeupdate", update], ["durationchange", update], ["loadedmetadata", update], ["ratechange", update], ["play", onPlay], ["pause", onPause], ["ended", onPause], ["waiting", onWaiting], ["playing", onReady], ["canplay", onReady], ["error", onError], ["volumechange", onVolume]];
     events.forEach(([name, fn]) => video.addEventListener(name, fn));
-    const onFs = () => setFullscreen(document.fullscreenElement === wrap.current);
+    const onFs = () => setFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFs);
     let disposed = false;
     let availabilityId: number | undefined;
