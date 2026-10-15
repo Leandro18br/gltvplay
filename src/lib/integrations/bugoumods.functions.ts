@@ -976,7 +976,9 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
 
         if (detail?.genres.length) report.genresAdded += await linkProviderMovieGenres(db, movieId, detail.genres);
         if (!detail?.plot?.trim() || !detail.genres.length) report.metadataUnavailable++;
-        await linkCategories(db, "movie", movieId, [m.category]);
+        const { data: categoryRows, error: categoryError } = await db.from("bugou_catalog_categories").select("category").eq("kind", "movie").eq("ext_id", id);
+        if (categoryError) throw new Error(categoryError.message);
+        await linkCategories(db, "movie", movieId, [m.category, ...((categoryRows ?? []) as any[]).map(x => x.category)]);
 
         // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.
         const { data: sources, error: sourcesErr } = await db.from("playback_sources").select("id,external_ref").eq("content_kind", "movie").eq("content_id", movieId);
