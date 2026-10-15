@@ -38,7 +38,7 @@ export function parseBugouGenreNames(...values: unknown[]): string[] {
   const names: string[] = [];
   const visit = (value: unknown) => {
     if (typeof value === "string") {
-      value.split(/[,;|/]/).map((part) => part.trim()).filter(Boolean).forEach((part) => names.push(part));
+      value.split(/[,;|]/).map((part) => part.trim()).filter(Boolean).forEach((part) => names.push(part));
       return;
     }
     if (Array.isArray(value)) {
