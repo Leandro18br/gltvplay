@@ -511,7 +511,8 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
         tm.provider += Date.now() - t; tm.calls++;
         fetched = details;
         st.rate_factor = adaptFactor(st.rate_factor ?? 1, "ok");
-        if (st.safe_rpm && ++okStreak >= RAISE_EVERY) { okStreak = 0; st.safe_rpm = raiseSafeRpm(st.safe_rpm); }
+        // Streak persisted in job stats: worker runs are ~45s, so a per-run counter never reached the threshold.
+        if (st.safe_rpm) { const k = ((st as any).ok_streak ?? 0) + 1; if (k >= RAISE_EVERY) { (st as any).ok_streak = 0; st.safe_rpm = raiseSafeRpm(st.safe_rpm); } else (st as any).ok_streak = k; }
         // Cancelled while the provider call was in flight: keep the cached details, write nothing to the catalog.
         if (await halted()) { await upd({ state: "pending" }); return "skip"; }
       }
@@ -533,7 +534,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
       if (e instanceof RateLimitedError) {
         // Real provider 429: wait the provider's hint (Retry-After / RateLimit reset) or a short backoff, then the queue resumes by itself.
         st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429");
-        st.safe_rpm = nextSafeRpm(st.safe_rpm ?? null, starts.filter(t => t > Date.now() - 60_000).length); okStreak = 0;
+        st.safe_rpm = nextSafeRpm(st.safe_rpm ?? null, starts.filter(t => t > Date.now() - 60_000).length); okStreak = 0; (st as any).ok_streak = 0;
         const rl = it.rate_limited + 1;
         const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(Math.min(rl, 6), PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS))).toISOString();
         if (!throttleUntil || until > throttleUntil) throttleUntil = until;
