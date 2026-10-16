@@ -4,7 +4,7 @@ import { z } from "zod";
 import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
-import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor } from "./ratelimit";
+import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS } from "./ratelimit";
 import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouVipEmbedUrl, mapBugouGenreSlugs, normTitle, compactTitle, type BugouSeries, type BugouDetails, type BugouMovieDetails } from "./bugoumods";
 
 /**
@@ -284,7 +284,7 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 // ---------- Resumable import jobs ----------
 
 type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
-export const MAX_CONCURRENCY = 12;
+export const MAX_CONCURRENCY = 6;
 
 async function jobView(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
@@ -491,7 +491,9 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   };
 
   while (!stop && Date.now() - started < budgetMs - 3000) {
-    if ((await globalThrottle(ctx)) > Date.now()) break;
+    // Provider wait inside this run's budget: sleep it out here instead of ending the run (the next run would start up to a minute later).
+    const gt = await globalThrottle(ctx);
+    if (gt > Date.now()) { if (gt - started > budgetMs - 8000) break; await sleep(gt - Date.now() + 200); continue; }
     const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
     if (cur?.status === "paused" || cur?.status === "cancelled") { stop = true; break; }
     const n = Math.max(1, Math.min(MAX_CONCURRENCY, st.concurrency ?? 2));
