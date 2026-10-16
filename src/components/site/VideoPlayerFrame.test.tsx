@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoPlayerFrame } from './VideoPlayerFrame';
-afterEach(() => { cleanup(); delete document.documentElement.dataset['remoteNavigation']; });
+beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); delete document.documentElement.dataset['remoteNavigation']; });
 function setup() {
   const rendered = render(<VideoPlayerFrame title="Movie"><video /></VideoPlayerFrame>);
   const video = rendered.container.querySelector('video');
