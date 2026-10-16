@@ -319,13 +319,21 @@ async function globalThrottle(ctx: Ctx): Promise<number> {
 
 export const bugouCreateJob = createServerFn({ method: "POST" })
   .middleware([...auth])
-  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).default([]), allMissing: z.boolean().default(false), category: z.string().max(200).optional(), repairEmpty: z.boolean().default(false) }).parse(d))
+  .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).default([]), allMissing: z.boolean().default(false), category: z.string().max(200).optional(), repairEmpty: z.boolean().default(false), repairMetadata: z.boolean().default(false) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
     let items: { ext_id: string; title: string | null }[] = [];
     let unmatched: string[] = [];
-    if (data.repairEmpty) {
+    if (data.repairMetadata) {
+      // Re-read every imported BugouMods series; the import is fill-only, so manual data and links are kept.
+      for (let from = 0; ; from += 1000) {
+        const { data: s, error } = await db.from("series").select("external_id, title").eq("external_source", SOURCE).order("id").range(from, from + 999);
+        if (error) throw new Error(error.message);
+        items.push(...((s ?? []) as any[]).filter(x => /^\d+$/.test(String(x.external_id))).map(x => ({ ext_id: String(x.external_id), title: x.title })));
+        if (!s || s.length < 1000) break;
+      }
+    } else if (data.repairEmpty) {
       // Existing BugouMods series without seasons: locate the current provider id (same id, else unique exact title+year) and queue them.
       await ensureIndex(ctx, true);
       const empty: any[] = [];
@@ -381,7 +389,7 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
       items = selectedIds.map(id => ({ ext_id: id, title: t.get(id) ?? null }));
     }
     if (!items.length) throw new Error("Nada para importar.");
-    const j = await db.from("bugou_import_jobs").insert({ label: data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
+    const j = await db.from("bugou_import_jobs").insert({ label: data.repairMetadata ? `Completar metadados das séries importadas (${items.length})` : data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
     if (j.error) throw new Error(j.error.message);
     for (let i = 0; i < items.length; i += 500) {
       const r = await db.from("bugou_import_items").insert(items.slice(i, i + 500).map(x => ({ job_id: j.data.id, ext_id: x.ext_id, title: x.title })));

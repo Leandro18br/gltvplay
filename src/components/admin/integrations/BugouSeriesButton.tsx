@@ -106,9 +106,9 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
 
   if (detailId) return <EpisodesDialog id={detailId} onBack={() => setDetailId(null)} onClose={onClose} />;
 
-  async function start(data: { ids?: string[]; allMissing?: boolean; category?: string; repairEmpty?: boolean }) {
+  async function start(data: { ids?: string[]; allMissing?: boolean; category?: string; repairEmpty?: boolean; repairMetadata?: boolean }) {
     setBusy("import");
-    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty } }); if (j.workerArmed === false) toast.warning("A fila foi salva, mas o agendador de segundo plano não confirmou a ativação. Mantenha o painel aberto e verifique os logs da integração."); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); if (apiTerm != null) searchApi(apiTerm); else run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); loadCats(); }
+    try { const j = await createJob({ data: { ids: data.ids ?? [], allMissing: !!data.allMissing, category: data.category, repairEmpty: !!data.repairEmpty, repairMetadata: !!data.repairMetadata } }); if (j.workerArmed === false) toast.warning("A fila foi salva, mas o agendador de segundo plano não confirmou a ativação. Mantenha o painel aberto e verifique os logs da integração."); if (j.unmatched?.length) toast.warning(`${j.unmatched.length} série(s) sem episódios não existem na lista atual da API e ficaram como estão: ${j.unmatched.slice(0, 5).join(", ")}${j.unmatched.length > 5 ? "…" : ""}`); setSel(new Set()); setConfirmAll(false); setConfirmCat(false); setBusy(null); await drive(j as Job); if (apiTerm != null) searchApi(apiTerm); else run(page); overview().then(setOv).catch(() => {}); if (cat) catStatsFn({ data: { category: cat } }).then(setCatStats).catch(() => {}); loadCats(); }
     catch (x) { toast.error(errMsg(x)); setBusy(null); }
   }
   const missing = ov ? Math.max(0, ov.indexTotal - ov.imported) : null;
@@ -144,6 +144,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
             </select>
           ) : null}
           <Button type="button" variant="outline" className="w-full sm:w-auto" disabled={!!busy || jobActive} onClick={() => start({ repairEmpty: true })} title="Busca na API VIP as temporadas, episódios e players das séries já importadas que estão vazias"><Wrench /> Completar séries sem episódios</Button>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" disabled={!!busy || jobActive} onClick={() => start({ repairMetadata: true })} title="Relê na API VIP todas as séries já importadas e preenche apenas campos vazios (sinopse, gêneros, fundo, datas, nota, episódios)"><Wrench /> Completar metadados</Button>
           </div>
         </div>
 
