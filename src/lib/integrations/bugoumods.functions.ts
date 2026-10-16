@@ -470,7 +470,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   st.rate_factor = Math.max(0.25, st.rate_factor ?? 1); // older runs could persist a 1/8 pace
   // Provider pace learned from real 429s, shared by every series job (same token = same quota).
   if (!st.safe_rpm) st.safe_rpm = await learnedRpm(ctx);
-  let okStreak = 0; const starts: number[] = [];
+  const starts: number[] = [];
   let throttleUntil: string | null = null; let stop = false;
   const started = Date.now(); let nextSlot = 0;
   const stamp = () => new Date().toISOString();
@@ -534,7 +534,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
       if (e instanceof RateLimitedError) {
         // Real provider 429: wait the provider's hint (Retry-After / RateLimit reset) or a short backoff, then the queue resumes by itself.
         st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429");
-        st.safe_rpm = nextSafeRpm(st.safe_rpm ?? null, starts.filter(t => t > Date.now() - 60_000).length); okStreak = 0; (st as any).ok_streak = 0;
+        st.safe_rpm = nextSafeRpm(st.safe_rpm ?? null, starts.filter(t => t > Date.now() - 60_000).length); (st as any).ok_streak = 0;
         const rl = it.rate_limited + 1;
         const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(Math.min(rl, 6), PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS))).toISOString();
         if (!throttleUntil || until > throttleUntil) throttleUntil = until;
