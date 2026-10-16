@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
 import { db, type Row } from "@/lib/admin/db";
 import { fmtDate, resellerErr, ORDER_STATUS, CONTENT_STATUS, TX_REASON } from "@/lib/resellers/shared";
+import { GLTVLogo } from "@/components/brand/GLTVLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
