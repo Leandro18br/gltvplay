@@ -105,12 +105,12 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
       if (rowId && data.mode === "new_only") { skipped++; continue; }
       const nonEmptyPatch: Record<string, unknown> = { streambetter_id: providerId, streambetter_tmdb_id: tmdbId };
       // Preserve an existing canonical ID; fill it only when missing.
-      if (!existing?.tmdb_id) nonEmptyPatch.tmdb_id = Number(tmdbId);
+      if (!existing?.tmdb_id) nonEmptyPatch["tmdb_id"] = Number(tmdbId);
       else if (String(existing.tmdb_id) !== tmdbId) { errors++; continue; }
-      if (title) nonEmptyPatch.title = title;
-      if (poster) nonEmptyPatch.poster_url = poster;
-      if (description) nonEmptyPatch.description = description;
-      if (year) nonEmptyPatch.release_year = year;
+      if (title) nonEmptyPatch["title"] = title;
+      if (poster) nonEmptyPatch["poster_url"] = poster;
+      if (description) nonEmptyPatch["description"] = description;
+      if (year) nonEmptyPatch["release_year"] = year;
       if (!rowId) {
         const insertRow = {
           ...nonEmptyPatch,

@@ -68,7 +68,7 @@ export function parseBugouGenreNames(...values: unknown[]): string[] {
     if (value && typeof value === "object") {
       const row = value as Record<string, unknown>;
       // Xtream-like providers may use {name}, {genre_name}, or {genre}; don't infer a name from a numeric ID.
-      visit(row.name ?? row.genre_name ?? row.genre ?? row.label ?? row.title);
+      visit(row["name"] ?? row["genre_name"] ?? row["genre"] ?? row["label"] ?? row["title"]);
     }
   };
   values.forEach(visit);
