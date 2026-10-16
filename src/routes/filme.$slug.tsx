@@ -4,6 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { movieDetailQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
+import { CastSection } from "@/components/site/CastSection";
 import { InlinePlayer } from "@/components/site/InlinePlayer";
 import { GridSection } from "@/components/site/ContentCard";
 
@@ -45,6 +46,7 @@ function MoviePage() {
     <SiteShell padTop={false} hideHeader>
       <article>
         <DetailHero item={data.item} flushPlayer player={<InlinePlayer className="movie-top-player" kind="movie" id={data.item.id} title={data.item.title} poster={data.item.backdrop_url || data.item.poster_url} />} />
+        <CastSection kind="movie" id={data.item.id} />
         <div className="py-8"><GridSection title="Títulos semelhantes" items={data.related} /></div>
       </article>
     </SiteShell>
