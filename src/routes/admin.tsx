@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -28,13 +28,13 @@ export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
 
-function AdminGateError({ error, reset }: { error: Error; reset: () => void }) {
+function AdminGateError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-5">
       <div className="max-w-sm rounded-2xl border border-border bg-card p-6 text-center">
         <h1 className="text-lg font-semibold">Falha temporária</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message} Sua conta não foi considerada sem acesso.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{error instanceof Error ? error.message : "Erro desconhecido."} Sua conta não foi considerada sem acesso.</p>
         <Button className="mt-4 rounded-full" onClick={() => { clearAdminAccessCache(); reset(); router.invalidate(); }}>Tentar novamente</Button>
       </div>
     </div>
