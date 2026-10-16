@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouEmbedUrl } from "./bugoumods";
+import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouEmbedUrl, mapBugouGenreSlugs, bugouBackdrop } from "./bugoumods";
 
 describe("parseBugouName", () => {
   it("separa título e ano", () => expect(parseBugouName("1883 (2021)")).toEqual({ title: "1883", year: 2021 }));
@@ -50,7 +50,7 @@ describe("parseBugouMovieDetails", () => {
       country: null,
       ext: "mkv",
       genres: [],
-      providerMetadataPaths: ["info.plot"],
+      providerMetadataPaths: ["info.plot", "movie_data.container_extension"],
     });
   });
 
@@ -87,5 +87,36 @@ describe("parseBugouMovieDetails", () => {
     expect(d.providerMetadataPaths).toContain("info.plot");
     expect(d.providerMetadataPaths).toContain("info.genre");
     expect(d.genres).not.toContain("28");
+  });
+});
+
+describe("BugouMods real response shapes", () => {
+  it("movie_info: reads tmdb_id and o_name, ignores empty plot/genre and rating 0", () => {
+    const d = parseBugouMovieDetails("19749467", { info: { tmdb_id: "1241982", name: "MOANA 2 (Cinema)", o_name: "Moana 2", plot: "", genre: "", rating: "0", duration: "00:00:00", duration_secs: "0", releasedate: "" }, movie_data: { stream_id: "19749467", year: "None", container_extension: "mp4" } });
+    expect(d.tmdbId).toBe(1241982);
+    expect(d.originalTitle).toBe("Moana 2");
+    expect(d.plot).toBeNull();
+    expect(d.genres).toEqual([]);
+    expect(d.rating).toBeNull();
+    expect(d.durationMinutes).toBeNull();
+  });
+  it("series_info: genres, backdrop list string, dates, rating, trailer, season and episode metadata", () => {
+    const d = parseBugouDetails("1", {
+      info: { name: "Loki (2021)", title: "Loki", year: "2021", plot: "Sinopse", genre: "Drama, Sci-Fi & Fantasy", release_date: "2021-06-09", rating: "8", backdrop_path: "['http://image.tmdb.org/t/p/w1280/x.jpg']", youtube_trailer: "ETpixAlp3bk" },
+      seasons: [{ season_number: "1", overview: "Temporada", air_date: "2021-06-09", id: "114355", cover_big: "https://image.tmdb.org/s.jpg" }],
+      episodes: { "1": [{ id: "21874030", episode_num: "1", title: "Glorioso Propósito", container_extension: "mp4", info: { plot: "Ep plot", release_date: "2021-06-09", rating: "7.421", tmdb_id: "2534997", duration_secs: "3180" } }] },
+    });
+    expect(d.genres).toEqual(["Drama", "Sci-Fi & Fantasy"]);
+    expect(mapBugouGenreSlugs(d.genres!)).toEqual(["drama", "ficcao-cientifica", "fantasia"]);
+    expect(d.backdrop).toBe("https://image.tmdb.org/t/p/w1280/x.jpg");
+    expect(d.releaseDate).toBe("2021-06-09");
+    expect(d.rating).toBe(8);
+    expect(d.trailer).toBe("https://www.youtube.com/watch?v=ETpixAlp3bk");
+    expect(d.seasonMeta?.[0]).toMatchObject({ season: 1, overview: "Temporada", air_date: "2021-06-09", tmdb_id: 114355 });
+    expect(d.seasons[0]!.episodes[0]).toMatchObject({ plot: "Ep plot", release_date: "2021-06-09", rating: 7.4, tmdb_id: 2534997, duration_minutes: 53 });
+  });
+  it("unknown genre labels are not mapped to invented genres", () => {
+    expect(mapBugouGenreSlugs(["Novela", "Reality"])).toEqual([]);
+    expect(bugouBackdrop("")).toBeNull();
   });
 });
