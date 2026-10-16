@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { UserRound } from "lucide-react";
 import { supabase } from "@/lib/auth/area-client";
-import { safeImageUrl } from "@/lib/media";
+import { safeImageUrl } from "@/lib/tmdb/completion";
 import { CREW_LABEL } from "@/lib/tmdb/extras";
 
 type Credit = { id: string; name: string; character: string | null; job: string | null; credit_type: string; profile_url: string | null };
