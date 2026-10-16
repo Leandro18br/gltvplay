@@ -64,6 +64,7 @@ function Nav({ onNavigate, role }: { onNavigate?: () => void; role: StaffRole })
   async function logout() {
     await qc.cancelQueries();
     qc.clear();
+    clearAdminAccessCache();
     await signOutSlot("admin");
     navigate({ to: "/admin/login", replace: true });
   }

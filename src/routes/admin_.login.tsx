@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureSlot } from "@/lib/auth/session-vault";
+import { claimSlot } from "@/lib/auth/session-vault";
+import { checkAdminAccess, clearAdminAccessCache, primeAdminAccess, resolveRole, roleToAccess } from "@/lib/auth/admin-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,11 +19,6 @@ export const Route = createFileRoute("/admin_/login")({
   component: AdminLogin,
 });
 
-async function isStaff(uid: string) {
-  const { data } = await supabase.rpc("is_staff", { _user_id: uid });
-  return !!data;
-}
-
 function AdminLogin() {
   const navigate = useNavigate();
   const { denied } = Route.useSearch();
@@ -31,16 +27,22 @@ function AdminLogin() {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"login" | "forgot">("login");
+  const busy = useRef(false);
 
   useEffect(() => {
-    if (denied) toast.error("Sua conta não tem permissão de administrador.");
-    ensureSlot("admin").then(() => supabase.auth.getUser()).then(async ({ data }) => {
-      if (data.user && (await isStaff(data.user.id))) navigate({ to: "/admin", replace: true });
+    if (denied) { toast.error("Sua conta não tem permissão de administrador."); return; }
+    // Already signed in to the admin area? Reuse the shared check (no duplicate queries).
+    let alive = true;
+    checkAdminAccess().then((a) => {
+      if (alive && !busy.current && a.status === "ok") navigate({ to: "/admin", replace: true });
     });
+    return () => { alive = false; };
   }, [denied, navigate]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy.current) return; // blocks duplicate submissions
+    busy.current = true;
     setLoading(true);
     try {
       if (mode === "forgot") {
@@ -50,18 +52,29 @@ function AdminLogin() {
         setMode("login");
         return;
       }
+      clearAdminAccessCache();
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-      if (error) throw new Error("E-mail ou senha inválidos");
-      if (!(await isStaff(data.user.id))) {
+      if (error) {
+        if (/invalid login|credentials/i.test(error.message)) throw new Error("E-mail ou senha inválidos.");
+        throw new Error("Não foi possível conectar ao servidor de login. Tente novamente.");
+      }
+      const { role, error: roleErr } = await resolveRole();
+      if (roleErr) throw new Error("Falha temporária ao verificar permissões. Tente novamente.");
+      const access = roleToAccess(data.user, role);
+      if (access.status !== "ok") {
         await supabase.auth.signOut({ scope: "local" });
         throw new Error("Acesso negado: esta conta não é administradora.");
       }
-      await supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", data.user.id);
+      // Bind this new session to the admin slot so the panel gate never restores an older one.
+      await claimSlot("admin");
+      primeAdminAccess(data.session.access_token, access);
+      void supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", data.user.id);
       toast.success("Bem-vindo(a) ao painel");
-      navigate({ to: "/admin", replace: true });
+      await navigate({ to: "/admin", replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao entrar");
     } finally {
+      busy.current = false;
       setLoading(false);
     }
   }
