@@ -76,7 +76,7 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
       invalidate(qc);
     }
     await onDone?.(result);
-    const nothingNew = !result.filled && !result.genres && !result.cast && !result.crew && !result.videos;
+    const nothingNew = !result.filled && !result.genres;
     const empty = labels(result.empty);
     const text = `${nothingNew ? "Já estava atualizado — o TMDB não trouxe informações novas." : "Informações atualizadas!"} ${parts.join(". ")}.${empty ? ` Sem dados no TMDB: ${empty}.` : ""}${result.dateConfirmed ? "" : " A data de lançamento não pôde ser confirmada no TMDB; o valor atual foi mantido."}${problems.length ? ` Atenção: ${problems.join(" ")}` : ""}`;
     setMessage({ text, error: problems.length > 0 });
