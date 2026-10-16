@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adaptFactor, backoffMs, fetchProviderJson, minIntervalMs, parseRetryAfter, RateLimitedError } from "./ratelimit";
+import { adaptFactor, backoffMs, fetchProviderJson, minIntervalMs, parseRateLimitReset, parseRetryAfter, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS, RateLimitedError } from "./ratelimit";
 
 const url = new URL("https://example.test/x");
 const res = (status: number, body: unknown = {}, headers: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers });
@@ -14,11 +14,21 @@ describe("rate limit helpers", () => {
     expect(backoffMs(3, 15_000, 600_000, () => 1)).toBe(75_000);
     expect(backoffMs(20, 15_000, 600_000, () => 0.5)).toBe(600_000);
   });
-  it("30 requests/min paces 2s apart; halved after 429", () => {
+  it("30 requests/min paces 2s apart; halved after 429, never below 1/4", () => {
     expect(minIntervalMs(30)).toBe(2000);
     expect(minIntervalMs(30, adaptFactor(1, "429"))).toBe(4000);
-    expect(adaptFactor(0.5, "ok")).toBeCloseTo(0.6);
+    expect(adaptFactor(0.25, "429")).toBe(0.25);
+    expect(adaptFactor(0.5, "ok")).toBeCloseTo(0.7);
   });
+  it("RateLimit header with remaining=0 gives the reset wait", () => {
+    expect(parseRateLimitReset(new Headers({ ratelimit: "limit=1200, remaining=0, reset=55" }))).toBe(55_000);
+    expect(parseRateLimitReset(new Headers({ ratelimit: "limit=1200, remaining=10, reset=55" }))).toBeNull();
+  });
+  it("429 without hint retries within 2 minutes", () => {
+    expect(backoffMs(1, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS, () => 0.5)).toBe(5_000);
+    expect(backoffMs(9, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS, () => 1)).toBe(150_000);
+  });
+});
 });
 
 describe("fetchProviderJson", () => {
