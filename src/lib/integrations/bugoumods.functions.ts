@@ -467,13 +467,13 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     } catch (e) {
       const msg = scrub(e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (e instanceof RateLimitedError) {
+        // Real provider 429: wait the provider's hint (Retry-After / RateLimit reset) or a short backoff, then the queue resumes by itself.
         st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429"); stop = true;
         const rl = it.rate_limited + 1;
-        const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(rl, 30_000))).toISOString();
+        const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(Math.min(rl, 6), PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS))).toISOString();
         if (!throttleUntil || until > throttleUntil) throttleUntil = until;
-        await upd(rl >= MAX_RATE_LIMITED
-          ? { state: "failed", rate_limited: rl, error: `${msg} Tentativas automáticas esgotadas — use "Tentar de novo só as falhas" mais tarde.`, next_attempt_at: null }
-          : { state: "pending", rate_limited: rl, error: `${msg} Nova tentativa programada.`, next_attempt_at: until });
+        console.warn("bugou 429", it.ext_id, e.retryAfterMs ?? "no-hint", until);
+        await upd({ state: "pending", rate_limited: rl, error: `${msg} Retomada automática programada.`, next_attempt_at: until });
         return "throttle";
       }
       if (/rate limit|too many requests|try again in a minute|statement timeout|canceling statement/i.test(msg)) {
