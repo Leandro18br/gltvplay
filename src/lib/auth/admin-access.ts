@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { getAreaClient } from "@/lib/auth/area-client";
+const supabase = getAreaClient("admin");
 import { ensureSlot } from "@/lib/auth/session-vault";
 import type { StaffRole } from "@/lib/admin/db";
 

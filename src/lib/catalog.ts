@@ -1,5 +1,5 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 
 // Public catalog reads. RLS only exposes published rows to visitors,
 // so whatever the admin publishes (or unpublishes) is reflected here automatically.

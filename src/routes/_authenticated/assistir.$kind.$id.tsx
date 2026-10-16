@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipForward, ListVideo, Settings2, Loader2, RotateCcw, RotateCw, Radio,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { useActiveProfile, getProgress, saveProgress } from "@/lib/user-data";
 import { Slider } from "@/components/ui/slider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";

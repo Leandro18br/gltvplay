@@ -14,8 +14,8 @@
 - Roles live in `user_roles` and are checked with `has_role`/`is_staff` SQL functions; first signup becomes admin. Why: prevent privilege escalation.
 - Playback sources live only in staff-only `playback_sources` and are resolved through `get_playback_source` for signed-in active users; the legacy URL RPC excludes embeds. Why: one authorization model for all source types.
 - History/watchlist/playback reference content polymorphically via `content_kind` + `content_id`. Why: one structure for movies, series, episodes and channels.
-- Catalog writes audited via `audit_trigger` → `audit_logs`. Why: traceability.
-- Media uploads use the private `media` bucket. Why: workspace blocks public buckets.
+- Catalog writes audited (`audit_trigger` → `audit_logs`). Why: traceability.
+- Media uploads: private `media` bucket. Why: no public buckets.
 - Admin CRUD screens are config-driven via `ResourceManager` + `src/lib/admin/configs.tsx`; add new admin entities as configs, not bespoke pages. Why: consistency.
 - Admin area lives under `/admin` (own ssr:false gate checking `is_staff`); login at `/admin/login` (`admin_.login.tsx`, un-nested). Why: separate admin entry.
 - Catalog import providers live in `src/lib/import/import.functions.ts` (licensed APIs only, keys via server secrets); imports dedupe on (external_source, external_id). Why: pluggable future integrations.
@@ -30,8 +30,7 @@
 - Cross-origin embed loading is not proof of playback; generic embeds record history without fabricated playback progress, and failures use rate-limited diagnostic reports. Why: provider APIs are required for accurate time and reliable playback signals.
 - TMDB reuses cached metadata, staff-only allowlisted completion and locked import deduplication; year jobs persist bounded discovery/item checkpoints. Episode updates touch existing rows only. Why: preserve manual data, identities and playback.
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
-- Detail rules: `src/lib/{integrations,playback,tmdb,admin,access}/AGENTS.md`. Why: directory scope.
+- Detail rules: `src/lib/{integrations,playback,tmdb,admin,access,auth}/AGENTS.md`. Why: directory scope.
 - Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
-- Per-area session slots (`session-vault.ts`): guards restore slot, then re-check server-side. Why: logins must not evict each other.
-- Brand logo renders only via `GLTVLogo` (`src/components/brand/GLTVLogo.tsx`) using the static file `public/brand/gltv-logo.png`; favicon is `public/favicon.png`. Why: one fixed official mark across all areas.
-- Admin UI gate uses the shared `checkAdminAccess` (`src/lib/auth/admin-access.ts`): one in-flight check, short per-token cache, distinct unauthenticated/forbidden/error states; login binds the admin slot before navigating. Why: avoid stale-slot false denials and repeated role queries.
+- Brand logo only via `GLTVLogo` (`public/brand/gltv-logo.png`); favicon `public/favicon.png`. Why: one mark.
+- Each area (client/admin/reseller) has its own auth client (`src/lib/auth/AGENTS.md`). Why: one area's sign-out/expiry must not affect another.

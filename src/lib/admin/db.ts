@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 
 // Untyped handle for config-driven admin screens (table names come from config).
 export const db = supabase as unknown as {
