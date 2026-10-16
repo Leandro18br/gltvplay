@@ -865,9 +865,10 @@ export const bugouRepairMovieMetadataBatch = createServerFn({ method: "POST" }).
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const list = (rows ?? []) as { id: string; external_id: string }[];
-    if (!list.length) return { scanned: 0, nextCursor: data.after ?? null, done: true, report: null };
-    const report = await importMovieIds(ctx, list.map(r => r.external_id).filter(x => /^\d+$/.test(x)));
-    return { scanned: list.length, nextCursor: list[list.length - 1]!.id, done: list.length < data.limit, report };
+    const empty = { scanned: 0, corrected: 0, descriptionsAdded: 0, genresAdded: 0, unavailable: 0, failed: 0 };
+    if (!list.length) return { ...empty, nextCursor: data.after ?? null, done: true };
+    const r = await importMovieIds(ctx, list.map(x => x.external_id).filter(x => /^\d+$/.test(x)));
+    return { scanned: list.length, corrected: r.fieldsFilled, descriptionsAdded: r.descriptionsAdded, genresAdded: r.genresAdded, unavailable: r.metadataUnavailable + r.detailFailures, failed: r.failed, nextCursor: list[list.length - 1]!.id, done: list.length < data.limit };
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
@@ -884,7 +885,7 @@ async function importMovieIds(ctx: Ctx, ids: string[]) {
     if (error) throw new Error(error.message);
     const byId = new Map((items ?? []).map((x: any) => [x.ext_id, x]));
     const { integ, tok } = await seriesIntegration();
-    const report = { created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0 };
+    const report = { created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0, fieldsFilled: 0 };
 
     for (const id of data.ids) {
       const m = byId.get(id) as any;
@@ -939,6 +940,7 @@ async function importMovieIds(ctx: Ctx, ids: string[]) {
           if (Object.keys(patch).length) {
             const up = await db.from("movies").update(patch).eq("id", movieId);
             if (up.error) throw new Error(up.error.message);
+            report.fieldsFilled++;
           }
           report.updated++;
         } else {
