@@ -33,3 +33,4 @@
 - Detail rules: `src/lib/{integrations,playback,tmdb,admin,access}/AGENTS.md`. Why: directory scope.
 - Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
 - Per-area session slots (`session-vault.ts`): guards restore slot, then re-check server-side. Why: logins must not evict each other.
+- Brand logo renders only via `GLTVLogo` (`src/components/brand/GLTVLogo.tsx`) using the static file `public/brand/gltv-logo.png`; favicon is `public/favicon.png`. Why: one fixed official mark across all areas.
