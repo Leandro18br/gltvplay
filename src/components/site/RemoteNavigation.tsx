@@ -45,7 +45,8 @@ export function RemoteNavigation() {
         window.scrollTo(pending.x, pending.y);
         const fallback = items[Math.max(0, Math.min(pending.index, items.length - 1))];
         pending = undefined;
-        if (target ?? fallback) focus((target ?? fallback) as HTMLElement);
+        const restored = target ?? fallback;
+        if (restored) focus(restored);
       } else if (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected || document.activeElement.matches(':disabled')) {
         const player = document.querySelector('[data-remote-player]');
         const primary = player ? items.find(el => player.contains(el) && /Reproduzir|Pausar/.test(el.getAttribute('aria-label') ?? '')) : undefined;

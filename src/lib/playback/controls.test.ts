@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { CONTROLS_IDLE_MS, PLAYBACK_RATES, seekTarget } from "./controls";
+import { CONTROLS_IDLE_MS, PLAYBACK_RATES, seekTarget, isMediaControl } from "./controls";
 
 describe("movie and episode control rules", () => {
+  it("does not seek or toggle while navigating buttons or native sliders", () => {
+    const button = document.createElement('button'), slider = document.createElement('span');
+    slider.setAttribute('role', 'slider');
+    expect(isMediaControl(button)).toBe(true);
+    expect(isMediaControl(slider)).toBe(true);
+    expect(isMediaControl(document.createElement('div'))).toBe(false);
+  });
   it("rewinds ten seconds without going below zero", () => {
     expect(seekTarget(32, -10, 108)).toBe(22);
     expect(seekTarget(4, -10, 108)).toBe(0);

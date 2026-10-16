@@ -38,7 +38,7 @@ export function navigable(root: ParentNode): HTMLElement[] {
 export function directionalTarget(current: HTMLElement, candidates: HTMLElement[], direction: Direction) {
   const row = current.closest('[data-remote-row]');
   const horizontal = direction === "left" || direction === "right";
-  const pool = row && horizontal ? candidates.filter(item => row.contains(item)) : candidates;
+  const pool = row && horizontal ? candidates.filter(item => row.contains(item) && (current.matches('a[data-remote-id]') ? item.matches('a[data-remote-id]') : true)) : candidates;
   let best: HTMLElement | undefined, score = Infinity;
   for (const item of pool) {
     if (item === current || current.contains(item) || item.contains(current)) continue;
