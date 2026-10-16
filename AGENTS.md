@@ -14,7 +14,7 @@
 - Roles live in `user_roles` and are checked with `has_role`/`is_staff` SQL functions; first signup becomes admin. Why: prevent privilege escalation.
 - Playback sources live only in staff-only `playback_sources` and are resolved through `get_playback_source` for signed-in active users; the legacy URL RPC excludes embeds. Why: one authorization model for all source types.
 - History/watchlist/playback reference content polymorphically via `content_kind` + `content_id`. Why: one structure for movies, series, episodes and channels.
-- Catalog writes audited via `audit_trigger` → `audit_logs`. Why: traceability.
+- Catalog writes audited (`audit_trigger` → `audit_logs`). Why: traceability.
 - Media uploads: private `media` bucket. Why: no public buckets.
 - Admin CRUD screens are config-driven via `ResourceManager` + `src/lib/admin/configs.tsx`; add new admin entities as configs, not bespoke pages. Why: consistency.
 - Admin area lives under `/admin` (own ssr:false gate checking `is_staff`); login at `/admin/login` (`admin_.login.tsx`, un-nested). Why: separate admin entry.
