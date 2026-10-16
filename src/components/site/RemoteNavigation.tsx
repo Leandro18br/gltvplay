@@ -16,8 +16,8 @@ export function RemoteNavigation() {
     const saved = new Map<string, SavedFocus>();
     const publicArea = () => !excluded(location.pathname);
     const keyFor = (element: HTMLElement) => {
-      if (element.dataset['remoteId']) return element.dataset['remoteId'];
       const section = element.closest('section')?.getAttribute('aria-label') ?? "";
+      if (element.dataset['remoteId']) return `${section}|${element.dataset['remoteId']}`;
       return `${section}|${element.dataset['remoteId'] ?? element.getAttribute('href') ?? element.id ?? ""}|${element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ""}`;
     };
     const scope = (): ParentNode => {
@@ -71,11 +71,22 @@ export function RemoteNavigation() {
       if (!publicArea() || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
       const key = remoteKey(event);
       if (isEditing(event.target instanceof Element ? event.target : null)) {
-        if (key === 'Escape' && !event.repeat) { event.preventDefault(); event.stopPropagation(); (event.target as HTMLElement).blur(); enable(); }
+        if (key === 'Escape' && !event.repeat) {
+          event.preventDefault(); event.stopPropagation(); enable();
+          const target = navigable(scope()).find(element => !isEditing(element) && element.closest('main')) ?? navigable(scope()).find(element => !isEditing(element));
+          if (target) focus(target);
+        }
         return;
       }
       if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Escape','Backspace'].includes(key)) return;
       enable();
+      // Enter finishes editing a slider; its arrow keys continue to change its native value.
+      if (key === 'Enter' && document.activeElement?.matches('[role="slider"]')) {
+        const items = navigable(scope()), index = items.indexOf(document.activeElement as HTMLElement);
+        const next = items.slice(index + 1).find(item => !item.matches('[role="slider"]'));
+        if (next) { event.preventDefault(); event.stopPropagation(); focus(next); }
+        return;
+      }
       // Radix retains its own focus management, selection and dismissal.
       if ((key === 'Backspace' || key === 'Escape') && document.querySelector(overlay)) {
         if (event.repeat) { event.preventDefault(); event.stopPropagation(); return; }
