@@ -799,6 +799,54 @@ export type Database = {
           },
         ]
       }
+      content_credits: {
+        Row: {
+          character: string | null
+          content_id: string
+          content_kind: Database["public"]["Enums"]["content_kind"]
+          credit_type: string
+          department: string | null
+          id: string
+          job: string | null
+          name: string
+          profile_url: string | null
+          sort_order: number
+          tmdb_credit_id: string
+          tmdb_person_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          character?: string | null
+          content_id: string
+          content_kind: Database["public"]["Enums"]["content_kind"]
+          credit_type: string
+          department?: string | null
+          id?: string
+          job?: string | null
+          name: string
+          profile_url?: string | null
+          sort_order?: number
+          tmdb_credit_id: string
+          tmdb_person_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          character?: string | null
+          content_id?: string
+          content_kind?: Database["public"]["Enums"]["content_kind"]
+          credit_type?: string
+          department?: string | null
+          id?: string
+          job?: string | null
+          name?: string
+          profile_url?: string | null
+          sort_order?: number
+          tmdb_credit_id?: string
+          tmdb_person_id?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_requests: {
         Row: {
           admin_note: string | null
@@ -851,6 +899,57 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      content_videos: {
+        Row: {
+          content_id: string
+          content_kind: Database["public"]["Enums"]["content_kind"]
+          id: string
+          is_primary: boolean
+          iso_3166_1: string | null
+          iso_639_1: string | null
+          name: string | null
+          official: boolean | null
+          published_at: string | null
+          site: string | null
+          tmdb_video_id: string
+          updated_at: string
+          video_key: string
+          video_type: string | null
+        }
+        Insert: {
+          content_id: string
+          content_kind: Database["public"]["Enums"]["content_kind"]
+          id?: string
+          is_primary?: boolean
+          iso_3166_1?: string | null
+          iso_639_1?: string | null
+          name?: string | null
+          official?: boolean | null
+          published_at?: string | null
+          site?: string | null
+          tmdb_video_id: string
+          updated_at?: string
+          video_key: string
+          video_type?: string | null
+        }
+        Update: {
+          content_id?: string
+          content_kind?: Database["public"]["Enums"]["content_kind"]
+          id?: string
+          is_primary?: boolean
+          iso_3166_1?: string | null
+          iso_639_1?: string | null
+          name?: string | null
+          official?: boolean | null
+          published_at?: string | null
+          site?: string | null
+          tmdb_video_id?: string
+          updated_at?: string
+          video_key?: string
+          video_type?: string | null
+        }
+        Relationships: []
       }
       credit_orders: {
         Row: {
@@ -1560,6 +1659,8 @@ export type Database = {
           popularity: number | null
           poster_path: string | null
           poster_url: string | null
+          production_companies: string[] | null
+          production_countries: string[] | null
           quality: string | null
           release_date: string | null
           release_year: number | null
@@ -1595,6 +1696,8 @@ export type Database = {
           popularity?: number | null
           poster_path?: string | null
           poster_url?: string | null
+          production_companies?: string[] | null
+          production_countries?: string[] | null
           quality?: string | null
           release_date?: string | null
           release_year?: number | null
@@ -1630,6 +1733,8 @@ export type Database = {
           popularity?: number | null
           poster_path?: string | null
           poster_url?: string | null
+          production_companies?: string[] | null
+          production_countries?: string[] | null
           quality?: string | null
           release_date?: string | null
           release_year?: number | null
@@ -1941,13 +2046,18 @@ export type Database = {
           first_air_date: string | null
           id: string
           imdb_id: string | null
+          in_production: boolean | null
           language: string | null
+          last_air_date: string | null
+          networks: string[] | null
           number_of_episodes: number | null
           number_of_seasons: number | null
           original_title: string | null
           popularity: number | null
           poster_path: string | null
           poster_url: string | null
+          production_companies: string[] | null
+          production_countries: string[] | null
           release_year: number | null
           slug: string | null
           sort_order: number
@@ -1976,13 +2086,18 @@ export type Database = {
           first_air_date?: string | null
           id?: string
           imdb_id?: string | null
+          in_production?: boolean | null
           language?: string | null
+          last_air_date?: string | null
+          networks?: string[] | null
           number_of_episodes?: number | null
           number_of_seasons?: number | null
           original_title?: string | null
           popularity?: number | null
           poster_path?: string | null
           poster_url?: string | null
+          production_companies?: string[] | null
+          production_countries?: string[] | null
           release_year?: number | null
           slug?: string | null
           sort_order?: number
@@ -2011,13 +2126,18 @@ export type Database = {
           first_air_date?: string | null
           id?: string
           imdb_id?: string | null
+          in_production?: boolean | null
           language?: string | null
+          last_air_date?: string | null
+          networks?: string[] | null
           number_of_episodes?: number | null
           number_of_seasons?: number | null
           original_title?: string | null
           popularity?: number | null
           poster_path?: string | null
           poster_url?: string | null
+          production_companies?: string[] | null
+          production_countries?: string[] | null
           release_year?: number | null
           slug?: string | null
           sort_order?: number
@@ -2474,6 +2594,16 @@ export type Database = {
       admin_upsert_reseller: {
         Args: { _display_name: string; _status?: string; _user_id: string }
         Returns: undefined
+      }
+      apply_tmdb_extras: {
+        Args: {
+          _credits: Json
+          _id: string
+          _kind: string
+          _patch: Json
+          _videos: Json
+        }
+        Returns: Json
       }
       bugou_apply_series: {
         Args: { _actor: string; _items: Json; _series_id: string }

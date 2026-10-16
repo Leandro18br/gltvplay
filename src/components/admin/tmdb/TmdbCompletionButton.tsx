@@ -21,6 +21,8 @@ const FIELD_LABEL: Record<string, string> = {
   release_date: "data de lançamento", first_air_date: "primeira exibição", release_year: "ano", duration_minutes: "duração",
   poster_url: "pôster", backdrop_url: "banner", vote_average: "nota", vote_count: "avaliações", popularity: "popularidade",
   tagline: "slogan", tmdb_status: "status", language: "idioma original", country: "país", number_of_seasons: "temporadas", number_of_episodes: "episódios",
+  age_rating: "classificação indicativa", trailer_url: "trailer", production_companies: "produtoras", production_countries: "países de produção",
+  last_air_date: "último episódio exibido", in_production: "status de produção", networks: "emissoras",
 };
 const labels = (keys: string[] = []) => [...new Set(keys.filter((k) => FIELD_LABEL[k]).map((k) => FIELD_LABEL[k]))].join(", ");
 export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: {
@@ -30,6 +32,7 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
   const resolve = useServerFn(tmdbResolveContent);
   const refresh = useServerFn(tmdbRefresh);
   const search = useServerFn(tmdbSearch);
+  const completeSeason = useServerFn(tmdbCompleteSeasonEpisodes);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
@@ -48,11 +51,36 @@ export function TmdbRefreshButton({ kind, id, disabled, onDone, onBusyChange }: 
   const markBusy = (value: boolean) => { setBusy(value); onBusyChange?.(value); };
   async function apply(tmdbId: number) {
     const result = await refresh({ data: { kind, id, tmdbId } });
-    invalidate(qc); await onDone?.(result); setOpen(false); setCandidates([]);
+    invalidate(qc); setOpen(false); setCandidates([]);
+    const parts: string[] = [];
     const filled = labels(result.filledFields);
+    if (filled) parts.push(`Informações gerais: ${filled}`);
+    if (result.genres) parts.push(`${result.genres} gênero(s)`);
+    if (result.cast || result.crew) parts.push(`Elenco: ${result.cast} ator(es)${result.crew ? `, ${result.crew} da equipe` : ""}`);
+    parts.push(result.trailer ? `Trailer: ${result.trailer}` : "Sem trailer no TMDB");
+    const problems: string[] = [];
+    if (result.extrasError) problems.push(result.extrasError);
+    if (kind === "series") {
+      setMessage({ text: "Atualizando temporadas e episódios...", error: false });
+      try {
+        const { data: rows, error } = await db.from("seasons").select("id").eq("series_id", id).order("season_number");
+        if (error) throw error;
+        let eps = 0, seasonFields = 0, unmatched = 0, failed = 0;
+        for (const s of (rows ?? []) as { id: string }[]) {
+          try { const r = await completeSeason({ data: { seriesId: id, seasonId: s.id } }); seasonFields += r.filled; eps += r.updated; unmatched += r.unmatched; }
+          catch { failed++; }
+        }
+        if (rows?.length) parts.push(`Temporadas e episódios: ${rows.length} temporada(s), ${eps} episódio(s) completados, ${seasonFields} campo(s)${unmatched ? `, ${unmatched} sem correspondência preservado(s)` : ""}`);
+        if (failed) problems.push(`${failed} temporada(s) não puderam ser atualizadas; tente novamente.`);
+      } catch (e) { problems.push(`Temporadas e episódios não atualizados: ${errMsg(e)}`); }
+      invalidate(qc);
+    }
+    await onDone?.(result);
+    const nothingNew = !result.filled && !result.genres;
     const empty = labels(result.empty);
-    const text = `Informações atualizadas! ${result.filled} campos foram preenchidos${filled ? ` (${filled})` : ""}.${result.genres ? ` ${result.genres} gênero(s) associado(s).` : ""}${result.genres_created ? ` ${result.genres_created} gênero(s) novo(s) criado(s).` : ""}${empty ? ` Sem dados no TMDB: ${empty}.` : ""}${result.dateConfirmed ? "" : " A data de lançamento não pôde ser confirmada no TMDB; o valor atual foi mantido."}`;
-    setMessage({ text, error: false }); toast.success(`Informações atualizadas! ${result.filled} campos foram preenchidos.`);
+    const text = `${nothingNew ? "Já estava atualizado — o TMDB não trouxe informações novas." : "Informações atualizadas!"} ${parts.join(". ")}.${empty ? ` Sem dados no TMDB: ${empty}.` : ""}${result.dateConfirmed ? "" : " A data de lançamento não pôde ser confirmada no TMDB; o valor atual foi mantido."}${problems.length ? ` Atenção: ${problems.join(" ")}` : ""}`;
+    setMessage({ text, error: problems.length > 0 });
+    if (problems.length) toast.warning("Atualização parcial. Veja os detalhes."); else toast.success(nothingNew ? "Conteúdo já atualizado." : "Informações atualizadas!");
   }
   async function run(tmdbId?: number) {
     markBusy(true); setMessage(null);

@@ -13,6 +13,7 @@ vi.mock("@tanstack/react-query", () => ({ useSuspenseQuery: () => ({ data: {
   ],
 } }) }));
 vi.mock("@/lib/catalog", () => ({ seriesDetailQuery: vi.fn(), formatDuration: () => "" }));
+vi.mock("@/components/site/CastSection", () => ({ CastSection: () => null }));
 vi.mock("@/components/site/SiteShell", () => ({ SiteShell: ({ children }: { children: React.ReactNode }) => <>{children}</>, RetryState: () => null, EmptyState: () => null }));
 vi.mock("@/components/site/DetailHero", () => ({ DetailHero: ({ player }: { player?: React.ReactNode }) => <>{player}</> }));
 vi.mock("@/components/site/InlinePlayer", () => ({ InlinePlayer: ({ id }: { id: string }) => <div role="region" aria-label={id} /> }));

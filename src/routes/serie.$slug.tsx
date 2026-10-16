@@ -7,6 +7,7 @@ import { Play } from "lucide-react";
 import { formatDuration, seriesDetailQuery } from "@/lib/catalog";
 import { RetryState, SiteShell, EmptyState } from "@/components/site/SiteShell";
 import { DetailHero } from "@/components/site/DetailHero";
+import { CastSection } from "@/components/site/CastSection";
 import { InlinePlayer } from "@/components/site/InlinePlayer";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,6 +71,7 @@ function SeriesPage() {
             <InlinePlayer key={current.id} autoStart className="movie-top-player" kind="episode" id={current.id} title={`${data.item.title} — ${current.title}`} poster={safeImageUrl(current.thumbnail_url) || data.item.backdrop_url || data.item.poster_url} />
           ) : undefined}
         />
+        <CastSection kind="series" id={data.item.id} />
         <section id="episodios" aria-label="Episódios" className="mx-auto max-w-[1600px] scroll-mt-20 px-4 py-10 md:px-10">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-semibold">Episódios</h2>
