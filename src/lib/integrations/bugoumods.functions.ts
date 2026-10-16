@@ -197,6 +197,7 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
   }));
   const r = await (await admin()).rpc("bugou_apply_series", { _series_id: seriesId, _items: items, _actor: ctx.userId || null });
   if (r.error) throw new Error(r.error.message);
+  await enrichContent({ supabase: await admin(), userId: "" }, "series", seriesId);
   const x = r.data as { items: number; seasons: number; episodes: number; sources_new: number; sources_updated: number; saved: number; with_player: number };
   out.seasonsCreated = x.seasons; out.episodesCreated = x.episodes; out.episodesExisting = Math.max(0, x.items - x.episodes);
   out.sourcesCreated = x.sources_new; out.sourcesExisting = Math.max(0, x.items - x.sources_new);
