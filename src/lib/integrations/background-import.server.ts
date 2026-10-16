@@ -65,7 +65,7 @@ export async function runMovieJob(ctx: Ctx, jobId: string, budgetMs: number) {
 export async function runStreamBetterJob(ctx: Ctx, jobId: string, kind: "movie" | "series", budgetMs: number) {
   const db = ctx.supabase; const t0 = Date.now();
   const job = await claim(db, jobId); if (!job) return { busy: true };
-  const s: Record<string, any> = { page: 1, totalPages: null, totalItems: 0, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0, http429: 0, pagesDone: 0, ...(job.stats ?? {}) };
+  const s: any = { page: 1, totalPages: null, totalItems: 0, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0, http429: 0, pagesDone: 0, ...(job.stats ?? {}) };
   let status = "running"; let throttle: string | null = null;
   try {
     while (Date.now() - t0 < budgetMs - 8000) {
