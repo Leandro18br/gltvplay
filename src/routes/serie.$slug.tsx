@@ -54,7 +54,10 @@ function SeriesPage() {
   useEffect(() => {
     if (!currentId) return;
     // Run after the selected player's DOM has committed, not in the click handler.
-    const frame = requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }));
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: document.documentElement.dataset['remoteNavigation'] === 'true' || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      if (document.documentElement.dataset['remoteNavigation'] === 'true') document.querySelector<HTMLElement>('[data-playback-stage] button')?.focus();
+    });
     return () => cancelAnimationFrame(frame);
   }, [currentId]);
   if (!data) return null;
@@ -77,7 +80,7 @@ function SeriesPage() {
             <h2 className="text-2xl font-semibold">Episódios</h2>
             {data.seasons.length > 0 && (
               <Select value={season?.id ?? ""} onValueChange={setSeasonId}>
-                <SelectTrigger className="w-48 rounded-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Temporada" className="w-48 rounded-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {data.seasons.map((s) => <SelectItem key={s.id} value={s.id}>{s.title || `Temporada ${s.season_number}`}</SelectItem>)}
                 </SelectContent>
@@ -92,7 +95,7 @@ function SeriesPage() {
                 const thumbnail = safeImageUrl(e.thumbnail_url);
                 return (
                 <li key={e.id}>
-                  <Button type="button" variant="ghost" onClick={() => { void requestPlaybackDisplay(document.documentElement); setEpisodeId(e.id); }}
+                  <Button type="button" variant="ghost" data-remote-id={`episode-${e.id}`} onClick={() => { void requestPlaybackDisplay(document.documentElement); setEpisodeId(e.id); }}
                     aria-current={e.id === current?.id}
                     className={`group grid h-auto w-full grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-3 whitespace-normal rounded-lg p-2 text-left transition hover:bg-card md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] md:gap-4 ${e.id === current?.id ? "bg-card ring-1 ring-primary/40" : ""}`}>
                     <span className="hidden text-center font-display text-2xl text-muted-foreground md:block">{e.episode_number}</span>

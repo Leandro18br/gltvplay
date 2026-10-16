@@ -47,7 +47,7 @@ export function Hero({ slides, tagline }: { slides: HeroSlide[]; tagline?: strin
   const meta = it ? [it.release_year, it.age_rating, it.kind === "movie" ? formatDuration(it.duration_minutes) : it.kind === "series" ? "Série" : null, it.language?.toUpperCase(), it.quality].filter(Boolean) : [];
 
   return (
-    <section aria-label="Destaque" aria-roledescription="carrossel" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocusCapture={() => setPaused(true)} onBlurCapture={() => setPaused(false)} onTouchStart={e => setTouchStart(e.touches[0]?.clientX ?? null)} onTouchEnd={e => { const end = e.changedTouches[0]?.clientX; if(touchStart !== null && end !== undefined && Math.abs(end-touchStart)>50) change(end<touchStart ? 1 : -1); setTouchStart(null); }} className="relative h-[78svh] min-h-[480px] max-h-[900px] w-full overflow-hidden bg-background md:h-[85vh]">
+    <section aria-label="Destaque" aria-roledescription="carrossel" onMouseEnter={() => setPaused(true)} onMouseLeave={() => { if (document.documentElement.dataset['remoteNavigation'] !== 'true') setPaused(false); }} onFocusCapture={() => setPaused(true)} onBlurCapture={event => { if (document.documentElement.dataset['remoteNavigation'] !== 'true' && !event.currentTarget.contains(event.relatedTarget)) setPaused(false); }} onTouchStart={e => setTouchStart(e.touches[0]?.clientX ?? null)} onTouchEnd={e => { const end = e.changedTouches[0]?.clientX; if(touchStart !== null && end !== undefined && Math.abs(end-touchStart)>50) change(end<touchStart ? 1 : -1); setTouchStart(null); }} className="relative h-[78svh] min-h-[480px] max-h-[900px] w-full overflow-hidden bg-background md:h-[85vh]">
       {slides.map((x, i) => (
         x.backdrop || x.mobile ? (
           <picture key={x.key} aria-hidden={i !== current} className={`absolute inset-0 block h-full w-full transition-[opacity,transform] duration-1000 ease-out motion-reduce:transition-none ${i === current ? "scale-100 opacity-100" : "scale-105 opacity-0"}`}>
@@ -59,7 +59,7 @@ export function Hero({ slides, tagline }: { slides: HeroSlide[]; tagline?: strin
       {!s.backdrop && !s.mobile && <div className="absolute inset-0 bg-card" />}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/90 via-background/40 to-transparent" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/30 to-background/10" />
-      <div key={s.key} className="relative mx-auto flex h-full max-w-[1600px] items-end px-4 pb-16 md:px-10 md:pb-24">
+      <div className="relative mx-auto flex h-full max-w-[1600px] items-end px-4 pb-16 md:px-10 md:pb-24">
         <div className="flex min-w-0 max-w-2xl animate-rise flex-col gap-4">
           <span className="w-fit text-xs font-semibold uppercase tracking-[0.2em] text-primary">{tagline || "Em destaque"}</span>
           {s.logo ? <img src={s.logo} alt={s.title} className="max-h-24 w-auto max-w-[80%] object-contain object-left drop-shadow-lg md:max-h-36" /> : <h1 className="break-words text-4xl font-bold leading-tight drop-shadow-lg md:text-6xl">{s.title}</h1>}

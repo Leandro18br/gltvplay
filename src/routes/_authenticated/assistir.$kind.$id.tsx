@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
 import { VideoPlayerFrame } from "@/components/site/VideoPlayerFrame";
 import { attachMpegTs, usesLiveMpegTs, resolveSecureUrl, MIXED_CONTENT_MESSAGE } from "@/lib/playback/mpegts";
+import { isMediaControl } from "@/lib/playback/controls";
 import { requestPlaybackDisplay, releasePlaybackDisplay } from "@/lib/playback/display-mode";
 
 type PKind = "movie" | "episode" | "channel";
@@ -251,7 +252,10 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
   const poke = useCallback(() => {
     setUi(true);
     clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => { if (!video.current?.paused) setUi(false); }, 3000);
+    hideTimer.current = setTimeout(() => {
+      const focused = document.activeElement;
+      if (!video.current?.paused && !(document.documentElement.dataset['remoteNavigation'] === 'true' && focused && wrap.current?.contains(focused))) setUi(false);
+    }, 3000);
   }, []);
 
   const toggle = useCallback(() => { const v = video.current; if (!v) return; if (v.paused) v.play().catch(() => {}); else v.pause(); }, []);
@@ -266,7 +270,8 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
     if (!live || embed) return;
     const onFs = () => setFs(!!document.fullscreenElement);
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || !wrap.current?.contains(e.target as Node) || isMediaControl(e.target)) return;
+      if (document.documentElement.dataset['remoteNavigation'] === 'true' && e.key.startsWith('Arrow')) { poke(); return; }
       if (e.key === " " || e.key === "k") { e.preventDefault(); toggle(); }
       else if (e.key === "ArrowRight") seekBy(10);
       else if (e.key === "ArrowLeft") seekBy(-10);
@@ -314,7 +319,7 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
   </>;
 
   return (
-    <div ref={wrap} onMouseMove={poke} onTouchStart={poke} className={`fixed inset-0 select-none bg-background ${ui ? "" : "cursor-none"}`}>
+    <div ref={wrap} data-remote-player onFocus={poke} onMouseMove={poke} onTouchStart={poke} className={`fixed inset-0 select-none bg-background ${ui ? "" : "cursor-none"}`}>
       {servers && <div className={`absolute right-4 top-16 z-20 transition-opacity ${ui ? "opacity-100" : "pointer-events-none opacity-0"}`}>{servers}</div>}
       {displayHint && <p role="status" className="pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-30 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-lg bg-black/75 px-3 py-2 text-center text-xs text-white shadow-lg">Gire o celular para assistir em tela cheia.</p>}
       <video
