@@ -47,7 +47,7 @@ export function normalizePlaybackSources(data: unknown): PlaybackSource[] {
       id: value.id,
       url: value.url,
       type,
-      label: typeof value.label === "string" ? value.label : null,
+      label: typeof value["label"] === "string" ? value["label"] : null,
     }];
   });
 }

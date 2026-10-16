@@ -10,6 +10,7 @@ import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
 import { ROLE_LABEL, isAdminRole, type StaffRole } from "@/lib/admin/db";
 import { adminHead } from "@/lib/admin/head";
 import { Button } from "@/components/ui/button";
+import { GLTVLogo } from "@/components/brand/GLTVLogo";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/admin")({
@@ -55,8 +56,8 @@ function Nav({ onNavigate, role }: { onNavigate?: () => void; role: StaffRole })
   }
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center px-5 font-display text-lg font-bold">
-        <span className="mr-2 text-primary">●</span> Painel ADM
+      <div className="flex h-16 items-center gap-2 px-5 font-display text-sm font-bold">
+        <GLTVLogo size="panel" /> <span className="text-muted-foreground">ADM</span>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
         {NAV.filter((n) => (!("adminOnly" in n) || isAdminRole(role)) && (!("superOnly" in n) || role === "super_admin")).map(({ to, label, icon: Icon, ...rest }) => (
@@ -89,7 +90,7 @@ function AdminLayout() {
       </Sheet>
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/85 px-4 backdrop-blur md:px-8">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen(true)} aria-label="Abrir menu"><Menu /></Button>
+          <div className="flex items-center gap-2 lg:hidden"><Button variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label="Abrir menu"><Menu /></Button><GLTVLogo size="panel" className="h-8" /></div>
           <div className="ml-auto flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><span className="shrink-0 rounded-full border border-primary/40 bg-accent px-2 py-0.5 text-xs text-accent-foreground">{ROLE_LABEL[role]}</span><span className="truncate">{user.email}</span></div>
         </header>
         <main className="mx-auto max-w-7xl p-4 md:p-8"><Outlet /></main>

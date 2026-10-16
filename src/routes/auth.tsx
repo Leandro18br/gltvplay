@@ -83,8 +83,8 @@ function AuthPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#000000] px-4 py-6 sm:px-6 sm:py-10">
       <div className="w-full max-w-sm animate-rise rounded-2xl border border-[#00DDFA]/35 bg-[#080808] p-6 shadow-[0_0_32px_rgba(0,221,250,0.10)] sm:p-8">
-        <Logo />
-        <h1 className="mt-5 text-2xl font-semibold">Entrar</h1>
+        <div className="flex justify-center"><Logo size="login" /></div>
+        <h1 className="mt-6 text-2xl font-semibold">Entrar</h1>
         <p className="mt-1 text-sm text-[#B3B3B3]">Digite seu código de acesso e sua senha.</p>
         <form onSubmit={submit} noValidate autoComplete="off" className="mt-5 space-y-3.5">
           <div className="space-y-1.5">

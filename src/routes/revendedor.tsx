@@ -108,7 +108,7 @@ function ResellerPanel() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/85 px-4 backdrop-blur md:px-8">
-        <div className="font-display text-lg font-bold"><span className="mr-2 text-primary">●</span> Revenda</div>
+        <div className="flex shrink-0 items-center gap-2 font-display text-sm font-bold"><GLTVLogo size="panel" className="h-8 md:h-9" /> <span className="hidden text-muted-foreground sm:inline">Revenda</span></div>
         <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><span className="truncate">{me.data?.display_name ?? user.email}</span>
           <Button variant="ghost" size="icon" onClick={logout} aria-label="Sair"><LogOut /></Button></div>
       </header>
