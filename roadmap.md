@@ -1,7 +1,8 @@
 # Public TV remote navigation
-- [ ] Implement reusable directional focus, contextual return and stable restoration without changing catalog or sources.
-- [ ] Integrate carousels, detail/episode controls and native players; preserve text fields and Radix widgets.
-- [ ] Run rule/regression tests and real signed-in keyboard flows; report device/provider limitations.
+- [x] Implement reusable directional focus, contextual return and stable restoration without changing catalog or sources.
+- [x] Integrate carousels, detail/episode controls and native players; preserve text fields and Radix widgets.
+- [x] Run rule/regression tests and real signed-in keyboard flows; report device/provider limitations.
+- [ ] Validate physical TV/TV Box keys and provider iframe playback: needs real device and provider-controlled support; parent cannot receive keys once a cross-origin iframe owns focus.
 
 # Player advertising and unauthorized buttons
 - [x] Identified the app-owned retry/report/fullscreen row; no app-owned ad integration. Existing BugouMods episode sources use provider Embed Free URLs, whose external page contains advertising code and provider-owned actions; no BugouMods movie sources exist.

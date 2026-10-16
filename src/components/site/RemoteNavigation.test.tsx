@@ -31,6 +31,9 @@ describe('Global remote focus behavior',()=>{
   it('leaves slider arrows to the media widget',()=>{
     const {one,two}=setup();one.setAttribute('role','slider');one.focus();const allowed=fireEvent.keyDown(one,{key:'ArrowRight'});expect(allowed).toBe(true);expect(document.activeElement).not.toBe(two);
   });
+  it('Enter exits progress editing to the next control',()=>{
+    const {one,two}=setup();one.setAttribute('role','slider');one.focus();fireEvent.keyDown(one,{key:'Enter'});expect(document.activeElement).toBe(two);
+  });
   it('pointer input exits remote mode without removing native focus',()=>{
     const {one}=setup();one.focus();fireEvent.keyDown(one,{key:'ArrowDown'});fireEvent.pointerDown(one);expect(document.documentElement.dataset['remoteNavigation']).toBeUndefined();expect(document.activeElement).toBe(one);
   });

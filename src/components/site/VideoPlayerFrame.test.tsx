@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoPlayerFrame } from './VideoPlayerFrame';
 beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); });
@@ -14,11 +14,11 @@ function setup() {
 describe('Native player remote controls',()=>{
   it('arrows on focused play do not trigger seek or playback',()=>{
     const video=setup(),play=vi.spyOn(video,'play').mockResolvedValue();
-    const control=screen.getByRole('button',{name:'Reproduzir'});control.focus();fireEvent.keyDown(control,{key:'ArrowRight'});
+    const control=screen.getByRole('button',{name:'Reproduzir'});act(()=>control.focus());fireEvent.keyDown(control,{key:'ArrowRight'});
     expect(video.currentTime).toBe(40);expect(play).not.toHaveBeenCalled();
   });
   it('progress slider owns arrows without the parent adding a ten-second seek',()=>{
-    const video=setup(),slider=screen.getByRole('slider',{name:'Progresso'});slider.focus();fireEvent.keyDown(slider,{key:'ArrowRight'});
+    const video=setup(),slider=screen.getByRole('slider',{name:'Progresso'});act(()=>slider.focus());fireEvent.keyDown(slider,{key:'ArrowRight'});
     expect(video.currentTime).toBeCloseTo(40.1);
   });
   it('explicit skip buttons still seek ten seconds',()=>{
