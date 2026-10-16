@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { enrichContent } from "@/lib/tmdb/tmdb.functions";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -136,6 +137,7 @@ export async function importStreamBetterPage(data: { kind: "movie" | "series"; p
         if (upd.error) { errors++; continue; }
         updated++;
       }
+      await enrichContent({ supabase: db, userId: "" }, data.kind, rowId!);
       if (data.kind === "movie") {
         const embedUrl = `${BASE}/filme/${encodeURIComponent(tmdbId)}${publicKey ? `?key=${encodeURIComponent(publicKey)}` : ""}`;
         const { data: currentSources, error: sourceError } = await db.from("playback_sources").select("id,url").eq("content_kind", "movie").eq("content_id", rowId).eq("external_ref", `streambetter:${tmdbId}`).limit(1);
