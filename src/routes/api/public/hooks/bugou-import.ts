@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/public/hooks/bugou-import")({
         for (const j of (jobs ?? []).filter((j: any) => !j.kind.startsWith("streambetter_") && j.kind !== "metadata_repair").sort((a: any, b: any) => Number(b.kind === "movie") - Number(a.kind === "movie"))) {
           const left = BUDGET - (Date.now() - started);
           if (left < 8000) break;
-          try { const r = j.kind === "movie" ? await runMovieJob(ctx, j.id, Math.min(left, 20000)) : await runSeriesJob(ctx, j.id, left); if (!r.busy) ran.push(j.id); }
+          try { const r = j.kind === "movie" ? await runMovieJob(ctx, j.id, left) : await runSeriesJob(ctx, j.id, left); if (!r.busy) ran.push(j.id); }
           catch (e) { console.error("bugou worker", j.id, (e as Error).message); }
         }
         await sbRun;

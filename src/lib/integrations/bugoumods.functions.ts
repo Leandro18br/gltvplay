@@ -294,17 +294,18 @@ async function jobView(ctx: Ctx, jobId: string) {
   const { data: job, error } = await db.from("bugou_import_jobs").select("*").eq("id", jobId).single();
   if (error) throw new Error(error.message);
   const since = new Date(Date.now() - 5 * 60_000).toISOString();
-  const [{ data: failures }, c, { data: nxt }, recent] = await Promise.all([
+  const [{ data: failures }, c, { data: nxt }, recent, { data: cur }] = await Promise.all([
     db.from("bugou_import_items").select("ext_id, title, error, attempts, rate_limited, step").eq("job_id", jobId).eq("state", "failed").order("updated_at", { ascending: false }).limit(20),
     recount(ctx, jobId),
     db.from("bugou_import_items").select("next_attempt_at").eq("job_id", jobId).eq("state", "pending").gt("next_attempt_at", new Date().toISOString()).order("next_attempt_at").limit(1),
     db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("job_id", jobId).eq("state", "done").gte("updated_at", since),
+    db.from("bugou_import_items").select("ext_id, title").eq("job_id", jobId).eq("state", "processing").limit(1),
   ]);
   const st = (job.stats ?? {}) as JobStats;
   const throttle = job.throttle_until && Date.parse(job.throttle_until) > Date.now() ? job.throttle_until : null;
   const perMin = Math.round(((recent.count ?? 0) / 5) * 10) / 10; // series completed per minute over the last 5 min
   const left = c.pending + c.processing;
-  return { ...job, pending: left, queued: c.pending - c.waiting, processing: c.processing, waiting: c.waiting, next_retry_at: throttle ?? nxt?.[0]?.next_attempt_at ?? null, throttled: !!throttle, requests: st.requests ?? 0, http429: st.http429 ?? 0, seasons: st.seasons ?? 0, with_player: st.with_player ?? 0, no_episodes: st.no_episodes ?? 0, concurrency: st.concurrency ?? 2, per_min: perMin, eta_min: perMin > 0 && left ? Math.ceil(left / perMin) : null, failures: failures ?? [] };
+  return { ...job, pending: left, queued: c.pending - c.waiting, processing: c.processing, waiting: c.waiting, next_retry_at: throttle ?? nxt?.[0]?.next_attempt_at ?? null, throttled: !!throttle, requests: st.requests ?? 0, http429: st.http429 ?? 0, seasons: st.seasons ?? 0, with_player: st.with_player ?? 0, no_episodes: st.no_episodes ?? 0, concurrency: 1, current: cur?.[0] ? (cur[0].title ?? cur[0].ext_id) : null, last_error: (failures ?? [])[0]?.error ?? null, avg_ms: (st as any).items_timed ? Math.round((st as any).items_ms / (st as any).items_timed) : null, per_min: perMin, eta_min: perMin > 0 && left ? Math.ceil(left / perMin) : null, failures: failures ?? [] };
 }
 
 async function recount(ctx: Ctx, jobId: string) {
@@ -531,7 +532,8 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     if (gt > Date.now()) { if (gt - started > budgetMs - 8000) break; await sleep(gt - Date.now() + 200); continue; }
     const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
     if (cur?.status === "paused" || cur?.status === "cancelled") { stop = true; break; }
-    const n = Math.max(1, Math.min(MAX_CONCURRENCY, st.concurrency ?? 2));
+    // One series at a time per queue: the next one starts as soon as the previous finishes (no fixed gap).
+    const n = 1; const tItem = Date.now();
     const { data: due } = await db.from("bugou_import_items").select("ext_id, title, attempts, rate_limited, details").eq("job_id", jobId).eq("state", "pending").or(`next_attempt_at.is.null,next_attempt_at.lte.${stamp()}`).order("attempts").order("ext_id").limit(n);
     if (!due?.length) break;
     // Never process the same series in two jobs at once (one query for the whole wave).
@@ -542,7 +544,8 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     if (!wave.length) continue;
     await db.from("bugou_import_items").update({ state: "processing", updated_at: stamp() }).eq("job_id", jobId).in("ext_id", wave.map(x => x.ext_id));
     const out = await Promise.all(wave.map(processOne));
-    st.concurrency = out.includes("throttle") ? Math.max(1, Math.floor(n / 2)) : out.every(o => o === "ok") && wave.length === n ? Math.min(MAX_CONCURRENCY, n + 1) : n;
+    st.concurrency = 1; (st as any).last_ms = Date.now() - tItem;
+    if (out[0] === "ok") { (st as any).items_ms = ((st as any).items_ms ?? 0) + (st as any).last_ms; (st as any).items_timed = ((st as any).items_timed ?? 0) + 1; }
     const c = await recount(ctx, jobId);
     await db.from("bugou_import_jobs").update({ done: c.done, failed: c.failed, episodes_created: episodes, stats: st, updated_at: stamp(), ...(throttleUntil ? { throttle_until: throttleUntil } : {}) }).eq("id", jobId);
     if (out.includes("skip")) break;
@@ -583,7 +586,13 @@ export const bugouRunJob = createServerFn({ method: "POST" })
     const ctx = context as Ctx;
     await assertStaff(ctx);
     if (data.resume) await armWorker();
-    const r = await runSeriesJob(ctx, data.jobId, 20_000, data.resume);
+    const { data: k } = await ctx.supabase.from("bugou_import_jobs").select("kind").eq("id", data.jobId).single();
+    let r: { busy: boolean };
+    if (k?.kind === "movie") {
+      if (data.resume) await ctx.supabase.from("bugou_import_jobs").update({ status: "running" }).eq("id", data.jobId).eq("status", "paused");
+      const { runMovieJob } = await import("./background-import.server");
+      r = await runMovieJob(ctx, data.jobId, 20_000);
+    } else r = await runSeriesJob(ctx, data.jobId, 20_000, data.resume);
     return { ...(await jobView(ctx, data.jobId)), busy: r.busy };
   });
 
@@ -630,7 +639,7 @@ export const bugouJobsOverview = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
-    const { data: jobs } = await db.from("bugou_import_jobs").select("id").eq("kind", "series").order("created_at", { ascending: false }).limit(5);
+    const { data: jobs } = await db.from("bugou_import_jobs").select("id").in("kind", ["series", "movie"]).order("created_at", { ascending: false }).limit(6);
     const views = await Promise.all((jobs ?? []).map((j: any) => jobView(ctx, j.id)));
     const sync = await db.from("bugou_sync").select("total, synced_at").eq("kind", "series").maybeSingle();
     const imported = (await db.from("series").select("id", { count: "exact", head: true }).eq("external_source", SOURCE)).count ?? 0;
@@ -801,7 +810,15 @@ async function freeTmdbId(db: any, table: "movies" | "series", tmdbId: number | 
 }
 
 /** Fetches one movie's full metadata from BugouMods VIP. A missing detail endpoint must not block importing the catalog row. */
-async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Promise<BugouMovieDetails | null> {
+/** movie_info responses (including empty ones) are cached 7 days so a re-run never asks the provider twice. */
+const MOVIE_INFO_TTL_MS = 7 * 24 * 3600_000;
+async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg, counter?: { calls: number }): Promise<BugouMovieDetails | null> {
+  const key = `bugou:movie_info:${id}`; const a = await admin();
+  if (integ?.id) {
+    const { data: hit } = await a.from("api_response_cache").select("body").eq("cache_key", key).gt("expires_at", new Date().toISOString()).maybeSingle();
+    if (hit) { const j = JSON.parse(hit.body); return j && (j.info || j.movie_data) ? parseBugouMovieDetails(id, j) : null; }
+  }
+  if (counter) counter.calls++;
   const url = new URL("https://cinema.bugoumods.com/index.php");
   url.search = new URLSearchParams({ ajax: "1", type: "movie_info", vod_id: id, vtoken: tok }).toString();
   const t0 = Date.now();
@@ -810,6 +827,7 @@ async function loadMovieDetails(id: string, tok: string, integ: SeriesInteg): Pr
     if (!json || typeof json !== "object" || json.Aviso) throw new Error("A API não devolveu detalhes válidos para este filme.");
     const details = parseBugouMovieDetails(id, json);
     await logCall(integ, `Detalhes do filme ${id}`, t0, null);
+    if (integ?.id) await a.from("api_response_cache").upsert({ cache_key: key, integration_id: integ.id, http_status: 200, body: JSON.stringify(json), expires_at: new Date(Date.now() + MOVIE_INFO_TTL_MS).toISOString() });
     return json.info || json.movie_data ? details : null;
   } catch (e) {
     const message = scrub((e as Error).message).slice(0, 400);
@@ -941,14 +959,23 @@ export async function importMovieIds(ctx: Ctx, ids: string[]) {
     if (error) throw new Error(error.message);
     const byId = new Map((items ?? []).map((x: any) => [x.ext_id, x]));
     const { integ, tok } = await seriesIntegration();
-    const report = { created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0, fieldsFilled: 0 };
+    const report = { providerCalls: 0, alreadyComplete: 0, created: 0, updated: 0, skipped: 0, descriptionsAdded: 0, genresAdded: 0, metadataUnavailable: 0, playersAdded: 0, detailFailures: 0, failed: 0, fieldsFilled: 0 };
 
     for (const id of data.ids) {
       const m = byId.get(id) as any;
       if (!m) { report.skipped++; continue; }
       try {
-        // BugouMods VIP is the sole source of movie synopsis and genres; no external metadata fallback.
-        const detail = await loadMovieDetails(id, tok, integ);
+        // Already imported with its VIP player and no fillable gap: no provider call at all.
+        const { data: known } = await db.from("movies").select("id").eq("external_source", SOURCE).eq("external_id", id).maybeSingle();
+        if (known) {
+          const { count: hasRef } = await db.from("playback_sources").select("id", { count: "exact", head: true }).eq("content_kind", "movie").eq("content_id", known.id).eq("external_ref", `bugoumods:${id}`);
+          if (hasRef) {
+            const en = await enrichContent(ctx, "movie", known.id); (report as any).tmdb = en.status;
+            if (en.status === "complete" || en.status === "incomplete" || en.status === "unmatched" || en.status === "filled") { report.alreadyComplete++; report.updated++; continue; }
+          }
+        }
+        const counter = { calls: 0 };
+        const detail = await loadMovieDetails(id, tok, integ, counter); report.providerCalls += counter.calls;
         if (!detail) report.detailFailures++;
         const title = detail?.title || m.title;
         const year = detail?.year ?? m.year;

@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { importMovieIds } from "./bugoumods.functions";
 import { importStreamBetterPage } from "./streambetter.functions";
-import { RateLimitedError, backoffMs } from "./ratelimit";
+import { RateLimitedError, backoffMs, nextSafeRpm, SAFE_RPM_MAX, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS } from "./ratelimit";
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /**
  * Background runners for movie queues (BugouMods VIP ids) and StreamBetter page cursors.
@@ -18,46 +19,66 @@ async function claim(db: any, jobId: string) {
   return data?.[0] ?? null;
 }
 
+/**
+ * Movie queue: exactly one movie at a time; the next starts as soon as the previous is saved.
+ * Provider pacing only after a real 429 (learned safe rpm, +1/min after 10 clean calls); a 429 wait that
+ * fits in this run is waited out here, otherwise it is persisted (throttle_until) and the worker resumes later.
+ */
 export async function runMovieJob(ctx: Ctx, jobId: string, budgetMs: number) {
   const db = ctx.supabase; const t0 = Date.now();
   const job = await claim(db, jobId); if (!job) return { busy: true };
-  const stats: Record<string, number> = { created: 0, updated: 0, failed: 0, playersAdded: 0, genresAdded: 0, http429: 0, requests: 0, ...(job.stats ?? {}) };
-  let done = job.done, failed = job.failed;
+  const stats: Record<string, any> = { created: 0, updated: 0, failed: 0, playersAdded: 0, genresAdded: 0, http429: 0, requests: 0, providerCalls: 0, alreadyComplete: 0, items_ms: 0, items_timed: 0, ...(job.stats ?? {}) };
+  let done = job.done, failed = job.failed; let lastCall = 0; let okStreak = 0; const calls: number[] = [];
+  const persist = (extra: Record<string, unknown> = {}) => db.from("bugou_import_jobs").update({ done, failed, stats, updated_at: new Date().toISOString(), ...extra }).eq("id", jobId);
+  await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", jobId).eq("state", "processing");
   try {
     while (Date.now() - t0 < budgetMs - 6000) {
+      const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
+      if (cur?.status !== "running") break; // paused/cancelled from the panel
       const nowIso = new Date().toISOString();
-      const { data: items } = await db.from("bugou_import_items").select("ext_id, attempts").eq("job_id", jobId).eq("state", "pending")
-        .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`).limit(5);
-      if (!items?.length) {
+      const { data: items } = await db.from("bugou_import_items").select("ext_id, title, attempts").eq("job_id", jobId).eq("state", "pending")
+        .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`).order("attempts").order("ext_id").limit(1);
+      const it = items?.[0];
+      if (!it) {
         const { count } = await db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("job_id", jobId).eq("state", "pending");
         if (!count) await db.from("bugou_import_jobs").update({ status: "done" }).eq("id", jobId);
         break;
       }
-      for (const it of items) {
-        if (Date.now() - t0 > budgetMs - 6000) break;
-        stats["requests"]!++;
-        try {
-          const r = await importMovieIds(ctx, [it.ext_id]);
-          for (const k of ["created", "updated", "playersAdded", "genresAdded"]) stats[k] = (stats[k] ?? 0) + ((r as any)[k] ?? 0);
-          const bad = r.failed > 0 || r.skipped > 0;
-          if (bad) { failed++; stats["failed"]!++; } else done++;
-          await db.from("bugou_import_items").update({ state: bad ? "failed" : "done", result: r, attempts: it.attempts + 1, error: bad ? (r.skipped ? "Fora da lista atual da API" : "Falha ao importar (ver logs)") : null, updated_at: new Date().toISOString() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
-        } catch (e) {
-          if (e instanceof RateLimitedError) {
-            stats["http429"]!++;
-            const wait = e.retryAfterMs ?? backoffMs(Math.min(6, stats["http429"]!));
-            const until = new Date(Date.now() + wait).toISOString();
-            await db.from("bugou_import_items").update({ next_attempt_at: until, rate_limited: 1 }).eq("job_id", jobId).eq("ext_id", it.ext_id);
-            await db.from("bugou_import_jobs").update({ throttle_until: until }).eq("id", jobId);
-            return { busy: false, throttled: true };
-          }
-          failed++; stats["failed"]!++;
-          await db.from("bugou_import_items").update({ state: "failed", error: String((e as Error).message).slice(0, 300), attempts: it.attempts + 1 }).eq("job_id", jobId).eq("ext_id", it.ext_id);
+      // Same movie in another queue right now: defer it there instead of processing twice.
+      const { count: elsewhere } = await db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("ext_id", it.ext_id).eq("state", "processing").neq("job_id", jobId);
+      if (elsewhere) { await db.from("bugou_import_items").update({ next_attempt_at: new Date(Date.now() + 30_000).toISOString() }).eq("job_id", jobId).eq("ext_id", it.ext_id); continue; }
+      // Learned provider pace (only exists after a real 429).
+      if (stats["safe_rpm"] && lastCall) { const w = lastCall + Math.ceil(60_000 / stats["safe_rpm"]) - Date.now(); if (w > 0) { if (Date.now() - t0 + w > budgetMs - 6000) break; await sleep(w); } }
+      await db.from("bugou_import_items").update({ state: "processing", updated_at: new Date().toISOString() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
+      const ti = Date.now();
+      try {
+        const r: any = await importMovieIds(ctx, [it.ext_id]);
+        for (const k of ["created", "updated", "playersAdded", "genresAdded", "providerCalls", "alreadyComplete"]) stats[k] = (stats[k] ?? 0) + (r[k] ?? 0);
+        stats["requests"] = (stats["requests"] ?? 0) + (r.providerCalls ?? 0);
+        if (r.providerCalls) { lastCall = Date.now(); calls.push(lastCall); if (stats["safe_rpm"] && ++okStreak >= 10) { okStreak = 0; stats["safe_rpm"] = Math.min(SAFE_RPM_MAX, stats["safe_rpm"] + 1); } }
+        const bad = r.failed > 0 || r.skipped > 0;
+        if (bad) { failed++; stats["failed"]++; } else done++;
+        stats["last_ms"] = Date.now() - ti; if (!bad) { stats["items_ms"] += stats["last_ms"]; stats["items_timed"]++; }
+        await db.from("bugou_import_items").update({ state: bad ? "failed" : "done", step: "done", result: r, attempts: it.attempts + 1, error: bad ? (r.skipped ? "Fora da lista atual da API" : "Falha ao importar (ver logs)") : null, next_attempt_at: null, updated_at: new Date().toISOString() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
+      } catch (e) {
+        if (e instanceof RateLimitedError) {
+          stats["http429"]++; stats["requests"]++;
+          stats["safe_rpm"] = nextSafeRpm(stats["safe_rpm"] ?? null, calls.filter(t => t > Date.now() - 60_000).length + 1); okStreak = 0;
+          const wait = e.retryAfterMs ?? backoffMs(Math.min(6, stats["http429"]), PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS);
+          const until = new Date(Date.now() + wait).toISOString();
+          await db.from("bugou_import_items").update({ state: "pending", next_attempt_at: until, rate_limited: 1, error: `${e.message} Retomada automática programada.` }).eq("job_id", jobId).eq("ext_id", it.ext_id);
+          if (Date.now() - t0 + wait < budgetMs - 6000) { await persist(); await sleep(wait); lastCall = Date.now(); continue; }
+          await persist({ throttle_until: until });
+          return { busy: false, throttled: true };
         }
+        failed++; stats["failed"]++;
+        await db.from("bugou_import_items").update({ state: "failed", error: String((e as Error).message).slice(0, 300), attempts: it.attempts + 1 }).eq("job_id", jobId).eq("ext_id", it.ext_id);
       }
+      await persist();
     }
   } finally {
-    await db.from("bugou_import_jobs").update({ done, failed, stats, lease_until: null, updated_at: new Date().toISOString() }).eq("id", jobId);
+    await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", jobId).eq("state", "processing");
+    await persist({ lease_until: null });
   }
   return { busy: false };
 }
