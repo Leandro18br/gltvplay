@@ -586,7 +586,13 @@ export const bugouRunJob = createServerFn({ method: "POST" })
     const ctx = context as Ctx;
     await assertStaff(ctx);
     if (data.resume) await armWorker();
-    const r = await runSeriesJob(ctx, data.jobId, 20_000, data.resume);
+    const { data: k } = await ctx.supabase.from("bugou_import_jobs").select("kind").eq("id", data.jobId).single();
+    let r: { busy: boolean };
+    if (k?.kind === "movie") {
+      if (data.resume) await ctx.supabase.from("bugou_import_jobs").update({ status: "running" }).eq("id", data.jobId).eq("status", "paused");
+      const { runMovieJob } = await import("./background-import.server");
+      r = await runMovieJob(ctx, data.jobId, 20_000);
+    } else r = await runSeriesJob(ctx, data.jobId, 20_000, data.resume);
     return { ...(await jobView(ctx, data.jobId)), busy: r.busy };
   });
 
@@ -633,7 +639,7 @@ export const bugouJobsOverview = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
-    const { data: jobs } = await db.from("bugou_import_jobs").select("id").eq("kind", "series").order("created_at", { ascending: false }).limit(5);
+    const { data: jobs } = await db.from("bugou_import_jobs").select("id").in("kind", ["series", "movie"]).order("created_at", { ascending: false }).limit(6);
     const views = await Promise.all((jobs ?? []).map((j: any) => jobView(ctx, j.id)));
     const sync = await db.from("bugou_sync").select("total, synced_at").eq("kind", "series").maybeSingle();
     const imported = (await db.from("series").select("id", { count: "exact", head: true }).eq("external_source", SOURCE)).count ?? 0;
