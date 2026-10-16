@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adaptFactor, backoffMs, fetchProviderJson, minIntervalMs, parseRateLimitReset, parseRetryAfter, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS, RateLimitedError, nextSafeRpm } from "./ratelimit";
+import { adaptFactor, backoffMs, fetchProviderJson, minIntervalMs, parseRateLimitReset, parseRetryAfter, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS, RateLimitedError, nextSafeRpm, raiseSafeRpm, RAISE_EVERY } from "./ratelimit";
 
 const url = new URL("https://example.test/x");
 const res = (status: number, body: unknown = {}, headers: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers });
@@ -54,4 +54,11 @@ describe("learned safe pace", () => {
   it("first 429 after 40 calls/min sets 32/min", () => expect(nextSafeRpm(null, 40)).toBe(32));
   it("another 429 at the learned pace lowers it by 20%", () => expect(nextSafeRpm(32, 32)).toBe(25));
   it("never below 3/min", () => expect(nextSafeRpm(3, 1)).toBe(3));
+});
+
+describe("gradual pace recovery", () => {
+  it("3/min rises to 4/min after a clean streak", () => expect(raiseSafeRpm(3)).toBe(4));
+  it("20/min rises by 25% to 25/min", () => expect(raiseSafeRpm(20)).toBe(25));
+  it("never above 120/min", () => expect(raiseSafeRpm(110)).toBe(120));
+  it("streak length is 5 clean calls", () => expect(RAISE_EVERY).toBe(5));
 });
