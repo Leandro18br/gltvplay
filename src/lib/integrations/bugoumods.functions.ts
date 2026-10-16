@@ -5,6 +5,7 @@ import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
 import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS } from "./ratelimit";
+import { nextSafeRpm, SAFE_RPM_MAX } from "./ratelimit";
 import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouVipEmbedUrl, mapBugouGenreSlugs, normTitle, compactTitle, type BugouSeries, type BugouDetails, type BugouMovieDetails } from "./bugoumods";
 
 /**
@@ -283,7 +284,7 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 
 // ---------- Resumable import jobs ----------
 
-type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
+type JobStats = { safe_rpm?: number | null; skipped_imported?: number; db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
 export const MAX_CONCURRENCY = 6;
 
 async function jobView(ctx: Ctx, jobId: string) {
@@ -309,6 +310,13 @@ async function recount(ctx: Ctx, jobId: string) {
   const c = async (state: string, waiting = false) => { let q = db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("job_id", jobId).eq("state", state); if (waiting) q = q.gt("next_attempt_at", new Date().toISOString()); return (await q).count ?? 0; };
   const [done, failed, pending, processing, waiting] = await Promise.all([c("done"), c("failed"), c("pending"), c("processing"), c("pending", true)]);
   return { done, failed, pending, processing, waiting };
+}
+
+/** Most recent safe pace learned by any series job in the last 6h (null = never throttled, run unpaced). */
+async function learnedRpm(ctx: Ctx): Promise<number | null> {
+  const { data } = await ctx.supabase.from("bugou_import_jobs").select("stats").neq("kind", "live").gt("updated_at", new Date(Date.now() - 6 * 3600_000).toISOString()).order("updated_at", { ascending: false }).limit(10);
+  for (const j of data ?? []) { const v = Number((j as any).stats?.safe_rpm); if (v > 0) return v; }
+  return null;
 }
 
 /** Latest provider throttle across all series jobs: one 429 pauses every series queue. */
@@ -389,14 +397,31 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
       items = selectedIds.map(id => ({ ext_id: id, title: t.get(id) ?? null }));
     }
     if (!items.length) throw new Error("Nada para importar.");
-    const j = await db.from("bugou_import_jobs").insert({ label: data.repairMetadata ? `Completar metadados das séries importadas (${items.length})` : data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
+    let skipped = 0;
+    const label = data.repairMetadata ? `Completar metadados das séries importadas (${items.length})` : data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`;
+    // Same queue already open (running/paused): reuse it instead of a second job spending the same provider quota.
+    const { data: open } = await db.from("bugou_import_jobs").select("id").neq("kind", "live").eq("label", label).in("status", ["running", "paused"]).limit(1);
+    if (open?.length) { await db.from("bugou_import_jobs").update({ status: "running" }).eq("id", open[0].id); const workerArmed = await armWorker(); return { ...(await jobView(ctx, open[0].id)), unmatched, workerArmed, reused: true, skipped }; }
+    if (!data.repairMetadata && !data.repairEmpty) {
+      // Already imported with episodes: no series_info call needed (repairs are the explicit way to re-read them).
+      const have = new Set<string>();
+      const ids = [...new Set(items.map(x => x.ext_id))];
+      for (let i = 0; i < ids.length; i += 300) {
+        const { data: s, error } = await db.from("series").select("external_id, seasons!inner(id)").eq("external_source", SOURCE).in("external_id", ids.slice(i, i + 300));
+        if (error) throw new Error(error.message);
+        (s ?? []).forEach((x: any) => have.add(String(x.external_id)));
+      }
+      const before = items.length; items = items.filter(x => !have.has(x.ext_id)); skipped = before - items.length;
+      if (!items.length) throw new Error(`Todas as ${before} série(s) já estão importadas com episódios. Use "Completar metadados" para relê-las.`);
+    }
+    const j = await db.from("bugou_import_jobs").insert({ label: skipped ? `${label} — ${skipped} já importada(s) ignorada(s)`.slice(0, 200) : label, total: items.length, created_by: ctx.userId }).select("id").single();
     if (j.error) throw new Error(j.error.message);
     for (let i = 0; i < items.length; i += 500) {
       const r = await db.from("bugou_import_items").insert(items.slice(i, i + 500).map(x => ({ job_id: j.data.id, ext_id: x.ext_id, title: x.title })));
       if (r.error) throw new Error(r.error.message);
     }
     const workerArmed = await armWorker();
-    return { ...(await jobView(ctx, j.data.id)), unmatched, workerArmed };
+    return { ...(await jobView(ctx, j.data.id)), unmatched, workerArmed, reused: false, skipped };
   });
 
 /**
@@ -419,8 +444,9 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   let episodes = lease.data[0].episodes_created as number;
   const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, concurrency: 4, ...(lease.data[0].stats ?? {}) };
   st.rate_factor = Math.max(0.25, st.rate_factor ?? 1); // older runs could persist a 1/8 pace
-  const { integ } = await seriesIntegration();
-  const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
+  // Provider pace learned from real 429s, shared by every series job (same token = same quota).
+  if (!st.safe_rpm) st.safe_rpm = await learnedRpm(ctx);
+  let okStreak = 0; const starts: number[] = [];
   let throttleUntil: string | null = null; let stop = false;
   const started = Date.now(); let nextSlot = 0;
   const stamp = () => new Date().toISOString();
@@ -437,11 +463,13 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     const tu = throttleUntil ? Date.parse(throttleUntil) : 0;
     const t = Math.max(Date.now(), nextSlot, tu);
     if (t - started > budgetMs) return false;
-    // No fixed spacing while the provider accepts the pace; the configured rpm only applies after a real 429 slowed us down.
-    nextSlot = (st.rate_factor ?? 1) < 1 ? t + minIntervalMs(rpm, st.rate_factor) : t;
+    // Unpaced until the provider answers 429; afterwards calls are spaced at the learned safe pace (no fixed waits otherwise).
+    nextSlot = st.safe_rpm ? t + Math.ceil(60_000 / st.safe_rpm) : t;
     if (t > Date.now()) await sleep(t - Date.now());
+    starts.push(Date.now());
     return !stop;
   };
+
   type It = { ext_id: string; title: string | null; attempts: number; rate_limited: number; details: any };
   const processOne = async (it: It): Promise<"ok" | "throttle" | "err" | "skip"> => {
     const upd = (patch: any) => db.from("bugou_import_items").update({ ...patch, updated_at: stamp() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
@@ -453,6 +481,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
         st.requests = (st.requests ?? 0) + 1;
         details = await loadDetails(it.ext_id, `Importação: ${it.title ?? it.ext_id}`);
         st.rate_factor = adaptFactor(st.rate_factor ?? 1, "ok");
+        if (st.safe_rpm && ++okStreak >= 10) { okStreak = 0; st.safe_rpm = Math.min(SAFE_RPM_MAX, st.safe_rpm + 1); }
         await upd({ details, step: "episodes", seasons_found: details.seasons.length, error: null });
         // Cancelled while the provider call was in flight: keep the cached details, write nothing to the catalog.
         if (await halted()) { await upd({ state: "pending" }); return "skip"; }
@@ -472,6 +501,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
       if (e instanceof RateLimitedError) {
         // Real provider 429: wait the provider's hint (Retry-After / RateLimit reset) or a short backoff, then the queue resumes by itself.
         st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429");
+        st.safe_rpm = nextSafeRpm(st.safe_rpm ?? null, starts.filter(t => t > Date.now() - 60_000).length); okStreak = 0;
         const rl = it.rate_limited + 1;
         const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(Math.min(rl, 6), PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS))).toISOString();
         if (!throttleUntil || until > throttleUntil) throttleUntil = until;

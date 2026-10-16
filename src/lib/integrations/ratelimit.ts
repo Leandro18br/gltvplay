@@ -72,3 +72,15 @@ export async function fetchProviderJson(url: URL, what: string, opts: { timeoutM
   }
   const err = new Error(last); (err as any).requests = requests; throw err;
 }
+
+/** Upper bound for the learned pace (requests/min). */
+export const SAFE_RPM_MAX = 120;
+/**
+ * After a real 429: the provider accepted roughly `sentLastMinute` calls in the window, so the safe pace
+ * becomes 80% of that (never above the previous safe pace × 0.8, floor 3/min).
+ */
+export function nextSafeRpm(prev: number | null, sentLastMinute: number): number {
+  const observed = Math.floor(Math.max(1, sentLastMinute) * 0.8);
+  const fromPrev = prev ? Math.floor(prev * 0.8) : Infinity;
+  return Math.max(3, Math.min(SAFE_RPM_MAX, observed, fromPrev));
+}
