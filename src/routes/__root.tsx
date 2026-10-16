@@ -12,7 +12,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { supabase } from "@/lib/auth/area-client";
+import { getAreaClient } from "@/lib/auth/area-client";
+const supabase = getAreaClient("client");
 import { Toaster } from "@/components/ui/sonner";
 import { useQuery } from "@tanstack/react-query";
 import { siteSettingsQuery } from "@/lib/catalog";
