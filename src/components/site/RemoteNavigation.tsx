@@ -3,7 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { directionalTarget, isEditing, navigable, remoteKey, type Direction } from "@/lib/navigation/spatial";
 
 type SavedFocus = { key: string; index: number; x: number; y: number; rows: number[] };
-const excluded = (path: string) => /^\/(admin|revend|reset-password)(\/|$)/.test(path);
+const excluded = (path: string) => /^\/(admin|revenda|revendedor|reset-password)(\/|$)/.test(path);
 const widget = '[role="menu"], [role="listbox"], [role="slider"], [role="tablist"], video[controls], [data-remote-native]';
 const overlay = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
@@ -16,6 +16,7 @@ export function RemoteNavigation() {
     const saved = new Map<string, SavedFocus>();
     const publicArea = () => !excluded(location.pathname);
     const keyFor = (element: HTMLElement) => {
+      if (element.dataset.remoteId) return element.dataset.remoteId;
       const section = element.closest('section')?.getAttribute('aria-label') ?? "";
       return `${section}|${element.dataset.remoteId ?? element.getAttribute('href') ?? element.id ?? ""}|${element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ""}`;
     };
@@ -105,6 +106,7 @@ export function RemoteNavigation() {
       const next = location.pathname + location.search;
       if (next === route) return;
       route = next;
+      if (remote && publicArea() && document.activeElement instanceof HTMLElement) document.activeElement.blur();
       last = null;
       pending = saved.get(route);
       requestAnimationFrame(recover);

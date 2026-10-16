@@ -14,6 +14,10 @@ export function playbackTime(seconds: number) {
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${String(minutes).padStart(2, "0")}:${rest}`;
 }
 
+export function isMediaControl(target: EventTarget | null) {
+  return isTextEntry(target) || (target instanceof HTMLElement && !!target.closest('button, a, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="listbox"], video[controls]'));
+}
+
 export function isTextEntry(target: EventTarget | null) {
   return target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="slider"], [role="menu"]');
 }

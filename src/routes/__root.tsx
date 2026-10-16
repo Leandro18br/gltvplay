@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useQuery } from "@tanstack/react-query";
 import { siteSettingsQuery } from "@/lib/catalog";
 import { checkSiteAccess, clearSiteAccessCache } from "@/lib/access/gate";
+import { RemoteNavigation } from "@/components/site/RemoteNavigation";
 import { syncSlots, isSwapping } from "@/lib/auth/session-vault";
 
 // Admin → site sync: the database is the single source of truth. Realtime change events
@@ -188,6 +189,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <SettingsSync />
       <CatalogSync />
+      <RemoteNavigation />
       <Outlet />
       <Toaster />
     </QueryClientProvider>

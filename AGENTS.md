@@ -30,7 +30,8 @@
 - Cross-origin embed loading is not proof of playback; generic embeds record history without fabricated playback progress, and failures use rate-limited diagnostic reports. Why: provider APIs are required for accurate time and reliable playback signals.
 - TMDB reuses cached metadata, staff-only allowlisted completion and locked import deduplication; year jobs persist bounded discovery/item checkpoints. Episode updates touch existing rows only. Why: preserve manual data, identities and playback.
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
-- Detail rules: `src/lib/{integrations,playback,tmdb,admin,access,auth}/AGENTS.md`. Why: directory scope.
+- Scoped rules: read nested AGENTS.md before edits. Why: local constraints.
+- Public remote navigation uses RemoteNavigation and src/lib/navigation geometry with native focus, row markers and route restoration; widgets own their keys. Why: reusable TV support without affecting staff areas or providers.
 - Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
 - Brand logo only via `GLTVLogo` (`public/brand/gltv-logo.png`); favicon `public/favicon.png`. Why: one mark.
 - Each area (client/admin/reseller) has its own auth client (`src/lib/auth/AGENTS.md`). Why: one area's sign-out/expiry must not affect another.

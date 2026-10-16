@@ -292,3 +292,23 @@ html:fullscreen .watch-embed-stage iframe {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Remote selection uses real DOM focus. Input, mouse and touch keep native behavior. */
+html[data-remote-navigation="true"] :is(a, button, input, select, textarea, iframe, video, [tabindex], [role="slider"]):focus {
+  outline: 3px solid var(--ring) !important;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 6px var(--background);
+  scroll-margin: 100px 48px;
+}
+html[data-remote-navigation="true"] [data-remote-site] { overflow-x: clip; }
+html[data-remote-navigation="true"] .remote-card-title { display: block; -webkit-line-clamp: unset; overflow: visible; overflow-wrap: anywhere; color: var(--foreground); }
+html[data-remote-navigation="true"] [data-remote-row] { scroll-padding-inline: 48px; scroll-behavior: auto; }
+html[data-remote-navigation="true"] [data-remote-skip] { pointer-events: none; opacity: 0; }
+html[data-remote-navigation="true"] [data-remote-player] :focus { scroll-margin: 16px; }
+.remote-card-action:focus-visible, .remote-card-action:hover, div:has(> .group\/card:hover) > .remote-card-action { opacity: 1; pointer-events: auto; }
+html[data-remote-navigation="true"] .remote-card-action { opacity: 1; }
+@media (min-width: 1600px) {
+  html[data-remote-navigation="true"] [data-remote-site] :is(header > div, footer > div) { padding-inline: 48px; }
+  html[data-remote-navigation="true"] [data-remote-site] :is(a, button) { min-height: 44px; }
+  html[data-remote-navigation="true"] .remote-card-title { font-size: 18px; }
+}

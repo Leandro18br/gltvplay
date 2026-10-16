@@ -32,6 +32,17 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
   const autoStartedId = useRef<string | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const [displayHint, setDisplayHint] = useState(false);
+  useEffect(() => {
+    const element = stage.current;
+    const onBack = (event: Event) => {
+      if (!started) return;
+      event.preventDefault();
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      setStarted(false);
+    };
+    element?.addEventListener('gltv:remote-back', onBack);
+    return () => element?.removeEventListener('gltv:remote-back', onBack);
+  }, [started]);
 
   useEffect(() => { setStarted(false); setLoading(false); setError(null); setSources([]); setServer(0); }, [kind, id]);
 
@@ -83,7 +94,7 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
 
   return (
     <div className={`w-full min-w-0 space-y-3 ${className}`}>
-      <div ref={stage} data-playback-stage className={`playback-stage relative w-full ${started ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
+      <div ref={stage} data-playback-stage data-remote-player className={`playback-stage relative w-full ${started ? "" : "aspect-video overflow-hidden rounded-xl bg-card ring-1 ring-border"}`}>
         {!started ? (
           <Button type="button" variant="ghost" onClick={start} disabled={loading} aria-label={`Reproduzir ${title}`} className="group relative block h-full w-full rounded-none p-0 [&_svg]:size-9">
             {poster && <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}

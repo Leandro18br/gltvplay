@@ -4,7 +4,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { CONTROLS_IDLE_MS, PLAYBACK_RATES, isTextEntry, playbackTime, seekTarget } from "@/lib/playback/controls";
+import { CONTROLS_IDLE_MS, PLAYBACK_RATES, isMediaControl, playbackTime, seekTarget } from "@/lib/playback/controls";
 import { requestPlaybackDisplay, releasePlaybackDisplay } from "@/lib/playback/display-mode";
 
 export type PlayerServer = { id: string; label: string | null };
@@ -67,7 +67,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     idle.current = setTimeout(() => {
       const video = media.current;
       const focused = document.activeElement;
-      if (video && !video.paused && !video.ended && !menuOpen.current && !(focused && wrap.current?.contains(focused) && focused.matches(':focus-visible'))) setVisible(false);
+      if (video && !video.paused && !video.ended && !menuOpen.current && !(focused && wrap.current?.contains(focused) && (focused.matches(':focus-visible') || document.documentElement.dataset.remoteNavigation === 'true'))) setVisible(false);
     }, CONTROLS_IDLE_MS);
   }, []);
   const flash = (value: string) => {
@@ -168,8 +168,9 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
 
   // Scoped to this player: keyboard commands never hijack other page controls or text entry.
   const onKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (isTextEntry(event.target) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (isMediaControl(event.target) || event.altKey || event.ctrlKey || event.metaKey) return;
     if ((event.key === " " || event.key === "Enter") && (event.target as HTMLElement).closest("button, a")) return;
+    if (document.documentElement.dataset.remoteNavigation === 'true' && event.key.startsWith('Arrow')) { reveal(); return; }
     const key = event.key.toLowerCase();
     if ([" ", "arrowleft", "arrowright", "m", "f"].includes(key)) event.preventDefault();
     if (key === " ") toggle();
@@ -183,7 +184,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     <Button type="button" variant="ghost" size="icon" title={label} aria-label={label} disabled={disabled} onClick={click} className="size-11 shrink-0 rounded-full text-player-foreground hover:bg-player-foreground/15 hover:text-player-foreground [&_svg]:size-5">{icon}</Button>
   );
 
-  return <div ref={wrap} role="region" aria-label={`Player de ${title}`} tabIndex={0} onKeyDown={onKey} onPointerMove={reveal} onPointerDown={reveal} onFocus={reveal} onBlur={reveal}
+  return <div ref={wrap} data-remote-player role="region" aria-label={`Player de ${title}`} tabIndex={0} onKeyDown={onKey} onPointerMove={reveal} onPointerDown={reveal} onFocus={reveal} onBlur={reveal}
     className={`group/player relative isolate min-w-0 bg-player text-player-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary ${fullPage ? "fixed inset-0" : "aspect-video w-full rounded-lg"} ${visible || !playing ? "" : "cursor-none"} [&:fullscreen]:h-dvh [&:fullscreen]:w-full [&:fullscreen]:rounded-none [&_video]:absolute [&_video]:inset-0 [&_video]:h-full [&_video]:w-full [&_video]:rounded-[inherit] [&_video]:transition-transform [&_video]:duration-300 [&_video]:origin-center overflow-hidden ${zoomed ? "[&_video]:object-cover [&_video]:scale-[1.15]" : "[&_video]:object-contain"}`}>
     {children}
     {/* Tapping the picture only shows/hides controls; pausing is exclusive to the Play/Pause button. */}
