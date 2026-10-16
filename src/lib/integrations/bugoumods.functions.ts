@@ -400,7 +400,7 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
     let skipped = 0;
     const label = data.repairMetadata ? `Completar metadados das séries importadas (${items.length})` : data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`;
     // Same queue already open (running/paused): reuse it instead of a second job spending the same provider quota.
-    const { data: open } = await db.from("bugou_import_jobs").select("id").neq("kind", "live").eq("label", label).in("status", ["running", "paused"]).limit(1);
+    const { data: open } = await db.from("bugou_import_jobs").select("id").eq("kind", "series").eq("label", label).in("status", ["running", "paused"]).limit(1);
     if (open?.length) { await db.from("bugou_import_jobs").update({ status: "running" }).eq("id", open[0].id); const workerArmed = await armWorker(); return { ...(await jobView(ctx, open[0].id)), unmatched, workerArmed, reused: true, skipped }; }
     if (!data.repairMetadata && !data.repairEmpty) {
       // Already imported with episodes: no series_info call needed (repairs are the explicit way to re-read them).
@@ -628,7 +628,7 @@ export const bugouJobsOverview = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const ctx = context as Ctx; const db = ctx.supabase;
     await assertStaff(ctx);
-    const { data: jobs } = await db.from("bugou_import_jobs").select("id").neq("kind", "live").order("created_at", { ascending: false }).limit(5);
+    const { data: jobs } = await db.from("bugou_import_jobs").select("id").eq("kind", "series").order("created_at", { ascending: false }).limit(5);
     const views = await Promise.all((jobs ?? []).map((j: any) => jobView(ctx, j.id)));
     const sync = await db.from("bugou_sync").select("total, synced_at").eq("kind", "series").maybeSingle();
     const imported = (await db.from("series").select("id", { count: "exact", head: true }).eq("external_source", SOURCE)).count ?? 0;
@@ -932,7 +932,7 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
     return importMovieIds(ctx, data.ids);
   });
 
-async function importMovieIds(ctx: Ctx, ids: string[]) {
+export async function importMovieIds(ctx: Ctx, ids: string[]) {
     const db = ctx.supabase; const data = { ids };
     await refreshMovieIndex(ctx, false);
     const { data: items, error } = await db.from("bugou_catalog").select("ext_id,title,year,poster_url,category").eq("kind", "movie").in("ext_id", data.ids);
