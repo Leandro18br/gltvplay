@@ -51,6 +51,7 @@ describe("parseBugouMovieDetails", () => {
       ext: "mkv",
       genres: [],
       providerMetadataPaths: ["info.plot", "movie_data.container_extension"],
+      tmdbId: null, rating: null, trailer: null,
     });
   });
 
