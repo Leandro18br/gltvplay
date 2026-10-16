@@ -418,6 +418,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", jobId).eq("state", "processing");
   let episodes = lease.data[0].episodes_created as number;
   const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, concurrency: 4, ...(lease.data[0].stats ?? {}) };
+  st.rate_factor = Math.max(0.25, st.rate_factor ?? 1); // older runs could persist a 1/8 pace
   const { integ } = await seriesIntegration();
   const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
   let throttleUntil: string | null = null; let stop = false;
@@ -432,7 +433,9 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   };
   /** Reserves the next provider call slot; false when it would fall outside the budget. */
   const slot = async () => {
-    const t = Math.max(Date.now(), nextSlot);
+    // After a 429 in this wave, no new provider call starts before the provider's wait has passed.
+    const tu = throttleUntil ? Date.parse(throttleUntil) : 0;
+    const t = Math.max(Date.now(), nextSlot, tu);
     if (t - started > budgetMs) return false;
     // No fixed spacing while the provider accepts the pace; the configured rpm only applies after a real 429 slowed us down.
     nextSlot = (st.rate_factor ?? 1) < 1 ? t + minIntervalMs(rpm, st.rate_factor) : t;
