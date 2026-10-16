@@ -70,9 +70,16 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
   .inputValidator(z.object({ kind: z.enum(["movie", "series"]), page: z.number().int().min(1).max(100000), limit: z.number().int().min(1).max(10).default(10), mode: z.enum(["sync", "new_only"]).default("sync") }))
   .handler(async ({ data, context }) => {
     await assertStaff(context);
+    return importStreamBetterPage(data);
+  });
+
+/** One provider page (10 titles). Shared by the admin step and the background worker. Series are never created
+ *  here: /api/titles has no episode list, so a new series would be published without playback. */
+export async function importStreamBetterPage(data: { kind: "movie" | "series"; page: number; limit: number; mode: "sync" | "new_only" }) {
+  {
     const type = data.kind === "movie" ? "movie" : "tv";
     const pageResult = await getPage(type, data.page);
-    if (!pageResult.body) return { retryMs: pageResult.retryMs, done: false, retry: true, page: data.page, totalPages: null, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0 };
+    if (!pageResult.body) return { retryMs: pageResult.retryMs, done: false, retry: true, page: data.page, nextPage: data.page, totalPages: null as number | null, processed: 0, imported: 0, updated: 0, skipped: 0, errors: 0, totalItems: 0 };
     const body = pageResult.body;
     const totalPages = Number(body.pagination.totalPages);
     const pageItems = (body.titles as any[]).slice(0, data.limit);
@@ -103,6 +110,7 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
         if (match.data) { existing = match.data; rowId = match.data.id; }
       }
       if (rowId && data.mode === "new_only") { skipped++; continue; }
+      if (!rowId && data.kind === "series") { skipped++; continue; }
       const nonEmptyPatch: Record<string, unknown> = { streambetter_id: providerId, streambetter_tmdb_id: tmdbId };
       // Preserve an existing canonical ID; fill it only when missing.
       if (!existing?.tmdb_id) nonEmptyPatch["tmdb_id"] = Number(tmdbId);
@@ -201,4 +209,5 @@ export const streamBetterImportStep = createServerFn({ method: "POST" }).middlew
       }
     }
     return { retryMs: 0, retry: false, done: data.page >= totalPages, page: data.page, nextPage: data.page + 1, totalPages, processed, imported, updated, skipped, errors, totalItems: Number(body.pagination.totalItems ?? 0) };
-  });
+  }
+}
