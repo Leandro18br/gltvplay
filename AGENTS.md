@@ -32,5 +32,5 @@
 - Fixed genres map TMDB IDs without creation. Organizational categories use additive joins and insert triggers; public category/Home filters read joins, retaining category_id. Why: defaults preserve prior categories and genres.
 - Detail rules: `src/lib/{integrations,playback,tmdb,admin,access,auth}/AGENTS.md`. Why: directory scope.
 - Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
-- Brand logo renders only via `GLTVLogo` (`src/components/brand/GLTVLogo.tsx`) using the static file `public/brand/gltv-logo.png`; favicon is `public/favicon.png`. Why: one fixed official mark across all areas.
+- Brand logo only via `GLTVLogo` (`public/brand/gltv-logo.png`); favicon `public/favicon.png`. Why: one official mark.
 - Each area (client/admin/reseller) has its own auth client (`src/lib/auth/AGENTS.md`). Why: one area's sign-out/expiry must not affect another.
