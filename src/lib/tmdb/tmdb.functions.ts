@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { extrasPatch, mapCredits, mapVideos } from "./extras";
 import { completionFields, coverDecision, isMissing, missingMetadata, rankCandidates, reliableMatch, rowYear, searchTitles, simplifiedTitle, type MatchCandidate, type CompletionKind } from "./completion";
 
 /**
@@ -112,8 +113,11 @@ function ptTranslation(body: any) {
   return { title: (typeof br.title === "string" && br.title.trim()) || (typeof br.name === "string" && br.name.trim()) || null, overview: pick("overview"), tagline: pick("tagline") };
 }
 const DETAIL_APPEND = "external_ids,translations";
+const MOVIE_FULL = "external_ids,translations,credits,videos,release_dates";
+const TV_FULL = "external_ids,translations,credits,videos,content_ratings";
+const VIDEO_LANGS = "pt,en,null";
 export async function movieMeta(tmdbId: number, fresh: boolean) {
-  const [m, i] = await Promise.all([tmdbGet(`/movie/${tmdbId}`, { language: LANG, append_to_response: DETAIL_APPEND }, { ttl: DAY, fresh, notFound: "Filme não encontrado." }), imageConfig()]);
+  const [m, i] = await Promise.all([tmdbGet(`/movie/${tmdbId}`, { language: LANG, append_to_response: MOVIE_FULL, include_video_language: VIDEO_LANGS }, { ttl: DAY, fresh, notFound: "Filme não encontrado." }), imageConfig()]);
   const tr = ptTranslation(m);
   const fields = {
     tmdb_id: m.id, imdb_id: m.imdb_id ?? m.external_ids?.imdb_id ?? null,
@@ -126,11 +130,11 @@ export async function movieMeta(tmdbId: number, fresh: boolean) {
     country: m.production_countries?.[0]?.name ?? m.origin_country?.[0] ?? null,
     external_source: "tmdb", external_id: `movie:${m.id}`, tmdb_synced_at: new Date().toISOString(),
   };
-  return { fields, genres: m.genres ?? [] };
+  return { fields, genres: m.genres ?? [], body: m, images: i };
 }
 
 export async function seriesMeta(tmdbId: number, fresh: boolean) {
-  const [s, i] = await Promise.all([tmdbGet(`/tv/${tmdbId}`, { language: LANG, append_to_response: DETAIL_APPEND }, { ttl: DAY, fresh, notFound: "Série não encontrada." }), imageConfig()]);
+  const [s, i] = await Promise.all([tmdbGet(`/tv/${tmdbId}`, { language: LANG, append_to_response: TV_FULL, include_video_language: VIDEO_LANGS }, { ttl: DAY, fresh, notFound: "Série não encontrada." }), imageConfig()]);
   const tr = ptTranslation(s);
   const fields = {
     tmdb_id: s.id, imdb_id: s.external_ids?.imdb_id ?? null,
@@ -143,7 +147,7 @@ export async function seriesMeta(tmdbId: number, fresh: boolean) {
     country: s.origin_country?.[0] ?? null, number_of_seasons: s.number_of_seasons ?? null, number_of_episodes: s.number_of_episodes ?? null,
     external_source: "tmdb", external_id: `tv:${s.id}`, tmdb_synced_at: new Date().toISOString(),
   };
-  return { fields, genres: s.genres ?? [], seasons: (s.seasons ?? []) as any[], images: i };
+  return { fields, genres: s.genres ?? [], seasons: (s.seasons ?? []) as any[], images: i, body: s };
 }
 
 /* ---------------- server functions ---------------- */
@@ -283,7 +287,7 @@ export const tmdbResolveContent = createServerFn({ method: "POST" })
 
 export async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string, current: any, fields: any, genres: any[] = []) {
   const patch: any = { ...missingMetadata(kind, current, fields), ...officialDates(kind, fields) };
-  if (kind === "movie" || kind === "series") patch._genres = genres.filter((g) => Number.isInteger(g.id) && g.name).map((g) => ({ id: g.id, name: PT_GENRE[g.id] ?? g.name }));
+  // Fixed genres only: no `_genres` payload, so the RPC never creates genres.
   const { data, error } = await ctx.supabase.rpc("complete_tmdb_metadata", {
     _kind: kind, _id: id, _patch: patch, _genre_ids: genres.map((g) => g.id).filter((id): id is number => Number.isInteger(id)),
   });
@@ -293,8 +297,6 @@ export async function applyCompletion(ctx: Ctx, kind: CompletionKind, id: string
   }
   return data as { filled: number; genres: number; genres_created: number; fields: Record<string, string | number | null> };
 }
-/** pt-BR names for official TV genres TMDB only returns in English. */
-const PT_GENRE: Record<number, string> = { 10762: "Infantil", 10763: "Notícias", 10764: "Reality", 10766: "Novela", 10767: "Talk Show" };
 /** Official TMDB date + its year always win over a wrong registered year; absent/invalid dates are never sent. */
 export function officialDates(kind: CompletionKind, fields: any) {
   const key = kind === "movie" ? "release_date" : kind === "series" ? "first_air_date" : null;
@@ -315,9 +317,18 @@ export const tmdbRefresh = createServerFn({ method: "POST" })
     if (!tmdbId) throw new Error(unidentified);
     const meta = data.kind === "movie" ? await movieMeta(tmdbId, false) : await seriesMeta(tmdbId, false);
     const result = await applyCompletion(ctx, data.kind, data.id, row, meta.fields, meta.genres);
+    // Credits, videos and extra fields: separate fill-only step; a failure here keeps the metadata above.
+    const credits = mapCredits(meta.body, meta.images.base);
+    const { videos, trailer } = mapVideos(meta.body);
+    let extras: { filled: number; fields: Record<string, unknown>; credits: number; videos: number } | null = null;
+    let extrasError: string | null = null;
+    const ex = await ctx.supabase.rpc("apply_tmdb_extras", { _kind: data.kind, _id: data.id, _patch: extrasPatch(data.kind, meta.body), _credits: credits, _videos: videos });
+    if (ex.error) extrasError = "Elenco e trailer não puderam ser salvos. Tente novamente."; else extras = ex.data;
+    const castCount = credits.filter((c) => c.type === "cast").length;
     const empty = completionFields[data.kind].filter((k) => isMissing(row[k]) && !(k in result.fields) && !["poster_path", "backdrop_path"].includes(k));
     const dateConfirmed = Object.keys(officialDates(data.kind, meta.fields)).length > 0;
-    return { ok: true, ...result, filledFields: Object.keys(result.fields ?? {}), empty, dateConfirmed };
+    return { ok: true, ...result, filledFields: [...Object.keys(result.fields ?? {}), ...Object.keys(extras?.fields ?? {})], empty, dateConfirmed, tmdbId,
+      cast: extras ? castCount : 0, crew: extras ? credits.length - castCount : 0, videos: extras?.videos ?? 0, trailer: trailer ? trailer.name ?? "Trailer" : null, extrasError };
   }));
 
 /** One existing season per request. No imports, removals or renumbering. */

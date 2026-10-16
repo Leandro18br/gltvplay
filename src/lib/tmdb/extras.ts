@@ -29,8 +29,8 @@ export function mapVideos(body: any): { videos: TmdbVideo[]; trailer: TmdbVideo 
   return { videos, trailer: videos.find((v) => v.primary) ?? null };
 }
 
-const CREW_JOBS = new Set(["Director", "Screenplay", "Writer", "Novel", "Story", "Creator", "Executive Producer"]);
-export const CREW_LABEL: Record<string, string> = { Director: "Direção", Screenplay: "Roteiro", Writer: "Roteiro", Novel: "Obra original", Story: "História", Creator: "Criação", "Executive Producer": "Produção executiva" };
+const CREW_JOBS = new Set(["Director", "Screenplay", "Writer", "Novel", "Story", "Creator"]);
+export const CREW_LABEL: Record<string, string> = { Director: "Direção", Screenplay: "Roteiro", Writer: "Roteiro", Novel: "Obra original", Story: "História", Creator: "Criação" };
 
 export function mapCredits(body: any, imageBase: string, maxCast = 30) {
   const credits = body?.credits ?? {};
@@ -39,7 +39,7 @@ export function mapCredits(body: any, imageBase: string, maxCast = 30) {
     type: "cast", credit_id: String(c.credit_id), person_id: c.id ?? null, name: c.name, character: c.character || null, job: null, department: "Acting",
     profile_url: photo(c.profile_path), order: Number.isInteger(c.order) ? c.order : i,
   }));
-  const crew = ((credits.crew ?? []) as any[]).filter((c) => c?.credit_id && c?.name && CREW_JOBS.has(c.job) && (c.job !== "Executive Producer" || body?.created_by === undefined)).slice(0, 20).map((c, i) => ({
+  const crew = ((credits.crew ?? []) as any[]).filter((c) => c?.credit_id && c?.name && CREW_JOBS.has(c.job)).slice(0, 20).map((c, i) => ({
     type: "crew", credit_id: String(c.credit_id), person_id: c.id ?? null, name: c.name, character: null, job: c.job, department: c.department ?? null,
     profile_url: photo(c.profile_path), order: i,
   }));
