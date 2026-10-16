@@ -90,7 +90,7 @@ export async function runMetadataRepairJob(ctx: Ctx, jobId: string, budgetMs: nu
   const { enrichContent } = await import("@/lib/tmdb/tmdb.functions");
   const db = ctx.supabase; const t0 = Date.now();
   const job = await claim(db, jobId); if (!job) return { busy: true };
-  const s: any = { complete: 0, filled: 0, unmatched: 0, error: 0, ...(job.stats ?? {}) };
+  const s: any = { complete: 0, filled: 0, incomplete: 0, unmatched: 0, error: 0, ...(job.stats ?? {}) };
   let done = job.done, failed = job.failed;
   try {
     while (Date.now() - t0 < budgetMs - 8000) {
@@ -100,7 +100,7 @@ export async function runMetadataRepairJob(ctx: Ctx, jobId: string, budgetMs: nu
         const [kind, id] = String(it.ext_id).split(":");
         const r = await enrichContent(ctx, kind as "movie" | "series", id!);
         s[r.status]++;
-        const ok = r.status === "filled" || r.status === "complete";
+        const ok = r.status === "filled" || r.status === "complete" || r.status === "incomplete";
         if (ok) done++; else failed++;
         await db.from("bugou_import_items").update({ state: ok ? "done" : "failed", result: r, error: ok ? null : (r.error ?? "Sem correspondência confiável no TMDB"), attempts: it.attempts + 1, updated_at: new Date().toISOString() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
       }));

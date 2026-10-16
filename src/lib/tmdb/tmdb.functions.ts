@@ -210,6 +210,8 @@ export const tmdbImportMovie = createServerFn({ method: "POST" })
     const r = await ctx.supabase.rpc("import_tmdb_movie_metadata", { _patch: fields, _genre_ids: genres.map((g: any) => g.id) });
     if (r.error) throw new Error("Não foi possível salvar os metadados do filme.");
     if (r.data.outcome === "ambiguous") throw new Error("Correspondência ambígua com conteúdo existente. Confira o título e ano antes de importar.");
+    // Same shared enrichment as every other importer: cast, crew, trailer and extra fields (fill-only).
+    if (r.data.outcome === "created" || data.update) await enrichContent(ctx, "movie", r.data.id);
     return { id: r.data.id as string, created: r.data.outcome === "created", exists: r.data.outcome !== "created" && !data.update };
   }));
 
@@ -233,6 +235,7 @@ export const tmdbImportSeries = createServerFn({ method: "POST" })
       id = r.data.id;
     }
     await linkGenres(ctx, "series", id, genres);
+    await enrichContent(ctx, "series", id);
     return { id, created: !found, exists: false };
   }));
 
@@ -453,23 +456,49 @@ export const tmdbImportEpisodes = createServerFn({ method: "POST" })
     return { created, updated };
   }));
 
-/** Shared fill-only TMDB enrichment used by every importer, the background worker and catalog recovery.
- *  Only runs when essential fields are missing; uses the registered TMDB id or a single reliable title/year/type match.
+export type EnrichResult = { status: "complete" | "filled" | "incomplete" | "unmatched" | "error"; filled?: number; genres?: number; fields?: string[]; credits?: number; videos?: number; missing?: string[]; tmdbId?: number; source?: "tmdb"; error?: string };
+
+/** Fields still absent after enrichment (recorded as "metadados incompletos"; never invented). */
+async function missingAfter(ctx: Ctx, kind: "movie" | "series", id: string) {
+  const row = await completionRow(ctx, kind, id);
+  const gt = kind === "movie" ? "movie_genres" : "series_genres";
+  const [g, c] = await Promise.all([
+    ctx.supabase.from(gt).select("genre_id", { count: "exact", head: true }).eq(kind === "movie" ? "movie_id" : "series_id", id),
+    ctx.supabase.from("content_credits").select("id", { count: "exact", head: true }).eq("content_kind", kind).eq("content_id", id),
+  ]);
+  const out: string[] = [];
+  for (const k of ["description", "poster_url", "backdrop_url", "release_year", "trailer_url", "age_rating"]) if (isMissing(row[k])) out.push(k);
+  if (kind === "movie" && !row.duration_minutes) out.push("duration_minutes");
+  if (!g.count) out.push("genres");
+  if (!c.count) out.push("cast");
+  return { row, missing: out, genres: g.count ?? 0, credits: c.count ?? 0 };
+}
+
+/** Shared fill-only TMDB enrichment used by every importer (manual, extension, BugouMods, background worker, recovery)
+ *  for movies AND series. Uses the registered TMDB id or a single reliable title/year/type match.
+ *  Runs when basic fields OR cast/trailer are missing (previously cast/trailer gaps were skipped, which is why
+ *  movies imported with a poster/synopsis never got credits or trailers). Never touches playback, status or categories.
  *  Never throws: a failure is returned so queues record it and continue. */
-export async function enrichContent(ctx: Ctx, kind: "movie" | "series", id: string): Promise<{ status: "complete" | "filled" | "unmatched" | "error"; filled?: number; genres?: number; error?: string }> {
+export async function enrichContent(ctx: Ctx, kind: "movie" | "series", id: string): Promise<EnrichResult> {
   try {
     if (!process.env["TMDB_API_KEY"]) return { status: "error", error: "TMDB não configurado" };
-    const row = await completionRow(ctx, kind, id);
-    const gt = kind === "movie" ? "movie_genres" : "series_genres";
-    const { count } = await ctx.supabase.from(gt).select("genre_id", { count: "exact", head: true }).eq(kind === "movie" ? "movie_id" : "series_id", id);
-    const missing = isMissing(row.description) || isMissing(row.poster_url) || isMissing(row.backdrop_url) || !row.release_year || !count;
-    if (!missing) return { status: "complete" };
+    const before = await missingAfter(ctx, kind, id);
+    const row = before.row;
+    const { count: vids } = await ctx.supabase.from("content_videos").select("id", { count: "exact", head: true }).eq("content_kind", kind).eq("content_id", id);
+    const basic = before.missing.some((k) => ["description", "poster_url", "backdrop_url", "release_year", "genres"].includes(k));
+    // Extras already fetched once (credits or videos stored) mean TMDB simply has no more: skip a redundant call.
+    const extrasGap = (before.missing.includes("cast") || before.missing.includes("trailer_url")) && !before.credits && !vids;
+    if (!basic && !extrasGap) return { status: "complete", missing: before.missing };
     const tmdbId = (await resolveCompletion(kind, row)).tmdbId;
-    if (!tmdbId) return { status: "unmatched" };
+    if (!tmdbId) return { status: "unmatched", missing: before.missing };
     const meta = kind === "movie" ? await movieMeta(tmdbId, false) : await seriesMeta(tmdbId, false);
     const r = await applyCompletion(ctx, kind, id, row, meta.fields, meta.genres);
-    await ctx.supabase.rpc("apply_tmdb_extras", { _kind: kind, _id: id, _patch: extrasPatch(kind, meta.body), _credits: mapCredits(meta.body, meta.images.base), _videos: mapVideos(meta.body).videos });
-    return { status: "filled", filled: r.filled, genres: r.genres };
+    const ex = await ctx.supabase.rpc("apply_tmdb_extras", { _kind: kind, _id: id, _patch: extrasPatch(kind, meta.body), _credits: mapCredits(meta.body, meta.images.base), _videos: mapVideos(meta.body).videos });
+    const after = await missingAfter(ctx, kind, id);
+    const fields = [...Object.keys(r.fields ?? {}), ...Object.keys(ex.data?.fields ?? {})];
+    // "incomplete": matched, but TMDB has nothing more for the remaining gaps (recorded, retried later only if new data appears).
+    const gained = fields.length + (r.genres ?? 0) + (after.credits > before.credits ? 1 : 0);
+    return { status: gained ? "filled" : "incomplete", filled: fields.length, genres: r.genres, fields, credits: ex.data?.credits ?? 0, videos: ex.data?.videos ?? 0, missing: after.missing, tmdbId, source: "tmdb", ...(ex.error ? { error: "Elenco/trailer não salvos" } : {}) };
   } catch (e) {
     return { status: "error", error: String((e as Error).message).slice(0, 300) };
   }
