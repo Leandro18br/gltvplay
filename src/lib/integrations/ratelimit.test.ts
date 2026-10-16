@@ -29,7 +29,6 @@ describe("rate limit helpers", () => {
     expect(backoffMs(9, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS, () => 1)).toBe(150_000);
   });
 });
-});
 
 describe("fetchProviderJson", () => {
   it("429 makes exactly one request and carries Retry-After", async () => {
