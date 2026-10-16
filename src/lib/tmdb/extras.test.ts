@@ -8,6 +8,10 @@ describe("tmdb extras", () => {
     expect(r.trailer?.id).toBe("3");
     expect(r.videos.filter((x) => x.primary)).toHaveLength(1);
   });
+  it("keeps the trailer even after many other videos", () => {
+    const many = Array.from({ length: 40 }, (_, i) => v(`f${i}`, { type: "Featurette" }));
+    expect(mapVideos({ videos: { results: [...many, v("t", {})] } }).trailer?.id).toBe("t");
+  });
   it("never treats teasers or clips as trailer", () => {
     expect(mapVideos({ videos: { results: [v("1", { type: "Teaser" }), v("2", { type: "Clip" })] } }).trailer).toBeNull();
   });

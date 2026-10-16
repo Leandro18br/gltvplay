@@ -21,7 +21,9 @@ export function mapVideos(body: any): { videos: TmdbVideo[]; trailer: TmdbVideo 
   const ranked = list.map((v) => ({ v, r: trailerRank(v) })).filter((x) => x.r !== null)
     .sort((a, b) => (a.r! - b.r!) || String(b.v.published_at ?? "").localeCompare(String(a.v.published_at ?? "")));
   const bestId = ranked[0]?.v.id ?? null;
-  const videos = list.slice(0, 30).map((v) => ({
+  // Trailers first (ranked), then other videos, so the cap never drops the chosen trailer.
+  const ordered = [...ranked.map((x) => x.v), ...list.filter((v) => trailerRank(v) === null)];
+  const videos = ordered.slice(0, 30).map((v) => ({
     id: String(v.id), name: v.name ?? null, type: v.type ?? null, site: v.site ?? null, key: String(v.key),
     iso_639_1: v.iso_639_1 ?? null, iso_3166_1: v.iso_3166_1 ?? null, official: typeof v.official === "boolean" ? v.official : null,
     published_at: typeof v.published_at === "string" ? v.published_at : null, primary: v.id === bestId,
