@@ -419,8 +419,9 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   let episodes = lease.data[0].episodes_created as number;
   const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, concurrency: 4, ...(lease.data[0].stats ?? {}) };
   st.rate_factor = Math.max(0.25, st.rate_factor ?? 1); // older runs could persist a 1/8 pace
-  const { integ } = await seriesIntegration();
-  const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
+  // Provider pace learned from real 429s, shared by every series job (same token = same quota).
+  if (!st.safe_rpm) st.safe_rpm = await learnedRpm(ctx);
+  let okStreak = 0; const starts: number[] = [];
   let throttleUntil: string | null = null; let stop = false;
   const started = Date.now(); let nextSlot = 0;
   const stamp = () => new Date().toISOString();
@@ -437,11 +438,13 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     const tu = throttleUntil ? Date.parse(throttleUntil) : 0;
     const t = Math.max(Date.now(), nextSlot, tu);
     if (t - started > budgetMs) return false;
-    // No fixed spacing while the provider accepts the pace; the configured rpm only applies after a real 429 slowed us down.
-    nextSlot = (st.rate_factor ?? 1) < 1 ? t + minIntervalMs(rpm, st.rate_factor) : t;
+    // Unpaced until the provider answers 429; afterwards calls are spaced at the learned safe pace (no fixed waits otherwise).
+    nextSlot = st.safe_rpm ? t + Math.ceil(60_000 / st.safe_rpm) : t;
     if (t > Date.now()) await sleep(t - Date.now());
+    starts.push(Date.now());
     return !stop;
   };
+
   type It = { ext_id: string; title: string | null; attempts: number; rate_limited: number; details: any };
   const processOne = async (it: It): Promise<"ok" | "throttle" | "err" | "skip"> => {
     const upd = (patch: any) => db.from("bugou_import_items").update({ ...patch, updated_at: stamp() }).eq("job_id", jobId).eq("ext_id", it.ext_id);
