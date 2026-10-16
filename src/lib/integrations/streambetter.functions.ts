@@ -7,6 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 type Ctx = { supabase: any; userId: string };
 const BASE = "https://streambetter.shop";
 const PAGE_SIZE = 10;
+const DISABLED: boolean = true;
 
 async function assertStaff(ctx: Ctx) {
   const { data, error } = await ctx.supabase.rpc("is_staff", { _user_id: ctx.userId });
@@ -70,9 +71,11 @@ export const streamBetterTest = createServerFn({ method: "POST" }).middleware([r
 export const streamBetterImportStep = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator(z.object({ kind: z.enum(["movie", "series"]), page: z.number().int().min(1).max(100000), limit: z.number().int().min(1).max(10).default(10), mode: z.enum(["sync", "new_only"]).default("sync") }))
   .handler(async ({ data, context }) => {
-    await assertStaff(context); void data;
+    await assertStaff(context);
+    if (DISABLED)
     // BugouMods VIP is the only official catalog/playback API: StreamBetter imports are disabled (existing rows/sources kept).
     throw new Error("A StreamBetter está desativada: a BugouMods VIP é a única API oficial de catálogo e reprodução.");
+    return importStreamBetterPage(data);
   });
 
 /** One provider page (10 titles). Shared by the admin step and the background worker. Series are never created
