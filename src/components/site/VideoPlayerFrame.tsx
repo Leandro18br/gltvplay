@@ -67,7 +67,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     idle.current = setTimeout(() => {
       const video = media.current;
       const focused = document.activeElement;
-      if (video && !video.paused && !video.ended && !menuOpen.current && !(focused && wrap.current?.contains(focused) && (focused.matches(':focus-visible') || document.documentElement.dataset.remoteNavigation === 'true'))) setVisible(false);
+      if (video && !video.paused && !video.ended && !menuOpen.current && !(focused && wrap.current?.contains(focused) && (focused.matches(':focus-visible') || document.documentElement.dataset['remoteNavigation'] === 'true'))) setVisible(false);
     }, CONTROLS_IDLE_MS);
   }, []);
   const flash = (value: string) => {
@@ -170,7 +170,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
   const onKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (isMediaControl(event.target) || event.altKey || event.ctrlKey || event.metaKey) return;
     if ((event.key === " " || event.key === "Enter") && (event.target as HTMLElement).closest("button, a")) return;
-    if (document.documentElement.dataset.remoteNavigation === 'true' && event.key.startsWith('Arrow')) { reveal(); return; }
+    if (document.documentElement.dataset['remoteNavigation'] === 'true' && event.key.startsWith('Arrow')) { reveal(); return; }
     const key = event.key.toLowerCase();
     if ([" ", "arrowleft", "arrowright", "m", "f"].includes(key)) event.preventDefault();
     if (key === " ") toggle();

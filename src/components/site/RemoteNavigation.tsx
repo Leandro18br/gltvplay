@@ -16,9 +16,9 @@ export function RemoteNavigation() {
     const saved = new Map<string, SavedFocus>();
     const publicArea = () => !excluded(location.pathname);
     const keyFor = (element: HTMLElement) => {
-      if (element.dataset.remoteId) return element.dataset.remoteId;
+      if (element.dataset['remoteId']) return element.dataset['remoteId'];
       const section = element.closest('section')?.getAttribute('aria-label') ?? "";
-      return `${section}|${element.dataset.remoteId ?? element.getAttribute('href') ?? element.id ?? ""}|${element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ""}`;
+      return `${section}|${element.dataset['remoteId'] ?? element.getAttribute('href') ?? element.id ?? ""}|${element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ""}`;
     };
     const scope = (): ParentNode => {
       const overlays = Array.from(document.querySelectorAll<HTMLElement>(overlay)).filter(el => el.getBoundingClientRect().width && getComputedStyle(el).visibility !== 'hidden');
@@ -40,33 +40,39 @@ export function RemoteNavigation() {
       if (!items.length) return;
       if (pending) {
         const target = items.find(el => keyFor(el) === pending?.key);
-        if (!target) return; // Wait for loader content rather than focusing a skeleton/header.
+        if (!target && !document.querySelector('main h1, main [data-remote-row]')) return;
         document.querySelectorAll<HTMLElement>('[data-remote-row]').forEach((row, i) => { row.scrollLeft = pending?.rows[i] ?? 0; });
         window.scrollTo(pending.x, pending.y);
+        const fallback = items[Math.max(0, Math.min(pending.index, items.length - 1))];
         pending = undefined;
-        focus(target);
+        if (target ?? fallback) focus((target ?? fallback) as HTMLElement);
       } else if (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected || document.activeElement.matches(':disabled')) {
         const player = document.querySelector('[data-remote-player]');
         const primary = player ? items.find(el => player.contains(el) && /Reproduzir|Pausar/.test(el.getAttribute('aria-label') ?? '')) : undefined;
-        focus(primary ?? items.find(el => el.closest('main')) ?? items[0]);
+        const target = primary ?? items.find(el => el.closest('main')) ?? items[0];
+        if (target) focus(target);
       }
     };
     const onFocus = (event: FocusEvent) => { if (event.target instanceof HTMLElement) last = event.target; };
-    const enable = () => { remote = true; document.documentElement.dataset.remoteNavigation = 'true'; };
-    const pointer = () => { remote = false; delete document.documentElement.dataset.remoteNavigation; };
+    const enable = () => { remote = true; document.documentElement.dataset['remoteNavigation'] = 'true'; };
+    const pointer = () => { pending = undefined; remote = false; delete document.documentElement.dataset['remoteNavigation']; };
     const back = (event: KeyboardEvent) => {
       if (event.repeat) { event.preventDefault(); return; }
       const active = document.activeElement;
       const player = active?.closest('[data-remote-player]') ?? document.querySelector('[data-remote-player]');
-      if (player && !player.dispatchEvent(new CustomEvent('gltv:remote-back', { bubbles: false, cancelable: true }))) { event.preventDefault(); return; }
+      if (player && !player.dispatchEvent(new CustomEvent('gltv:remote-back', { bubbles: true, cancelable: true }))) { event.preventDefault(); return; }
       const link = document.querySelector<HTMLAnchorElement>('[data-remote-back], a[aria-label="Voltar"]');
       if (link) { event.preventDefault(); link.click(); return; }
       // A single back action, with no history interception or permanent browser lock.
       if (router.history.canGoBack()) { event.preventDefault(); router.history.back(); }
     };
     const normalize = (event: KeyboardEvent) => {
-      if (!publicArea() || event.altKey || event.ctrlKey || event.metaKey || isEditing(event.target instanceof Element ? event.target : null)) return;
+      if (!publicArea() || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
       const key = remoteKey(event);
+      if (isEditing(event.target instanceof Element ? event.target : null)) {
+        if (key === 'Escape' && !event.repeat) { event.preventDefault(); event.stopPropagation(); (event.target as HTMLElement).blur(); enable(); }
+        return;
+      }
       if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Escape','Backspace'].includes(key)) return;
       enable();
       // Radix retains its own focus management, selection and dismissal.
@@ -117,7 +123,7 @@ export function RemoteNavigation() {
     document.addEventListener('keydown', onKey);
     document.addEventListener('focusin', onFocus);
     document.addEventListener('pointerdown', pointer, true);
-    return () => { before(); resolved(); observer.disconnect(); document.removeEventListener('keydown', normalize, true); document.removeEventListener('keydown', onKey); document.removeEventListener('focusin', onFocus); document.removeEventListener('pointerdown', pointer, true); delete document.documentElement.dataset.remoteNavigation; };
+    return () => { before(); resolved(); observer.disconnect(); document.removeEventListener('keydown', normalize, true); document.removeEventListener('keydown', onKey); document.removeEventListener('focusin', onFocus); document.removeEventListener('pointerdown', pointer, true); delete document.documentElement.dataset['remoteNavigation']; };
   }, [router]);
   return null;
 }

@@ -55,8 +55,8 @@ function SeriesPage() {
     if (!currentId) return;
     // Run after the selected player's DOM has committed, not in the click handler.
     const frame = requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: document.documentElement.dataset.remoteNavigation === 'true' || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
-      if (document.documentElement.dataset.remoteNavigation === 'true') document.querySelector<HTMLElement>('[data-playback-stage] button')?.focus();
+      window.scrollTo({ top: 0, behavior: document.documentElement.dataset['remoteNavigation'] === 'true' || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      if (document.documentElement.dataset['remoteNavigation'] === 'true') document.querySelector<HTMLElement>('[data-playback-stage] button')?.focus();
     });
     return () => cancelAnimationFrame(frame);
   }, [currentId]);
