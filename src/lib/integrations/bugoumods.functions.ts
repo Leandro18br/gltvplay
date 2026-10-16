@@ -4,7 +4,7 @@ import { z } from "zod";
 import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
-import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor } from "./ratelimit";
+import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS } from "./ratelimit";
 import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouVipEmbedUrl, mapBugouGenreSlugs, normTitle, compactTitle, type BugouSeries, type BugouDetails, type BugouMovieDetails } from "./bugoumods";
 
 /**
@@ -284,7 +284,7 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 // ---------- Resumable import jobs ----------
 
 type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
-export const MAX_CONCURRENCY = 12;
+export const MAX_CONCURRENCY = 6;
 
 async function jobView(ctx: Ctx, jobId: string) {
   const db = ctx.supabase;
@@ -418,6 +418,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   await db.from("bugou_import_items").update({ state: "pending" }).eq("job_id", jobId).eq("state", "processing");
   let episodes = lease.data[0].episodes_created as number;
   const st: JobStats = { requests: 0, http429: 0, rate_factor: 1, seasons: 0, episodes_total: 0, concurrency: 4, ...(lease.data[0].stats ?? {}) };
+  st.rate_factor = Math.max(0.25, st.rate_factor ?? 1); // older runs could persist a 1/8 pace
   const { integ } = await seriesIntegration();
   const rpm = Math.max(1, Number(integ?.rate_limit_per_minute ?? 30));
   let throttleUntil: string | null = null; let stop = false;
@@ -432,7 +433,9 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   };
   /** Reserves the next provider call slot; false when it would fall outside the budget. */
   const slot = async () => {
-    const t = Math.max(Date.now(), nextSlot);
+    // After a 429 in this wave, no new provider call starts before the provider's wait has passed.
+    const tu = throttleUntil ? Date.parse(throttleUntil) : 0;
+    const t = Math.max(Date.now(), nextSlot, tu);
     if (t - started > budgetMs) return false;
     // No fixed spacing while the provider accepts the pace; the configured rpm only applies after a real 429 slowed us down.
     nextSlot = (st.rate_factor ?? 1) < 1 ? t + minIntervalMs(rpm, st.rate_factor) : t;
@@ -467,13 +470,13 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     } catch (e) {
       const msg = scrub(e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (e instanceof RateLimitedError) {
-        st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429"); stop = true;
+        // Real provider 429: wait the provider's hint (Retry-After / RateLimit reset) or a short backoff, then the queue resumes by itself.
+        st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429");
         const rl = it.rate_limited + 1;
-        const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(rl, 30_000))).toISOString();
+        const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(Math.min(rl, 6), PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS))).toISOString();
         if (!throttleUntil || until > throttleUntil) throttleUntil = until;
-        await upd(rl >= MAX_RATE_LIMITED
-          ? { state: "failed", rate_limited: rl, error: `${msg} Tentativas automáticas esgotadas — use "Tentar de novo só as falhas" mais tarde.`, next_attempt_at: null }
-          : { state: "pending", rate_limited: rl, error: `${msg} Nova tentativa programada.`, next_attempt_at: until });
+        console.warn("bugou 429", it.ext_id, e.retryAfterMs ?? "no-hint", until);
+        await upd({ state: "pending", rate_limited: rl, error: `${msg} Retomada automática programada.`, next_attempt_at: until });
         return "throttle";
       }
       if (/rate limit|too many requests|try again in a minute|statement timeout|canceling statement/i.test(msg)) {
@@ -491,7 +494,9 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
   };
 
   while (!stop && Date.now() - started < budgetMs - 3000) {
-    if ((await globalThrottle(ctx)) > Date.now()) break;
+    // Provider wait inside this run's budget: sleep it out here instead of ending the run (the next run would start up to a minute later).
+    const gt = await globalThrottle(ctx);
+    if (gt > Date.now()) { if (gt - started > budgetMs - 8000) break; await sleep(gt - Date.now() + 200); continue; }
     const { data: cur } = await db.from("bugou_import_jobs").select("status").eq("id", jobId).single();
     if (cur?.status === "paused" || cur?.status === "cancelled") { stop = true; break; }
     const n = Math.max(1, Math.min(MAX_CONCURRENCY, st.concurrency ?? 2));
@@ -505,7 +510,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
     if (!wave.length) continue;
     await db.from("bugou_import_items").update({ state: "processing", updated_at: stamp() }).eq("job_id", jobId).in("ext_id", wave.map(x => x.ext_id));
     const out = await Promise.all(wave.map(processOne));
-    st.concurrency = out.includes("throttle") ? Math.max(1, Math.floor(n / 2)) : out.every(o => o === "ok") && wave.length === n ? Math.min(MAX_CONCURRENCY, n + 2) : n;
+    st.concurrency = out.includes("throttle") ? Math.max(1, Math.floor(n / 2)) : out.every(o => o === "ok") && wave.length === n ? Math.min(MAX_CONCURRENCY, n + 1) : n;
     const c = await recount(ctx, jobId);
     await db.from("bugou_import_jobs").update({ done: c.done, failed: c.failed, episodes_created: episodes, stats: st, updated_at: stamp(), ...(throttleUntil ? { throttle_until: throttleUntil } : {}) }).eq("id", jobId);
     if (out.includes("skip")) break;

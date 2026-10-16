@@ -152,7 +152,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
           <section aria-label="Progresso da importação" className={`space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm ${later}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="min-w-0 flex-1 truncate font-medium" title={job.label}>{job.label}</span>
-              <Badge variant={job.status === "paused" ? "outline" : "secondary"}>{job.throttled ? "Aguardando API" : job.status === "paused" ? "Pausada" : job.status === "done" ? "Concluída" : jobActive || job.status === "running" ? "Em andamento" : "Parada"}</Badge>
+              <Badge variant={job.status === "paused" ? "outline" : "secondary"}>{job.throttled ? "Aguardando limite do provedor" : job.status === "paused" ? "Pausada" : job.status === "done" ? (job.failed > 0 ? "Concluída com erros" : "Concluída") : (job.waiting ?? 0) > 0 && !job.processing && !job.queued ? "Retomada automática programada" : jobActive || job.status === "running" ? "Importando" : "Parada"}</Badge>
             </div>
             <Progress value={pct} />
             <div className="grid grid-cols-3 gap-1.5 text-center text-xs sm:grid-cols-6">
@@ -161,7 +161,7 @@ function BugouDialog({ onClose }: { onClose: () => void }) {
             </div>
             <p className="break-words text-xs text-muted-foreground">{job.seasons ?? 0} temporada(s) · {job.with_player ?? 0} com player VIP · {job.concurrency ?? 2} em paralelo · {job.per_min ? `${job.per_min}/min` : "medindo velocidade…"}{job.eta_min ? ` · faltam ~${job.eta_min >= 60 ? `${Math.floor(job.eta_min / 60)} h ${job.eta_min % 60} min` : `${job.eta_min} min`}` : ""} · {job.requests ?? 0} consulta(s) · {job.http429 ?? 0}× HTTP 429{(job.waiting ?? 0) > 0 ? ` · ${job.waiting} aguardando nova tentativa` : ""}</p>
             {job.next_retry_at && Date.parse(job.next_retry_at) > Date.now() && (
-              <p className="rounded-lg bg-primary/10 px-2 py-1 text-xs">{job.throttled ? "Pausado pelo limite do provedor. " : ""}Próxima tentativa às {new Date(job.next_retry_at).toLocaleTimeString("pt-BR")}. Progresso salvo.</p>
+              <p className="rounded-lg bg-primary/10 px-2 py-1 text-xs">{job.throttled ? "A API BugouMods respondeu HTTP 429 (limite de requisições do provedor, não do GLTV Play). " : "Algumas séries terão nova tentativa. "}Retomada automática às {new Date(job.next_retry_at).toLocaleTimeString("pt-BR")}, sem precisar clicar em nada. Progresso salvo.</p>
             )}
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {jobActive && <Button size="sm" variant="outline" onClick={() => { running.current = false; pause({ data: { jobId: job.id } }).then(j => showJob(j as Job)); }}><Pause /> Pausar</Button>}
