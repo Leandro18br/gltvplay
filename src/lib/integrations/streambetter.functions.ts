@@ -98,7 +98,7 @@ export async function importStreamBetterPage(data: { kind: "movie" | "series"; p
       if (!tmdbId || !providerId || !title || !/^\d+$/.test(tmdbId)) { skipped++; continue; }
       const poster = posterUrl(item?.poster_path);
       const description = cleanText(item?.overview);
-      const year = yearFrom(item?.release_date ?? item?.first_air_date);
+      const year = yearFrom(String(item?.release_year ?? item?.release_date ?? item?.first_air_date ?? ""));
       // Only write provider fields when present; never erase an existing non-empty value.
       let { data: existing, error: findError } = await db.from(table).select("*").eq("streambetter_tmdb_id", tmdbId).maybeSingle();
       if (findError) { errors++; continue; }
