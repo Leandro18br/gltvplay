@@ -34,3 +34,4 @@
 - Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
 - Per-area session slots (`session-vault.ts`): guards restore slot, then re-check server-side. Why: logins must not evict each other.
 - Brand logo renders only via `GLTVLogo` (`src/components/brand/GLTVLogo.tsx`) using the static file `public/brand/gltv-logo.png`; favicon is `public/favicon.png`. Why: one fixed official mark across all areas.
+- Admin UI gate uses the shared `checkAdminAccess` (`src/lib/auth/admin-access.ts`): one in-flight check, short per-token cache, distinct unauthenticated/forbidden/error states; login binds the admin slot before navigating. Why: avoid stale-slot false denials and repeated role queries.

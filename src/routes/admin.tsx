@@ -1,12 +1,12 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, LayoutTemplate, Film, Tv, Radio, Tags, Shapes, Users,
   UserCircle, LogOut, Menu, ExternalLink, Cable, Coins, Store, UserPlus,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
+import { claimSlot, signOutSlot } from "@/lib/auth/session-vault";
+import { checkAdminAccess, clearAdminAccessCache } from "@/lib/auth/admin-access";
 import { ROLE_LABEL, isAdminRole, type StaffRole } from "@/lib/admin/db";
 import { adminHead } from "@/lib/admin/head";
 import { Button } from "@/components/ui/button";
@@ -17,16 +17,29 @@ export const Route = createFileRoute("/admin")({
   ssr: false,
   head: () => adminHead("Painel", "Administração do catálogo e das fontes de reprodução autorizadas."),
   beforeLoad: async () => {
-    await ensureSlot("admin");
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/admin/login" });
-    const { data: role } = await supabase.rpc("my_role");
-    if (role !== "super_admin" && role !== "admin" && role !== "editor") throw redirect({ to: "/admin/login", search: { denied: 1 } });
+    const access = await checkAdminAccess();
+    if (access.status === "unauthenticated") throw redirect({ to: "/admin/login" });
+    if (access.status === "forbidden") throw redirect({ to: "/admin/login", search: { denied: 1 } });
+    if (access.status === "error") throw new Error(`Não foi possível verificar o acesso (${access.message}).`);
     await claimSlot("admin");
-    return { user: data.user, role: role as StaffRole };
+    return { user: access.user, role: access.role };
   },
+  errorComponent: AdminGateError,
   component: AdminLayout,
 });
+
+function AdminGateError({ error, reset }: ErrorComponentProps) {
+  const router = useRouter();
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-5">
+      <div className="max-w-sm rounded-2xl border border-border bg-card p-6 text-center">
+        <h1 className="text-lg font-semibold">Falha temporária</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{error instanceof Error ? error.message : "Erro desconhecido."} Sua conta não foi considerada sem acesso.</p>
+        <Button className="mt-4 rounded-full" onClick={() => { clearAdminAccessCache(); reset(); router.invalidate(); }}>Tentar novamente</Button>
+      </div>
+    </div>
+  );
+}
 
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -51,6 +64,7 @@ function Nav({ onNavigate, role }: { onNavigate?: () => void; role: StaffRole })
   async function logout() {
     await qc.cancelQueries();
     qc.clear();
+    clearAdminAccessCache();
     await signOutSlot("admin");
     navigate({ to: "/admin/login", replace: true });
   }
