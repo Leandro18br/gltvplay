@@ -84,3 +84,13 @@ export function nextSafeRpm(prev: number | null, sentLastMinute: number): number
   const fromPrev = prev ? Math.floor(prev * 0.8) : Infinity;
   return Math.max(3, Math.min(SAFE_RPM_MAX, observed, fromPrev));
 }
+
+/** Clean calls in a row before the learned pace is probed upward. */
+export const RAISE_EVERY = 5;
+/**
+ * Gradual recovery after a 429: +25% (at least +1/min) per RAISE_EVERY clean calls, capped.
+ * The old +1/min per 10 calls kept a 3/min pace for ~hours after a single 429.
+ */
+export function raiseSafeRpm(rpm: number): number {
+  return Math.min(SAFE_RPM_MAX, Math.max(rpm + 1, Math.ceil(rpm * 1.25)));
+}

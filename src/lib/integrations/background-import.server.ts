@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { importMovieIds } from "./bugoumods.functions";
 import { importStreamBetterPage } from "./streambetter.functions";
-import { RateLimitedError, backoffMs, nextSafeRpm, SAFE_RPM_MAX, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS } from "./ratelimit";
+import { RateLimitedError, backoffMs, nextSafeRpm, raiseSafeRpm, RAISE_EVERY, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS } from "./ratelimit";
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /**
@@ -55,7 +55,7 @@ export async function runMovieJob(ctx: Ctx, jobId: string, budgetMs: number) {
         const r: any = await importMovieIds(ctx, [it.ext_id]);
         for (const k of ["created", "updated", "playersAdded", "genresAdded", "providerCalls", "alreadyComplete"]) stats[k] = (stats[k] ?? 0) + (r[k] ?? 0);
         stats["requests"] = (stats["requests"] ?? 0) + (r.providerCalls ?? 0);
-        if (r.providerCalls) { lastCall = Date.now(); calls.push(lastCall); if (stats["safe_rpm"] && ++okStreak >= 10) { okStreak = 0; stats["safe_rpm"] = Math.min(SAFE_RPM_MAX, stats["safe_rpm"] + 1); } }
+        if (r.providerCalls) { lastCall = Date.now(); calls.push(lastCall); if (stats["safe_rpm"] && ++okStreak >= RAISE_EVERY) { okStreak = 0; stats["safe_rpm"] = raiseSafeRpm(stats["safe_rpm"]); } }
         const bad = r.failed > 0 || r.skipped > 0;
         if (bad) { failed++; stats["failed"]++; } else done++;
         stats["last_ms"] = Date.now() - ti; if (!bad) { stats["items_ms"] += stats["last_ms"]; stats["items_timed"]++; }
