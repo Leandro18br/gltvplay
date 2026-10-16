@@ -5,6 +5,7 @@ import { linkCategories } from "./categories";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertStaff, uniqueSlug } from "@/lib/tmdb/tmdb.functions";
 import { fetchProviderJson, RateLimitedError, MAX_RATE_LIMITED, MAX_ERRORS, backoffMs, minIntervalMs, adaptFactor, PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS } from "./ratelimit";
+import { nextSafeRpm, SAFE_RPM_MAX } from "./ratelimit";
 import { parseBugouName, parseBugouDetails, parseBugouMovieDetails, bugouVipEmbedUrl, mapBugouGenreSlugs, normTitle, compactTitle, type BugouSeries, type BugouDetails, type BugouMovieDetails } from "./bugoumods";
 
 /**
@@ -283,7 +284,7 @@ export const bugouImportEpisodes = createServerFn({ method: "POST" })
 
 // ---------- Resumable import jobs ----------
 
-type JobStats = { db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
+type JobStats = { safe_rpm?: number | null; skipped_imported?: number; db_throttled?: number; requests?: number; http429?: number; rate_factor?: number; seasons?: number; episodes_total?: number; with_player?: number; no_episodes?: number; concurrency?: number };
 export const MAX_CONCURRENCY = 6;
 
 async function jobView(ctx: Ctx, jobId: string) {
@@ -309,6 +310,13 @@ async function recount(ctx: Ctx, jobId: string) {
   const c = async (state: string, waiting = false) => { let q = db.from("bugou_import_items").select("ext_id", { count: "exact", head: true }).eq("job_id", jobId).eq("state", state); if (waiting) q = q.gt("next_attempt_at", new Date().toISOString()); return (await q).count ?? 0; };
   const [done, failed, pending, processing, waiting] = await Promise.all([c("done"), c("failed"), c("pending"), c("processing"), c("pending", true)]);
   return { done, failed, pending, processing, waiting };
+}
+
+/** Most recent safe pace learned by any series job in the last 6h (null = never throttled, run unpaced). */
+async function learnedRpm(ctx: Ctx): Promise<number | null> {
+  const { data } = await ctx.supabase.from("bugou_import_jobs").select("stats").neq("kind", "live").gt("updated_at", new Date(Date.now() - 6 * 3600_000).toISOString()).order("updated_at", { ascending: false }).limit(10);
+  for (const j of data ?? []) { const v = Number((j as any).stats?.safe_rpm); if (v > 0) return v; }
+  return null;
 }
 
 /** Latest provider throttle across all series jobs: one 429 pauses every series queue. */
@@ -456,6 +464,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
         st.requests = (st.requests ?? 0) + 1;
         details = await loadDetails(it.ext_id, `Importação: ${it.title ?? it.ext_id}`);
         st.rate_factor = adaptFactor(st.rate_factor ?? 1, "ok");
+        if (st.safe_rpm && ++okStreak >= 10) { okStreak = 0; st.safe_rpm = Math.min(SAFE_RPM_MAX, st.safe_rpm + 1); }
         await upd({ details, step: "episodes", seasons_found: details.seasons.length, error: null });
         // Cancelled while the provider call was in flight: keep the cached details, write nothing to the catalog.
         if (await halted()) { await upd({ state: "pending" }); return "skip"; }
@@ -475,6 +484,7 @@ export async function runSeriesJob(ctx: Ctx, jobId: string, budgetMs: number, re
       if (e instanceof RateLimitedError) {
         // Real provider 429: wait the provider's hint (Retry-After / RateLimit reset) or a short backoff, then the queue resumes by itself.
         st.http429 = (st.http429 ?? 0) + 1; st.rate_factor = adaptFactor(st.rate_factor ?? 1, "429");
+        st.safe_rpm = nextSafeRpm(st.safe_rpm ?? null, starts.filter(t => t > Date.now() - 60_000).length); okStreak = 0;
         const rl = it.rate_limited + 1;
         const until = new Date(Date.now() + (e.retryAfterMs ?? backoffMs(Math.min(rl, 6), PROVIDER_429_BASE_MS, PROVIDER_429_CAP_MS))).toISOString();
         if (!throttleUntil || until > throttleUntil) throttleUntil = until;
