@@ -397,14 +397,31 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
       items = selectedIds.map(id => ({ ext_id: id, title: t.get(id) ?? null }));
     }
     if (!items.length) throw new Error("Nada para importar.");
-    const j = await db.from("bugou_import_jobs").insert({ label: data.repairMetadata ? `Completar metadados das séries importadas (${items.length})` : data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`, total: items.length, created_by: ctx.userId }).select("id").single();
+    let skipped = 0;
+    const label = data.repairMetadata ? `Completar metadados das séries importadas (${items.length})` : data.repairEmpty ? `Completar séries sem episódios (${items.length})` : data.allMissing ? "Todas as séries não importadas" : data.category && !data.ids.length ? `Categoria ${data.category} (todas)`.slice(0, 200) : `${items.length} série(s) selecionada(s)`;
+    // Same queue already open (running/paused): reuse it instead of a second job spending the same provider quota.
+    const { data: open } = await db.from("bugou_import_jobs").select("id").neq("kind", "live").eq("label", label).in("status", ["running", "paused"]).limit(1);
+    if (open?.length) { await db.from("bugou_import_jobs").update({ status: "running" }).eq("id", open[0].id); const workerArmed = await armWorker(); return { ...(await jobView(ctx, open[0].id)), unmatched, workerArmed, reused: true, skipped }; }
+    if (!data.repairMetadata && !data.repairEmpty) {
+      // Already imported with episodes: no series_info call needed (repairs are the explicit way to re-read them).
+      const have = new Set<string>();
+      const ids = [...new Set(items.map(x => x.ext_id))];
+      for (let i = 0; i < ids.length; i += 300) {
+        const { data: s, error } = await db.from("series").select("external_id, seasons!inner(episodes!inner(id))").eq("external_source", SOURCE).in("external_id", ids.slice(i, i + 300)).limit(300, { foreignTable: "seasons" });
+        if (error) throw new Error(error.message);
+        (s ?? []).forEach((x: any) => have.add(String(x.external_id)));
+      }
+      const before = items.length; items = items.filter(x => !have.has(x.ext_id)); skipped = before - items.length;
+      if (!items.length) throw new Error(`Todas as ${before} série(s) já estão importadas com episódios. Use "Completar metadados" para relê-las.`);
+    }
+    const j = await db.from("bugou_import_jobs").insert({ label: skipped ? `${label} — ${skipped} já importada(s) ignorada(s)`.slice(0, 200) : label, total: items.length, created_by: ctx.userId }).select("id").single();
     if (j.error) throw new Error(j.error.message);
     for (let i = 0; i < items.length; i += 500) {
       const r = await db.from("bugou_import_items").insert(items.slice(i, i + 500).map(x => ({ job_id: j.data.id, ext_id: x.ext_id, title: x.title })));
       if (r.error) throw new Error(r.error.message);
     }
     const workerArmed = await armWorker();
-    return { ...(await jobView(ctx, j.data.id)), unmatched, workerArmed };
+    return { ...(await jobView(ctx, j.data.id)), unmatched, workerArmed, reused: false, skipped };
   });
 
 /**
