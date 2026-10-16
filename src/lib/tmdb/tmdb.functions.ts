@@ -485,10 +485,9 @@ export async function enrichContent(ctx: Ctx, kind: "movie" | "series", id: stri
     const before = await missingAfter(ctx, kind, id);
     const row = before.row;
     const { count: vids } = await ctx.supabase.from("content_videos").select("id", { count: "exact", head: true }).eq("content_kind", kind).eq("content_id", id);
-    const basic = before.missing.some((k) => ["description", "poster_url", "backdrop_url", "release_year", "genres"].includes(k));
-    // Extras already fetched once (credits or videos stored) mean TMDB simply has no more: skip a redundant call.
-    const extrasGap = (before.missing.includes("cast") || before.missing.includes("trailer_url")) && !before.credits && !vids;
-    if (!basic && !extrasGap) return { status: "complete", missing: before.missing };
+    void vids;
+    // Any gap (incl. rating, duration, trailer, cast) triggers a fill-only lookup; TMDB responses are cached.
+    if (!before.missing.length) return { status: "complete", missing: before.missing };
     const tmdbId = (await resolveCompletion(kind, row)).tmdbId;
     if (!tmdbId) return { status: "unmatched", missing: before.missing };
     const meta = kind === "movie" ? await movieMeta(tmdbId, false) : await seriesMeta(tmdbId, false);
