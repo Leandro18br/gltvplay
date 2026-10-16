@@ -1,7 +1,15 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { getAreaClient, currentArea } from "@/lib/auth/area-client";
+
+// Replaces the generated attachSupabaseAuth: attaches the bearer of the area (client/admin/reseller)
+// the call comes from, since each area keeps its own independent session.
+const attachAreaAuth = createMiddleware({ type: "function" }).client(async ({ next }) => {
+  const { data } = await getAreaClient(currentArea()).auth.getSession();
+  const token = data.session?.access_token;
+  return next({ headers: token ? { Authorization: `Bearer ${token}` } : {} });
+});
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -26,6 +34,6 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [attachAreaAuth],
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, LogOut } from "lucide-react";
 import { AccessManager, type Created } from "@/components/access/AccessManager";
-import { supabase } from "@/lib/auth/area-client";
+import { supabase, getAreaClient } from "@/lib/auth/area-client";
 import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
 import { db, type Row } from "@/lib/admin/db";
 import { fmtDate, resellerErr, ORDER_STATUS, CONTENT_STATUS, TX_REASON } from "@/lib/resellers/shared";
@@ -30,9 +30,9 @@ export const Route = createFileRoute("/revendedor")({
   }),
   beforeLoad: async () => {
     await ensureSlot("reseller");
-    const { data } = await supabase.auth.getUser();
+    const { data } = await getAreaClient("reseller").auth.getUser();
     if (!data.user) throw redirect({ to: "/revendedor/login", search: { denied: undefined } });
-    const { data: ok } = await supabase.rpc("is_active_reseller", { _user_id: data.user.id });
+    const { data: ok } = await getAreaClient("reseller").rpc("is_active_reseller", { _user_id: data.user.id });
     if (!ok) throw redirect({ to: "/revendedor/login", search: { denied: 1 } });
     await claimSlot("reseller");
     return { user: data.user };
