@@ -119,7 +119,7 @@ export function parseBugouGenreNames(...values: unknown[]): string[] {
   values.forEach(visit);
   const unique = new Map<string, string>();
   for (const raw of names) {
-    const name = raw.replace(/\\s+/g, " ").trim().slice(0, 80);
+    const name = raw.replace(/\s+/g, " ").trim().slice(0, 80);
     const key = normTitle(name);
     if (key && !/^\d+$/.test(name) && !unique.has(key)) unique.set(key, name);
   }

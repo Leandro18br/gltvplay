@@ -157,12 +157,16 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
   if (!seriesId) {
     if (!title) throw new Error("Série sem nome na resposta da API.");
     const slug = await uniqueSlug(ctx, "series", title, year);
-    const r = await db.from("series").insert({ title, release_year: year, poster_url: cover, description: d.plot, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
+    const r = await db.from("series").insert({ title, release_year: year, poster_url: cover, description: d.plot, backdrop_url: d.backdrop ?? null, first_air_date: d.releaseDate ?? null, vote_average: d.rating ?? null, trailer_url: d.trailer ?? null, slug, status: "published", external_source: SOURCE, external_id: id }).select("id").single();
     if (r.error) throw new Error(r.error.message);
     seriesId = r.data.id as string; seriesCreated = true;
   } else {
-    const { data: cur } = await db.from("series").select("description, poster_url, release_year, external_source, external_id").eq("id", seriesId).single();
+    const { data: cur } = await db.from("series").select("description, poster_url, release_year, backdrop_url, first_air_date, vote_average, trailer_url, external_source, external_id").eq("id", seriesId).single();
     const patch: any = {};
+    if (cur && !cur.backdrop_url && d.backdrop) patch.backdrop_url = d.backdrop;
+    if (cur && !cur.first_air_date && d.releaseDate) patch.first_air_date = d.releaseDate;
+    if (cur && !cur.vote_average && d.rating) patch.vote_average = d.rating;
+    if (cur && !cur.trailer_url && d.trailer) patch.trailer_url = d.trailer;
     if (cur && !cur.description && d.plot) patch.description = d.plot;
     if (cur && !cur.poster_url && cover) patch.poster_url = cover;
     if (cur && !cur.release_year && year) patch.release_year = year;
@@ -177,11 +181,18 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
     ]);
     await linkCategories(await admin(), "series", seriesId!, [row?.category, ...((mem ?? []) as any[]).map(m => m.category)]);
   }
+  if (d.genres?.length) await linkProviderGenres(await admin(), "series", seriesId!, d.genres);
   const out: ImportResult = { seriesId: seriesId!, seriesCreated, seasonsFound: want.length, episodesTotal: apiEpisodes, seasonsCreated: 0, episodesCreated: 0, episodesExisting: 0, sourcesCreated: 0, sourcesExisting: 0, episodesSaved: 0, withPlayer: 0, withoutPlayer: 0, complete: false };
   if (!apiEpisodes) return out;
   // One set-based RPC per series: seasons, episodes and VIP sources upserted + verified by re-read, one summary audit row.
   const vtok = await token();
-  const items = want.flatMap(s => s.episodes.map(e => ({ s: s.season, e: e.episode, ref: `bugoumods:${e.id}`, t: e.title, img: e.image, dur: e.duration_minutes, url: bugouVipEmbedUrl(e.id, e.ext, vtok) })));
+  const sm = new Map((d.seasonMeta ?? []).map(x => [x.season, x]));
+  const items = want.flatMap(s => s.episodes.map(e => {
+    const m = sm.get(s.season);
+    return { s: s.season, e: e.episode, ref: `bugoumods:${e.id}`, t: e.title, img: e.image, dur: e.duration_minutes, url: bugouVipEmbedUrl(e.id, e.ext, vtok),
+      d: e.plot ?? null, dt: e.release_date ?? null, v: e.rating ?? null, tm: e.tmdb_id ?? null,
+      sd: m?.overview ?? null, sa: m?.air_date ?? null, sp: m?.cover ?? null, st: m?.tmdb_id ?? null };
+  }));
   const r = await (await admin()).rpc("bugou_apply_series", { _series_id: seriesId, _items: items, _actor: ctx.userId || null });
   if (r.error) throw new Error(r.error.message);
   const x = r.data as { items: number; seasons: number; episodes: number; sources_new: number; sources_updated: number; saved: number; with_player: number };
