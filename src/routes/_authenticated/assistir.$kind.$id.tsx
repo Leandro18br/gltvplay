@@ -252,7 +252,10 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
   const poke = useCallback(() => {
     setUi(true);
     clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => { if (!video.current?.paused) setUi(false); }, 3000);
+    hideTimer.current = setTimeout(() => {
+      const focused = document.activeElement;
+      if (!video.current?.paused && !(document.documentElement.dataset['remoteNavigation'] === 'true' && focused && wrap.current?.contains(focused))) setUi(false);
+    }, 3000);
   }, []);
 
   const toggle = useCallback(() => { const v = video.current; if (!v) return; if (v.paused) v.play().catch(() => {}); else v.pause(); }, []);
