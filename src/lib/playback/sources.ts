@@ -29,25 +29,25 @@ function validPlaybackUrl(value: unknown): value is string {
 export function normalizePlaybackSources(data: unknown): PlaybackSource[] {
   const rows = Array.isArray(data)
     ? data
-    : isRecord(data) && Array.isArray(data.sources)
-      ? data.sources
+    : isRecord(data) && Array.isArray(data["sources"])
+      ? data["sources"]
       : [];
 
   return rows.flatMap((value): PlaybackSource[] => {
-    if (!isRecord(value) || !validPlaybackUrl(value.url) || typeof value.id !== "string" || !value.id) return [];
-    const rawType = typeof value.type === "string" ? value.type : value.source_type;
+    if (!isRecord(value) || !validPlaybackUrl(value["url"]) || typeof value["id"] !== "string" || !value["id"]) return [];
+    const rawType = typeof value["type"] === "string" ? value["type"] : value["source_type"];
     const typeText = typeof rawType === "string" ? rawType.toLowerCase() : "";
     const type: PlaybackSource["type"] =
       typeText === "embed" || typeText === "iframe"
         ? "embed"
-        : typeText === "hls" || typeText === "m3u8" || /\.m3u8(?:$|\?)/i.test(value.url)
+        : typeText === "hls" || typeText === "m3u8" || /\.m3u8(?:$|\?)/i.test(value["url"])
           ? "hls"
           : "url";
     return [{
-      id: value.id,
-      url: value.url,
+      id: value["id"],
+      url: value["url"],
       type,
-      label: typeof value.label === "string" ? value.label : null,
+      label: typeof value["label"] === "string" ? value["label"] : null,
     }];
   });
 }

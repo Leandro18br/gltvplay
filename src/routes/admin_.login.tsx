@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { adminHead } from "@/lib/admin/head";
+import { GLTVLogo } from "@/components/brand/GLTVLogo";
 
 export const Route = createFileRoute("/admin_/login")({
   ssr: false,
@@ -69,7 +70,8 @@ function AdminLogin() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5">
       <div className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
       <div className="animate-rise relative w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-glow">
-        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-primary"><ShieldCheck /></div>
+        <div className="mb-6 flex justify-center"><GLTVLogo size="login" /></div>
+        <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary"><ShieldCheck className="size-5" /></div>
         <h1 className="text-2xl font-semibold">{mode === "login" ? "Acesso administrativo" : "Recuperar senha"}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{mode === "login" ? "Entre com sua conta de administrador." : "Enviaremos um link para redefinir sua senha."}</p>
         <form onSubmit={submit} className="mt-6 space-y-4">

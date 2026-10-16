@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Store } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureSlot } from "@/lib/auth/session-vault";
+import { GLTVLogo } from "@/components/brand/GLTVLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,7 +72,8 @@ function ResellerLogin() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5">
       <div className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
       <div className="animate-rise relative w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-glow">
-        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-primary"><Store /></div>
+        <div className="mb-6 flex justify-center"><GLTVLogo size="login" /></div>
+        <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary"><Store className="size-5" /></div>
         <h1 className="text-2xl font-semibold">Painel de revenda</h1>
         <p className="mt-1 text-sm text-muted-foreground">Entre com o e-mail e a senha cadastrados pelo administrador.</p>
         <form onSubmit={submit} noValidate className="mt-6 space-y-4">

@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
 import { db, type Row } from "@/lib/admin/db";
 import { fmtDate, resellerErr, ORDER_STATUS, CONTENT_STATUS, TX_REASON } from "@/lib/resellers/shared";
+import { GLTVLogo } from "@/components/brand/GLTVLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -108,7 +109,7 @@ function ResellerPanel() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/85 px-4 backdrop-blur md:px-8">
-        <div className="font-display text-lg font-bold"><span className="mr-2 text-primary">●</span> Revenda</div>
+        <div className="flex shrink-0 items-center gap-2 font-display text-sm font-bold"><GLTVLogo size="panel" className="h-8 md:h-9" /> <span className="hidden text-muted-foreground sm:inline">Revenda</span></div>
         <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><span className="truncate">{me.data?.display_name ?? user.email}</span>
           <Button variant="ghost" size="icon" onClick={logout} aria-label="Sair"><LogOut /></Button></div>
       </header>

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, User, LogOut, ListVideo, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signOutSlot } from "@/lib/auth/session-vault";
-import { siteSettingsQuery } from "@/lib/catalog";
+import { GLTVLogo } from "@/components/brand/GLTVLogo";
 import { useAuthUser } from "@/lib/user-data";
 import { greetingFor } from "@/lib/access/greeting";
 import { Button } from "@/components/ui/button";
@@ -21,18 +21,10 @@ const NAV = [
   { to: "/minha-lista", label: "Minha lista" },
 ] as const;
 
-export function Logo() {
-  const { data: settings } = useQuery(siteSettingsQuery);
-  const name = "GLTV Play";
+export function Logo({ size = "header" }: { size?: "header" | "login" }) {
   return (
-    <Link to="/" className="flex shrink-0 items-center gap-2" aria-label={name}>
-      {settings?.logo_url ? (
-        <img src={settings.logo_url} alt={name} className="h-7 w-auto" />
-      ) : (
-        <span className="font-display text-xl font-bold tracking-tight">
-          <span className="text-primary">●</span> {name}
-        </span>
-      )}
+    <Link to="/" className="flex shrink-0 items-center" aria-label="GLTV Play — Início">
+      <GLTVLogo size={size} />
     </Link>
   );
 }

@@ -11,7 +11,7 @@ const pageParam = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) > 1 
 export const Route = createFileRoute("/categoria/$slug")({
   ssr: false,
   beforeLoad: requireSiteAccess,
-  validateSearch: (s: Record<string, unknown>): { pf?: number | undefined; ps?: number | undefined; tipo?: "movie" | "series" } => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]), tipo: s["tipo"] === "movie" || s["tipo"] === "series" ? s["tipo"] : undefined }),
+  validateSearch: (s: Record<string, unknown>): { pf?: number | undefined; ps?: number | undefined; tipo?: "movie" | "series" | undefined } => ({ pf: pageParam(s["pf"]), ps: pageParam(s["ps"]), tipo: s["tipo"] === "movie" || s["tipo"] === "series" ? s["tipo"] : undefined }),
   loader: async ({ context, params }) => {
     const d = await context.queryClient.ensureQueryData(categoryQuery(params.slug));
     if (!d) throw notFound();

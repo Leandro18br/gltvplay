@@ -968,18 +968,18 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
         if (existing) {
           movieId = existing.id;
           const patch: Record<string, unknown> = {};
-          if (!String(existing.title ?? "").trim() && title) patch.title = title;
-          if (!String(existing.original_title ?? "").trim() && detail?.originalTitle) patch.original_title = detail.originalTitle;
-          if (!String(existing.description ?? "").trim() && detail?.plot) { patch.description = detail.plot; report.descriptionsAdded++; }
-          if (!existing.poster_url && poster) patch.poster_url = poster;
-          if (!existing.backdrop_url && detail?.backdrop) patch.backdrop_url = detail.backdrop;
-          if (!existing.release_year && year) patch.release_year = year;
-          if (!existing.duration_minutes && detail?.durationMinutes) patch.duration_minutes = detail.durationMinutes;
-          if (!String(existing.age_rating ?? "").trim() && detail?.ageRating) patch.age_rating = detail.ageRating;
-          if (!String(existing.quality ?? "").trim() && detail?.quality) patch.quality = detail.quality;
-          if (!String(existing.language ?? "").trim() && detail?.language) patch.language = detail.language;
-          if (!String(existing.country ?? "").trim() && detail?.country) patch.country = detail.country;
-          if (!existing.external_id) { patch.external_source = SOURCE; patch.external_id = id; }
+          if (!String(existing.title ?? "").trim() && title) patch["title"] = title;
+          if (!String(existing.original_title ?? "").trim() && detail?.originalTitle) patch["original_title"] = detail.originalTitle;
+          if (!String(existing.description ?? "").trim() && detail?.plot) { patch["description"] = detail.plot; report.descriptionsAdded++; }
+          if (!existing.poster_url && poster) patch["poster_url"] = poster;
+          if (!existing.backdrop_url && detail?.backdrop) patch["backdrop_url"] = detail.backdrop;
+          if (!existing.release_year && year) patch["release_year"] = year;
+          if (!existing.duration_minutes && detail?.durationMinutes) patch["duration_minutes"] = detail.durationMinutes;
+          if (!String(existing.age_rating ?? "").trim() && detail?.ageRating) patch["age_rating"] = detail.ageRating;
+          if (!String(existing.quality ?? "").trim() && detail?.quality) patch["quality"] = detail.quality;
+          if (!String(existing.language ?? "").trim() && detail?.language) patch["language"] = detail.language;
+          if (!String(existing.country ?? "").trim() && detail?.country) patch["country"] = detail.country;
+          if (!existing.external_id) { patch["external_source"] = SOURCE; patch["external_id"] = id; }
           if (Object.keys(patch).length) {
             const up = await db.from("movies").update(patch).eq("id", movieId);
             if (up.error) throw new Error(up.error.message);

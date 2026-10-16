@@ -49,15 +49,7 @@ function SettingsSync() {
   useEffect(() => {
     if (!data) return;
     const root = document.documentElement.style;
-    // Keep the global brand palette fixed; site settings may still control the favicon.
-    root.setProperty("--primary", "#00DDFA");
-    root.setProperty("--ring", "#00DDFA");
-    root.setProperty("--background", "#000000");
-    if (data.favicon_url) {
-      let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
-      if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
-      link.href = data.favicon_url;
-    }
+    // Keep the global brand palette and official favicon fixed.
   }, [data]);
   return null;
 }
@@ -135,7 +127,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/favicon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700;800&display=swap" },
