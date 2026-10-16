@@ -851,71 +851,34 @@ export const bugouSearchMovies = createServerFn({ method: "POST" }).middleware([
     return { total: sync.total, synced_at: sync.synced_at, matches: result.count ?? 0, page: data.page, pageSize: PAGE, categories, categoryStats, results, existing };
   });
 
-/** Fill missing BugouMods movie synopsis and add provider genres without deleting existing links. */
+/**
+ * Repairs already-imported BugouMods movies: re-reads movie_info for each one (keyset pages by id)
+ * and runs the same fill-only import routine, so valid/manual data is never overwritten and nothing is duplicated.
+ * Resumable via the returned cursor; per-item failures are counted and don't stop the batch.
+ */
 export const bugouRepairMovieMetadataBatch = createServerFn({ method: "POST" }).middleware([...auth])
-  .inputValidator((d) => z.object({
-    after: z.string().uuid().nullable().optional(),
-    limit: z.number().int().min(1).max(10).default(5),
-  }).parse(d))
+  .inputValidator((d) => z.object({ after: z.string().uuid().nullable().optional(), limit: z.number().int().min(1).max(10).default(5) }).parse(d))
   .handler(async ({ data, context }) => {
-    const ctx = context as Ctx;
-    await assertStaff(ctx);
-    const db = await admin();
-    const { data: rows, error } = await db.rpc("bugoumods_movies_needing_metadata_batch", {
-      _after: data.after ?? null,
-      _limit: data.limit,
-    });
-    if (error) throw new Error("Não foi possível localizar filmes BugouMods com metadados incompletos.");
-    const candidates = (rows ?? []) as { id: string; title: string; release_year: number | null; external_id: string | null; description: string | null }[];
-    const report = { scanned: candidates.length, corrected: 0, descriptionsAdded: 0, genresAdded: 0, unavailable: 0, failed: 0 };
-    if (!candidates.length) return { ...report, nextCursor: data.after ?? null, done: true };
-
-    const { integ, tok } = await seriesIntegration();
-    for (const row of candidates) {
-      try {
-        let providerId = String(row.external_id ?? "").trim();
-        if (!/^\d+$/.test(providerId)) {
-          // Only use a unique exact title/year match in the provider's own indexed catalog.
-          let query = db.from("bugou_catalog").select("ext_id,title,year").eq("kind", "movie").eq("title_norm", normTitle(row.title)).limit(3);
-          const { data: matches, error: matchError } = await query;
-          if (matchError) throw new Error(matchError.message);
-          const exact = (matches ?? []).filter((x: any) =>
-            normTitle(String(x.title ?? "")) === normTitle(row.title) &&
-            (row.release_year == null || x.year == null || Number(x.year) === Number(row.release_year))
-          );
-          if (exact.length !== 1) { report.unavailable++; continue; }
-          providerId = String(exact[0].ext_id);
-        }
-
-        const detail = await loadMovieDetails(providerId, tok, integ);
-        if (!detail) { report.unavailable++; continue; }
-        let changed = false;
-        if (!String(row.description ?? "").trim() && detail.plot?.trim()) {
-          let saveQuery = db.from("movies").update({ description: detail.plot }).eq("id", row.id);
-          saveQuery = row.description == null ? saveQuery.is("description", null) : saveQuery.eq("description", row.description);
-          const saved = await saveQuery.select("id").maybeSingle();
-          if (saved.error) throw new Error(saved.error.message);
-          if (saved.data) { report.descriptionsAdded++; changed = true; }
-        }
-        if (detail.genres.length) {
-          const added = await linkProviderGenres(db, "movie", row.id, detail.genres);
-          report.genresAdded += added;
-          if (added > 0) changed = true;
-        }
-        if (!detail.plot?.trim() || !detail.genres.length) report.unavailable++;
-        if (changed) report.corrected++;
-      } catch (error) {
-        report.failed++;
-        console.warn("[BugouMods metadata repair] Falha para filme", row.id, scrub(error instanceof Error ? error.message : String(error)).slice(0, 250));
-      }
-    }
-    return { ...report, nextCursor: candidates[candidates.length - 1]!.id, done: candidates.length < data.limit };
+    const ctx = context as Ctx; await assertStaff(ctx);
+    let q = ctx.supabase.from("movies").select("id,external_id").eq("external_source", SOURCE).order("id").limit(data.limit);
+    if (data.after) q = q.gt("id", data.after);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    const list = (rows ?? []) as { id: string; external_id: string }[];
+    if (!list.length) return { scanned: 0, nextCursor: data.after ?? null, done: true, report: null };
+    const report = await importMovieIds(ctx, list.map(r => r.external_id).filter(x => /^\d+$/.test(x)));
+    return { scanned: list.length, nextCursor: list[list.length - 1]!.id, done: list.length < data.limit, report };
   });
 
 export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([...auth])
   .inputValidator((d) => z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(10) }).parse(d))
   .handler(async ({ data, context }) => {
-    const ctx = context as Ctx; const db = ctx.supabase; await assertStaff(ctx);
+    const ctx = context as Ctx; await assertStaff(ctx);
+    return importMovieIds(ctx, data.ids);
+  });
+
+async function importMovieIds(ctx: Ctx, ids: string[]) {
+    const db = ctx.supabase; const data = { ids };
     await refreshMovieIndex(ctx, false);
     const { data: items, error } = await db.from("bugou_catalog").select("ext_id,title,year,poster_url,category").eq("kind", "movie").in("ext_id", data.ids);
     if (error) throw new Error(error.message);
@@ -1014,4 +977,5 @@ export const bugouImportMovies = createServerFn({ method: "POST" }).middleware([
       }
     }
     return report;
-  });
+}
+
