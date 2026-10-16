@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, LogOut, Plus, Trash2, Check, Baby } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { signOutSlot } from "@/lib/auth/session-vault";
 import { setActiveProfileId, useActiveProfile, useWatchlist } from "@/lib/user-data";
 import { nameSchema } from "@/lib/validation";

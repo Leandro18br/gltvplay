@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
+import { getAreaClient } from "@/lib/auth/area-client";
+const supabase = getAreaClient("client");
 import { ensureSlot } from "@/lib/auth/session-vault";
 
 export const Route = createFileRoute("/_authenticated")({

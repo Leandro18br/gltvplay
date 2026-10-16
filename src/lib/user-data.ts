@@ -2,7 +2,7 @@ import { safeImageUrl } from "@/lib/tmdb/completion";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { toChannel, toMovie, toSeries, type Item } from "@/lib/catalog";
 
 // Signed-in viewer data (history, watchlist). Browser client: RLS restricts rows to auth.uid().

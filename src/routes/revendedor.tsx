@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, LogOut } from "lucide-react";
 import { AccessManager, type Created } from "@/components/access/AccessManager";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { ensureSlot, claimSlot, signOutSlot } from "@/lib/auth/session-vault";
 import { db, type Row } from "@/lib/admin/db";
 import { fmtDate, resellerErr, ORDER_STATUS, CONTENT_STATUS, TX_REASON } from "@/lib/resellers/shared";

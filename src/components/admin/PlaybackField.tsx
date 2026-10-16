@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Play, ShieldCheck, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { validatePlayback } from "@/lib/playback/playback.functions";
 import { emptyPlayback, embedHost, embedDomainAllowed, isIframeCode, looksLikePlayerPage, type PlaybackValue } from "@/lib/playback/embed";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, Play } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { EmbedPlayer } from "./EmbedPlayer";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerFrame } from "./VideoPlayerFrame";

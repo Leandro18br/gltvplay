@@ -2,7 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, User, LogOut, ListVideo, LayoutDashboard } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { signOutSlot } from "@/lib/auth/session-vault";
 import { GLTVLogo } from "@/components/brand/GLTVLogo";
 import { useAuthUser } from "@/lib/user-data";

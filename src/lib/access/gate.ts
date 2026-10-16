@@ -1,5 +1,6 @@
 import { redirect } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
+import { getAreaClient } from "@/lib/auth/area-client";
+const supabase = getAreaClient("client");
 import { ensureSlot, claimSlot } from "@/lib/auth/session-vault";
 
 let cache: { uid: string; ok: boolean; at: number } | null = null;

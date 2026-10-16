@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/auth/area-client";
 import { previewHomeDraft } from "@/lib/home/home.functions";
 import { SiteShell, RetryState, EmptyState } from "@/components/site/SiteShell";
 import { HomeContent } from "@/components/site/HomeContent";
