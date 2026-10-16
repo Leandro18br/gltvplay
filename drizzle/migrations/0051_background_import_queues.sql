@@ -1,0 +1,10 @@
+ALTER TABLE public.movies ADD COLUMN IF NOT EXISTS streambetter_id text;
+ALTER TABLE public.movies ADD COLUMN IF NOT EXISTS streambetter_tmdb_id text;
+ALTER TABLE public.series ADD COLUMN IF NOT EXISTS streambetter_id text;
+ALTER TABLE public.series ADD COLUMN IF NOT EXISTS streambetter_tmdb_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS movies_streambetter_tmdb_id_uidx ON public.movies(streambetter_tmdb_id) WHERE streambetter_tmdb_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS series_streambetter_tmdb_id_uidx ON public.series(streambetter_tmdb_id) WHERE streambetter_tmdb_id IS NOT NULL;
+INSERT INTO public.embed_domains(hostname) VALUES ('streambetter.shop') ON CONFLICT (hostname) DO NOTHING;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS streambetter_public_key text;
+ALTER TABLE public.bugou_import_jobs DROP CONSTRAINT IF EXISTS bugou_import_jobs_kind_check;
+ALTER TABLE public.bugou_import_jobs ADD CONSTRAINT bugou_import_jobs_kind_check CHECK (kind IN ('series','live','movie','streambetter_movie','streambetter_series'));

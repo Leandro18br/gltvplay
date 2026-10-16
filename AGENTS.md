@@ -34,3 +34,4 @@
 - Movie/episode videos use VideoPlayerFrame; channels keep their player and embeds use a bare shared iframe, without auxiliary action rows. Why: preserve playback and provider controls without app-owned extras.
 - Brand logo only via `GLTVLogo` (`public/brand/gltv-logo.png`); favicon `public/favicon.png`. Why: one mark.
 - Each area (client/admin/reseller) has its own auth client (`src/lib/auth/AGENTS.md`). Why: one area's sign-out/expiry must not affect another.
+- Background imports: `/api/public/hooks/bugou-import` runs queued jobs by `bugou_import_jobs.kind` (series/movie via BugouMods, streambetter_* page cursors via `background-import.server.ts`). Why: one lease-guarded, resumable worker for every source.

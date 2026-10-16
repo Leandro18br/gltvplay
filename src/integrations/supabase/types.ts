@@ -1667,6 +1667,8 @@ export type Database = {
           slug: string | null
           sort_order: number
           status: Database["public"]["Enums"]["content_status"]
+          streambetter_id: string | null
+          streambetter_tmdb_id: string | null
           tagline: string | null
           title: string
           tmdb_id: number | null
@@ -1704,6 +1706,8 @@ export type Database = {
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          streambetter_id?: string | null
+          streambetter_tmdb_id?: string | null
           tagline?: string | null
           title: string
           tmdb_id?: number | null
@@ -1741,6 +1745,8 @@ export type Database = {
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          streambetter_id?: string | null
+          streambetter_tmdb_id?: string | null
           tagline?: string | null
           title?: string
           tmdb_id?: number | null
@@ -2062,6 +2068,8 @@ export type Database = {
           slug: string | null
           sort_order: number
           status: Database["public"]["Enums"]["content_status"]
+          streambetter_id: string | null
+          streambetter_tmdb_id: string | null
           tagline: string | null
           title: string
           tmdb_id: number | null
@@ -2102,6 +2110,8 @@ export type Database = {
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          streambetter_id?: string | null
+          streambetter_tmdb_id?: string | null
           tagline?: string | null
           title: string
           tmdb_id?: number | null
@@ -2142,6 +2152,8 @@ export type Database = {
           slug?: string | null
           sort_order?: number
           status?: Database["public"]["Enums"]["content_status"]
+          streambetter_id?: string | null
+          streambetter_tmdb_id?: string | null
           tagline?: string | null
           title?: string
           tmdb_id?: number | null
@@ -2240,6 +2252,7 @@ export type Database = {
           megaembed_player: string | null
           platform_name: string
           social_links: Json
+          streambetter_public_key: string | null
           texts: Json
           updated_at: string
         }
@@ -2260,6 +2273,7 @@ export type Database = {
           megaembed_player?: string | null
           platform_name?: string
           social_links?: Json
+          streambetter_public_key?: string | null
           texts?: Json
           updated_at?: string
         }
@@ -2280,6 +2294,7 @@ export type Database = {
           megaembed_player?: string | null
           platform_name?: string
           social_links?: Json
+          streambetter_public_key?: string | null
           texts?: Json
           updated_at?: string
         }
