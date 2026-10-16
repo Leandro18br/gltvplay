@@ -407,7 +407,7 @@ export const bugouCreateJob = createServerFn({ method: "POST" })
       const have = new Set<string>();
       const ids = [...new Set(items.map(x => x.ext_id))];
       for (let i = 0; i < ids.length; i += 300) {
-        const { data: s, error } = await db.from("series").select("external_id, seasons!inner(episodes!inner(id))").eq("external_source", SOURCE).in("external_id", ids.slice(i, i + 300)).limit(300, { foreignTable: "seasons" });
+        const { data: s, error } = await db.from("series").select("external_id, seasons!inner(id)").eq("external_source", SOURCE).in("external_id", ids.slice(i, i + 300));
         if (error) throw new Error(error.message);
         (s ?? []).forEach((x: any) => have.add(String(x.external_id)));
       }
