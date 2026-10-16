@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { enrichContent } from "@/lib/tmdb/tmdb.functions";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { linkCategories } from "./categories";
@@ -196,6 +197,7 @@ async function importSeriesFull(ctx: Ctx, id: string, onlySeasons?: number[], pr
   }));
   const r = await (await admin()).rpc("bugou_apply_series", { _series_id: seriesId, _items: items, _actor: ctx.userId || null });
   if (r.error) throw new Error(r.error.message);
+  await enrichContent({ supabase: await admin(), userId: "" }, "series", seriesId);
   const x = r.data as { items: number; seasons: number; episodes: number; sources_new: number; sources_updated: number; saved: number; with_player: number };
   out.seasonsCreated = x.seasons; out.episodesCreated = x.episodes; out.episodesExisting = Math.max(0, x.items - x.episodes);
   out.sourcesCreated = x.sources_new; out.sourcesExisting = Math.max(0, x.items - x.sources_new);
@@ -1012,6 +1014,8 @@ export async function importMovieIds(ctx: Ctx, ids: string[]) {
         const { data: categoryRows, error: categoryError } = await db.from("bugou_catalog_categories").select("category").eq("kind", "movie").eq("ext_id", id);
         if (categoryError) throw new Error(categoryError.message);
         await linkCategories(db, "movie", movieId, [m.category, ...((categoryRows ?? []) as any[]).map(x => x.category)]);
+        // Provider gives no synopsis/genres for many titles: complete missing fields from TMDB (fill-only, reliable match only).
+        const en = await enrichContent(ctx, "movie", movieId); (report as any).tmdb = en.status;
 
         // Never replace an existing working player. Add the Bugou VIP source only once per provider ID.
         const { data: sources, error: sourcesErr } = await db.from("playback_sources").select("id,external_ref").eq("content_kind", "movie").eq("content_id", movieId);

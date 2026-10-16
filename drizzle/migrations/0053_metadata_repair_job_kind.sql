@@ -1,0 +1,2 @@
+ALTER TABLE public.bugou_import_jobs DROP CONSTRAINT IF EXISTS bugou_import_jobs_kind_check;
+ALTER TABLE public.bugou_import_jobs ADD CONSTRAINT bugou_import_jobs_kind_check CHECK (kind IN ('series','live','movie','streambetter_movie','streambetter_series','metadata_repair'));

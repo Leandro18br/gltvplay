@@ -452,3 +452,25 @@ export const tmdbImportEpisodes = createServerFn({ method: "POST" })
     }
     return { created, updated };
   }));
+
+/** Shared fill-only TMDB enrichment used by every importer, the background worker and catalog recovery.
+ *  Only runs when essential fields are missing; uses the registered TMDB id or a single reliable title/year/type match.
+ *  Never throws: a failure is returned so queues record it and continue. */
+export async function enrichContent(ctx: Ctx, kind: "movie" | "series", id: string): Promise<{ status: "complete" | "filled" | "unmatched" | "error"; filled?: number; genres?: number; error?: string }> {
+  try {
+    if (!process.env["TMDB_API_KEY"]) return { status: "error", error: "TMDB não configurado" };
+    const row = await completionRow(ctx, kind, id);
+    const gt = kind === "movie" ? "movie_genres" : "series_genres";
+    const { count } = await ctx.supabase.from(gt).select("genre_id", { count: "exact", head: true }).eq(kind === "movie" ? "movie_id" : "series_id", id);
+    const missing = isMissing(row.description) || isMissing(row.poster_url) || isMissing(row.backdrop_url) || !row.release_year || !count;
+    if (!missing) return { status: "complete" };
+    const tmdbId = (await resolveCompletion(kind, row)).tmdbId;
+    if (!tmdbId) return { status: "unmatched" };
+    const meta = kind === "movie" ? await movieMeta(tmdbId, false) : await seriesMeta(tmdbId, false);
+    const r = await applyCompletion(ctx, kind, id, row, meta.fields, meta.genres);
+    await ctx.supabase.rpc("apply_tmdb_extras", { _kind: kind, _id: id, _patch: extrasPatch(kind, meta.body), _credits: mapCredits(meta.body, meta.images.base), _videos: mapVideos(meta.body).videos });
+    return { status: "filled", filled: r.filled, genres: r.genres };
+  } catch (e) {
+    return { status: "error", error: String((e as Error).message).slice(0, 300) };
+  }
+}
