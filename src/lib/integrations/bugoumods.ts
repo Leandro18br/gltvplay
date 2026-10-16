@@ -14,8 +14,52 @@ export function parseBugouName(nome: string): { title: string; year: number | nu
   return { title: s, year: null };
 }
 
-export type BugouEpisode = { id: string; season: number; episode: number; title: string; image: string | null; duration_minutes: number | null; embed_url: string; ext: string };
-export type BugouDetails = { id: string; title: string; year: number | null; plot: string | null; cover: string | null; seasons: { season: number; episodes: BugouEpisode[] }[] };
+export type BugouEpisode = { id: string; season: number; episode: number; title: string; image: string | null; duration_minutes: number | null; embed_url: string; ext: string; plot?: string | null; release_date?: string | null; rating?: number | null; tmdb_id?: number | null };
+export type BugouSeasonMeta = { season: number; overview: string | null; air_date: string | null; cover: string | null; tmdb_id: number | null };
+export type BugouDetails = {
+  id: string; title: string; year: number | null; plot: string | null; cover: string | null;
+  seasons: { season: number; episodes: BugouEpisode[] }[];
+  backdrop?: string | null; releaseDate?: string | null; rating?: number | null; trailer?: string | null;
+  genres?: string[]; durationMinutes?: number | null; seasonMeta?: BugouSeasonMeta[];
+};
+
+const isoDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? v.trim() : null;
+const posNum = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+const text = (v: unknown, max = 5000) => typeof v === "string" && v.trim() && !/^(n\/a|none|null|sem sinopse dispon[ií]vel\.?)$/i.test(v.trim()) ? v.trim().slice(0, max) : null;
+/** Provider rating is 0-10; "0" means unrated. */
+const rating10 = (v: unknown) => { const n = posNum(v); return n && n <= 10 ? Math.round(n * 10) / 10 : null; };
+/** YouTube id or URL -> watch URL. */
+export function bugouTrailer(v: unknown): string | null {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return `https://www.youtube.com/watch?v=${s}`;
+  return /^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(s) ? s : null;
+}
+/** backdrop_path arrives as an array, a URL, or a Python-style "['https://…']" string. */
+export function bugouBackdrop(v: unknown): string | null {
+  const first = Array.isArray(v) ? v[0] : typeof v === "string" ? (v.match(/https?:\/\/[^'"\s\],]+/)?.[0] ?? null) : null;
+  return typeof first === "string" && /^https?:\/\//.test(first) ? first.replace(/^http:\/\//, "https://") : null;
+}
+
+/** Provider genre labels (TMDB pt-BR or English names) -> slugs of the system's existing genres. Never invents genres. */
+const GENRE_ALIASES: Record<string, string[]> = {
+  "acao": ["acao"], "action": ["acao"], "aventura": ["aventura"], "adventure": ["aventura"],
+  "action adventure": ["acao", "aventura"], "acao e aventura": ["acao", "aventura"], "acao aventura": ["acao", "aventura"],
+  "animacao": ["animacao"], "animation": ["animacao"], "comedia": ["comedia"], "comedy": ["comedia"], "crime": ["crime"],
+  "documentario": ["documentario"], "documentary": ["documentario"], "drama": ["drama"], "familia": ["familia"], "family": ["familia"],
+  "fantasia": ["fantasia"], "fantasy": ["fantasia"], "faroeste": ["faroeste"], "western": ["faroeste"],
+  "ficcao cientifica": ["ficcao-cientifica"], "science fiction": ["ficcao-cientifica"], "sci fi": ["ficcao-cientifica"],
+  "sci fi fantasy": ["ficcao-cientifica", "fantasia"], "ficcao cientifica e fantasia": ["ficcao-cientifica", "fantasia"],
+  "guerra": ["guerra"], "war": ["guerra"], "war politics": ["guerra"], "guerra e politica": ["guerra"],
+  "historia": ["historia"], "history": ["historia"], "misterio": ["misterio"], "mystery": ["misterio"],
+  "musica": ["musica"], "music": ["musica"], "romance": ["romance"], "terror": ["terror"], "horror": ["terror"],
+  "thriller": ["thriller-suspense"], "suspense": ["thriller-suspense"], "thriller suspense": ["thriller-suspense"],
+  "cinema tv": ["cinema-tv"], "tv movie": ["cinema-tv"], "kids": ["infantil"], "infantil": ["infantil"],
+};
+export function mapBugouGenreSlugs(names: string[]): string[] {
+  const out = new Set<string>();
+  for (const n of names) for (const slug of GENRE_ALIASES[normTitle(n)] ?? []) out.add(slug);
+  return [...out];
+}
 
 const https = (u: unknown) => typeof u === "string" && /^https?:\/\//.test(u) ? u.replace(/^http:\/\//, "https://") : null;
 
@@ -37,6 +81,7 @@ export type BugouMovieDetails = {
   releaseDate: string | null; durationMinutes: number | null; ageRating: string | null;
   quality: string | null; language: string | null; country: string | null;
   ext: string; genres: string[]; providerMetadataPaths: string[];
+  tmdbId?: number | null; rating?: number | null; trailer?: string | null;
 };
 
 /** Return only JSON key paths for metadata audit; never return tokens or arbitrary field values. */
@@ -74,7 +119,7 @@ export function parseBugouGenreNames(...values: unknown[]): string[] {
   values.forEach(visit);
   const unique = new Map<string, string>();
   for (const raw of names) {
-    const name = raw.replace(/\\s+/g, " ").trim().slice(0, 80);
+    const name = raw.replace(/\s+/g, " ").trim().slice(0, 80);
     const key = normTitle(name);
     if (key && !/^\d+$/.test(name) && !unique.has(key)) unique.set(key, name);
   }
@@ -114,7 +159,7 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
     const value = values.find((x) => typeof x === "string" && x.trim());
     return typeof value === "string" ? value.trim().slice(0, 200) : null;
   };
-  const originalTitle = textValue(info?.original_title, data?.original_title, j?.original_title);
+  const originalTitle = textValue(info?.original_title, info?.o_name, data?.original_title, j?.original_title);
   const ageRating = textValue(info?.age_rating, info?.mpaa_rating, info?.certification, data?.age_rating, data?.mpaa_rating, data?.certification);
   const quality = textValue(info?.quality, data?.quality, j?.quality);
   const language = textValue(info?.language, info?.audio_language, data?.language, data?.audio_language, j?.language);
@@ -136,6 +181,9 @@ export function parseBugouMovieDetails(id: string, j: any): BugouMovieDetails {
     ext,
     genres,
     providerMetadataPaths,
+    tmdbId: posNum(info?.tmdb_id ?? data?.tmdb_id) ? Math.trunc(Number(info?.tmdb_id ?? data?.tmdb_id)) : null,
+    rating: rating10(info?.rating ?? data?.rating),
+    trailer: bugouTrailer(info?.youtube_trailer ?? data?.youtube_trailer),
   };
 }
 
@@ -154,11 +202,23 @@ export function parseBugouDetails(id: string, j: any): BugouDetails {
       const eid = String(e?.id ?? ""); const n = Number(e?.episode_num);
       if (!/^\d+$/.test(eid) || !Number.isInteger(n) || n < 1 || eps.some(x => x.episode === n)) continue;
       const secs = Number(e?.info?.duration_secs);
-      eps.push({ id: eid, season, episode: n, title: String(e?.title || e?.info?.name || `Episódio ${n}`).trim().slice(0, 300), image: https(e?.info?.movie_image ?? e?.info?.cover_big), duration_minutes: secs > 0 ? Math.round(secs / 60) : null, embed_url: bugouEmbedUrl(eid, String(e?.container_extension ?? "mp4")), ext: String(e?.container_extension ?? "mp4") });
+      const ei = e?.info ?? {};
+      eps.push({ id: eid, season, episode: n, title: String(e?.title || ei?.name || `Episódio ${n}`).trim().slice(0, 300), image: https(ei?.movie_image ?? ei?.cover_big), duration_minutes: secs > 0 ? Math.round(secs / 60) : null, embed_url: bugouEmbedUrl(eid, String(e?.container_extension ?? "mp4")), ext: String(e?.container_extension ?? "mp4"),
+        plot: text(ei?.plot ?? ei?.description), release_date: isoDate(ei?.release_date ?? ei?.releasedate), rating: rating10(ei?.rating), tmdb_id: posNum(ei?.tmdb_id) ? Math.trunc(Number(ei.tmdb_id)) : null });
     }
     eps.sort((a, b) => a.episode - b.episode);
     if (eps.length) seasons.push({ season, episodes: eps });
   }
   seasons.sort((a, b) => a.season - b.season);
-  return { id, title: String(info.title || name.title || "").trim(), year: Number(info.year) || name.year, plot: info.plot ? String(info.plot) : null, cover: https(info.cover), seasons };
+  const seasonMeta: BugouSeasonMeta[] = (Array.isArray(j?.seasons) ? j.seasons : []).map((x: any) => ({
+    season: Number(x?.season_number), overview: text(x?.overview), air_date: isoDate(x?.air_date), cover: https(x?.cover_big ?? x?.cover), tmdb_id: posNum(x?.id) ? Math.trunc(Number(x.id)) : null,
+  })).filter((x: BugouSeasonMeta) => Number.isInteger(x.season) && x.season >= 0);
+  const runTime = posNum(info.episode_run_time);
+  return {
+    id, title: String(info.title || name.title || "").trim(), year: Number(info.year) || name.year,
+    plot: text(info.plot ?? info.description), cover: https(info.cover), seasons,
+    backdrop: bugouBackdrop(info.backdrop_path), releaseDate: isoDate(info.release_date ?? info.releaseDate),
+    rating: rating10(info.rating), trailer: bugouTrailer(info.youtube_trailer),
+    genres: parseBugouGenreNames(info.genre, info.genres), durationMinutes: runTime ? Math.round(runTime) : null, seasonMeta,
+  };
 }
