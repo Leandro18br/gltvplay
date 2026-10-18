@@ -34,26 +34,42 @@ export const savePlayback = createServerFn({method:"POST"}).middleware([requireS
   return {id:r.data.id};
 });
 /** Classifies a player endpoint (e.g. player.php?...) for signed-in viewers. Reads only headers + first bytes; never relays content. */
-export const probePlayerUrl = createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).inputValidator(z.object({url:z.string().url().max(2000)})).handler(async ({data}) => {
-  const { classifyResponse, isScriptEndpoint } = await import("./script-url");
+export const probePlayerUrl = createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).inputValidator(z.object({url:z.string().url().max(2048)})).handler(async ({data}) => {
+  const { classifyResponse, needsResourceProbe } = await import("./script-url");
   const { isBlockedHost } = await import("@/lib/integrations/engine");
-  if (!isScriptEndpoint(data.url)) throw new Error("Endereço não suportado");
+  if (!needsResourceProbe(data.url)) throw new Error("Endereço não suportado");
+  const signal = AbortSignal.timeout(12000);
   let cur = data.url;
   try {
     for (let hop = 0; hop < 6; hop++) {
       const u = new URL(cur);
-      if (!/^https?:$/.test(u.protocol) || u.username || u.password || isBlockedHost(u.hostname)) throw new Error("blocked-host");
-      const res = await fetch(u.href, { redirect: "manual", headers: { Range: "bytes=0-2047", "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(10000) });
+      if (!/^https?:$/.test(u.protocol) || u.username || u.password || u.port || isBlockedHost(u.hostname)) throw new Error("blocked-host");
+      // The fragment is browser-only. Never strip it from the saved/returned original URL.
+      const requestUrl = new URL(u); requestUrl.hash = "";
+      const res = await fetch(requestUrl.href, { redirect: "manual", headers: { Range: "bytes=0-2047" }, signal });
       const loc = res.headers.get("location");
-      if (res.status >= 300 && res.status < 400 && loc) { await res.body?.cancel(); cur = new URL(loc, u).href; continue; }
+      if (res.status >= 300 && res.status < 400 && loc) { await res.body?.cancel(); const next = new URL(loc, u); if (u.protocol === "https:" && next.protocol !== "https:") throw new Error("insecure-redirect"); cur = next.href; continue; }
       let body = "";
       const reader = res.body?.getReader();
-      if (reader) { const { value } = await reader.read(); await reader.cancel().catch(() => {}); body = new TextDecoder().decode(value?.slice(0, 2048) ?? new Uint8Array()); }
-      return classifyResponse({ status: res.status, contentType: res.headers.get("content-type"), xfo: res.headers.get("x-frame-options"), csp: res.headers.get("content-security-policy"), body, finalUrl: cur, originalUrl: data.url });
+      if (reader) {
+        const bytes = new Uint8Array(2048); let size = 0;
+        try { while (size < bytes.length) { const { value, done } = await reader.read(); if (done) break; const part = value.slice(0, bytes.length - size); bytes.set(part, size); size += part.length; } }
+        finally { await reader.cancel().catch(() => {}); }
+        body = new TextDecoder().decode(bytes.slice(0, size));
+      }
+      const result = classifyResponse({ status: res.status, contentType: res.headers.get("content-type"), xfo: res.headers.get("x-frame-options"), csp: res.headers.get("content-security-policy"), body, finalUrl: cur, originalUrl: data.url, appOrigin: new URL(getRequest().url).origin });
+      if (result.kind === "html" && result.playUrl) {
+        // Viewer cannot read the staff-only allowlist. Only return a decision, never its contents.
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const domains = await supabaseAdmin.from("embed_domains").select("hostname");
+        const { embedDomainAllowed } = await import("./embed");
+        if (domains.error || ![data.url, cur].every(url => embedDomainAllowed(new URL(url).hostname, (domains.data ?? []).map(d => d.hostname)))) return { ...result, embeddable: false, playUrl: null, message: "Página de player identificada. O administrador precisa autorizar o domínio para incorporação." };
+      }
+      return result;
     }
     return { kind: "error" as const, status: null, contentType: null, embeddable: false, playUrl: null, message: "Redirecionamentos demais no endereço do player." };
-  } catch (e) {
-    console.error("probePlayerUrl", e);
-    return { kind: "error" as const, status: null, contentType: null, embeddable: false, playUrl: null, message: "Não foi possível conectar ao servidor do player." };
+  } catch {
+    // Fetch errors can include private source parameters. Do not log raw exceptions or URLs.
+    return { kind: "error" as const, status: null, contentType: null, embeddable: false, playUrl: null, message: signal.aborted ? "O servidor do player demorou demais para responder. Tente novamente." : "Não foi possível conectar ao servidor do player. Verifique a conexão e o certificado HTTPS do provedor." };
   }
 });

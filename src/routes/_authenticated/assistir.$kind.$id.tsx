@@ -13,6 +13,9 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { EmbedPlayer } from "@/components/site/EmbedPlayer";
+import { PlaybackResource } from "@/components/site/PlaybackResource";
+import { isDirectEmbedEndpoint, needsResourceProbe } from "@/lib/playback/script-url";
+import { mediaErrorMessage } from "@/lib/playback/media-error";
 import { VideoPlayerFrame } from "@/components/site/VideoPlayerFrame";
 import { attachMpegTs, usesLiveMpegTs, resolveSecureUrl, MIXED_CONTENT_MESSAGE } from "@/lib/playback/mpegts";
 import { isMediaControl } from "@/lib/playback/controls";
@@ -124,6 +127,10 @@ function PlayerPage() {
     </div>
   ) : null;
   if (!started) return <PlayGate data={data} onPlay={startPlayback} />;
+  if (source && source.type !== "embed" && !isDirectEmbedEndpoint(source.url) && needsResourceProbe(source.url)) return <div className="min-h-dvh bg-background p-4">
+    <Link to={(data.back.slug ? data.back.to : "/") as "/filme/$slug"} params={{ slug: data.back.slug ?? "" }} aria-label="Voltar" className="mb-4 inline-flex rounded-full p-2"><ArrowLeft /></Link>
+    <PlaybackResource key={source.id} url={source.url}>{result => <Player key={`${source.id}-${result.kind}`} kind={kind} id={id} data={{ ...data, url: result.playUrl, source: { ...source, url: result.playUrl ?? source.url, type: result.kind === "html" ? "embed" : result.kind === "hls" ? "hls" : "url" } }} servers={servers} onServerChange={setServer} displayHint={displayHint} />}</PlaybackResource>
+  </div>;
   return <Player key={`${kind}-${id}-${source?.id}-${data.url}-${source?.type}`} kind={kind} id={id} data={data} servers={servers} onServerChange={setServer} displayHint={displayHint} />;
 }
 
@@ -171,7 +178,7 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
   const [resumed, setResumed] = useState<number | null>(null);
   const live = kind === "channel";
    const url = data.url ?? "";
-   const embed = data.source?.type === "embed";
+   const embed = data.source?.type === "embed" || isDirectEmbedEndpoint(url);
   const idx = data.episodes.findIndex((e) => e.id === id);
   const next = idx >= 0 ? data.episodes[idx + 1] : undefined;
 
@@ -306,7 +313,7 @@ function Player({ kind, id, data, servers, onServerChange, displayHint }: { kind
     <VideoPlayerFrame title={data.title} fullPage header={<>{backLink}<div className="min-w-0"><p className="truncate font-semibold">{data.title}</p>{data.subtitle && <p className="truncate text-xs text-muted-foreground">{data.subtitle}</p>}</div></>}
       servers={data.sources} selectedServer={data.source?.id ?? ""} onServerChange={onServerChange} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (hlsRef.current) hlsRef.current.currentLevel = value; }} error={error} onRetry={() => location.reload()}
       actions={<>{next && <Button variant="ghost" size="icon" title="Próximo episódio" aria-label="Próximo episódio" onClick={goNext}><SkipForward /></Button>}{data.episodes.length > 0 && <Button variant="ghost" size="icon" title="Episódios" aria-label="Episódios" onClick={() => setEpOpen(true)}><ListVideo /></Button>}</>}>
-      <video ref={video} autoPlay playsInline onPause={persist} onEnded={() => { persist(); if (next) goNext(); }} onError={() => setError("Não foi possível reproduzir este vídeo.")} />
+      <video ref={video} autoPlay playsInline onPause={persist} onEnded={() => { persist(); if (next) goNext(); }} onError={event => setError(mediaErrorMessage(event.currentTarget.error?.code))} />
     </VideoPlayerFrame>
     <Sheet open={epOpen} onOpenChange={setEpOpen}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md"><SheetTitle>Episódios</SheetTitle>

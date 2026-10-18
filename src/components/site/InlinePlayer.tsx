@@ -5,9 +5,8 @@ import { supabase } from "@/lib/auth/area-client";
 import { EmbedPlayer } from "./EmbedPlayer";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerFrame } from "./VideoPlayerFrame";
-import { useServerFn } from "@tanstack/react-start";
-import { probePlayerUrl } from "@/lib/playback/playback.functions";
-import { isDirectEmbedEndpoint, isScriptEndpoint, type ProbeResult } from "@/lib/playback/script-url";
+import { PlaybackResource } from "./PlaybackResource";
+import { isDirectEmbedEndpoint, needsResourceProbe } from "@/lib/playback/script-url";
 import { normalizePlaybackSources, type PlaybackSource } from "@/lib/playback/sources";
 import { requestPlaybackDisplay } from "@/lib/playback/display-mode";
 
@@ -110,7 +109,7 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
           <EmbedPlayer url={source.url} title={title} />
         ) : isDirectEmbedEndpoint(source.url) ? (
           <EmbedPlayer url={source.url} title={title} />
-        ) : isScriptEndpoint(source.url) ? (
+        ) : needsResourceProbe(source.url) ? (
           <ScriptSource key={source.id} source={source} title={title} poster={poster} sources={sources} onServerChange={setServer} />
         ) : isHls ? (
           <InlineHls key={source.id} url={source.url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
@@ -119,7 +118,7 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
             <video src={source.url} autoPlay playsInline className="h-full w-full bg-player" />
           </VideoPlayerFrame>
         )}
-        {started && displayHint && <p role="status" className="absolute bottom-3 left-1/2 z-30 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-lg bg-black/75 px-3 py-2 text-center text-xs text-white shadow-lg">Gire o celular para assistir em tela cheia.</p>}
+        {started && displayHint && <p role="status" className="absolute bottom-3 left-1/2 z-30 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-lg bg-player/75 px-3 py-2 text-center text-xs text-player-foreground shadow-lg">Gire o celular para assistir em tela cheia.</p>}
       </div>
     </div>
   );
@@ -129,9 +128,11 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
 function InlineHls({ url, title, servers, selectedServer, onServerChange }: { url: string; title: string; poster: string | null; servers: Src[]; selectedServer: string; onServerChange: (index: number) => void }) {
   const [el, setEl] = useState<HTMLVideoElement | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!el) return;
+    setFailed(false); setLevels([]); setLevel(-1); setEngine(null);
     let cancelled = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let hls: any = null;
@@ -149,31 +150,25 @@ function InlineHls({ url, title, servers, selectedServer, onServerChange }: { ur
         });
         setEngine(hls);
         hls.on(Hls.Events.ERROR, (_e: unknown, d: { fatal: boolean }) => { if (d.fatal) setFailed(true); });
-      });
+      }).catch(() => { if (!cancelled) setFailed(true); });
     }
     return () => { cancelled = true; hls?.destroy(); };
-  }, [el, url]);
+  }, [el, url, attempt]);
 
   const [levels, setLevels] = useState<{ i: number; label: string }[]>([]);
   const [level, setLevel] = useState(-1);
   const [engine, setEngine] = useState<{ currentLevel: number } | null>(null);
-  return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={failed ? "HLS" : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
+  return <VideoPlayerFrame key={attempt} title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} onRetry={() => setAttempt(value => value + 1)} error={failed ? "Falha ao carregar HLS. Verifique a conexão, as permissões da origem e tente novamente." : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
     <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player" />
   </VideoPlayerFrame>;
 }
 
 /** player.php-style endpoints: identify the real response before choosing video, HLS or iframe. */
 function ScriptSource({ source, title, poster, sources, onServerChange }: { source: Src; title: string; poster: string | null; sources: Src[]; onServerChange: (index: number) => void }) {
-  const probe = useServerFn(probePlayerUrl);
-  const [r, setR] = useState<ProbeResult | null>(null);
-  useEffect(() => {
-    let off = false;
-    probe({ data: { url: source.url } }).then(v => { if (!off) setR(v as ProbeResult); }).catch(() => { if (!off) setR({ kind: "error", status: null, contentType: null, embeddable: false, playUrl: null, message: "Não foi possível verificar o endereço do player." }); });
-    return () => { off = true; };
-  }, [source.url, probe]);
-  if (!r) return <div className="flex aspect-video items-center justify-center rounded-xl bg-card ring-1 ring-border"><Loader2 className="size-10 animate-spin text-primary" /></div>;
-  if (!r.playUrl) return <div className="flex aspect-video items-center justify-center rounded-xl bg-card px-4 text-center text-sm text-muted-foreground ring-1 ring-border">{r.message ?? "Não foi possível carregar o player."}</div>;
-  if (r.kind === "html") return <EmbedPlayer url={r.playUrl} title={title} />;
-  if (r.kind === "hls") return <InlineHls url={r.playUrl} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={onServerChange} />;
-  return <VideoPlayerFrame title={title} servers={sources} selectedServer={source.id} onServerChange={onServerChange}><video src={r.playUrl} autoPlay playsInline className="h-full w-full bg-player" /></VideoPlayerFrame>;
+  return <PlaybackResource url={source.url}>{r => {
+    if (!r.playUrl) return null;
+    if (r.kind === "html") return <EmbedPlayer url={r.playUrl} title={title} />;
+    if (r.kind === "hls") return <InlineHls url={r.playUrl} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={onServerChange} />;
+    return <VideoPlayerFrame title={title} servers={sources} selectedServer={source.id} onServerChange={onServerChange}><video src={r.playUrl} autoPlay playsInline className="h-full w-full bg-player" /></VideoPlayerFrame>;
+  }}</PlaybackResource>;
 }

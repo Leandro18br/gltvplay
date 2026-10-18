@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { CONTROLS_IDLE_MS, PLAYBACK_RATES, isMediaControl, playbackTime, seekTarget } from "@/lib/playback/controls";
+import { MEDIA_WAIT_TIMEOUT_MS, mediaErrorMessage } from "@/lib/playback/media-error";
 import { requestPlaybackDisplay, releasePlaybackDisplay } from "@/lib/playback/display-mode";
 
 export type PlayerServer = { id: string; label: string | null };
@@ -54,6 +55,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
   const [fullscreen, setFullscreen] = useState(false);
   const [cast, setCast] = useState<"remote" | "airplay" | null>(null);
   const [failed, setFailed] = useState(false);
+  const [failureMessage, setFailureMessage] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Visual-only framing: never touches playback state, source or resolution.
@@ -129,14 +131,19 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     };
     const onPlay = () => { setNotice(null); update(); reveal(); };
     const onPause = () => { update(); setVisible(true); clearTimeout(idle.current); };
-    const onWaiting = () => setWaiting(true);
-    const onReady = () => { setWaiting(false); update(); };
-    const onError = () => { setFailed(true); setWaiting(false); setVisible(true); };
+    let waitTimer: ReturnType<typeof setTimeout> | undefined;
+    const onWaiting = () => {
+      setWaiting(true);
+      if (waitTimer !== undefined) return;
+      waitTimer = setTimeout(() => { waitTimer = undefined; setWaiting(false); setFailed(true); setFailureMessage("O vídeo demorou demais para carregar. Verifique a conexão e tente novamente."); setVisible(true); }, MEDIA_WAIT_TIMEOUT_MS);
+    };
+    const onReady = () => { clearTimeout(waitTimer); waitTimer = undefined; setWaiting(false); setFailed(false); setFailureMessage(null); update(); };
+    const onError = () => { clearTimeout(waitTimer); waitTimer = undefined; setFailed(true); setFailureMessage(mediaErrorMessage(video.error?.code)); setWaiting(false); setVisible(true); };
     const onVolume = () => {
       update();
       try { sessionStorage.setItem("gltv-player-volume", JSON.stringify({ volume: video.volume, muted: video.muted })); } catch { /* Optional preference. */ }
     };
-    const events: [string, EventListener][] = [["timeupdate", update], ["durationchange", update], ["loadedmetadata", update], ["ratechange", update], ["play", onPlay], ["pause", onPause], ["ended", onPause], ["waiting", onWaiting], ["playing", onReady], ["canplay", onReady], ["error", onError], ["volumechange", onVolume]];
+    const events: [string, EventListener][] = [["timeupdate", update], ["durationchange", update], ["loadedmetadata", update], ["ratechange", update], ["play", onPlay], ["pause", onPause], ["ended", onPause], ["waiting", onWaiting], ["loadstart", onWaiting], ["stalled", onWaiting], ["playing", onReady], ["canplay", onReady], ["error", onError], ["volumechange", onVolume]];
     events.forEach(([name, fn]) => video.addEventListener(name, fn));
     const onFs = () => setFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFs);
@@ -153,9 +160,11 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     update();
     setWaiting(video.readyState < 3);
     setFailed(!!video.error);
+    if (video.error) onError(); else if (video.readyState < 3) onWaiting();
     reveal();
     return () => {
       disposed = true;
+      clearTimeout(waitTimer);
       events.forEach(([name, fn]) => video.removeEventListener(name, fn));
       document.removeEventListener("fullscreenchange", onFs);
       video.removeEventListener("webkitplaybacktargetavailabilitychanged", onAirplay);
@@ -228,8 +237,8 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     {notice && !hasError && <p role="status" className="pointer-events-none absolute inset-x-3 top-3 rounded bg-player/85 px-3 py-1 text-center text-xs">{notice}</p>}
     {hasError && <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-2 overflow-y-auto rounded-[inherit] bg-player/95 px-3 py-2 text-center">
       <AlertTriangle className="hidden size-6 text-primary sm:block" /><p className="text-sm font-semibold sm:text-lg">Não foi possível reproduzir este vídeo.</p>
-      {error && error.length > 12 && <p className="max-w-md text-xs text-player-foreground/70">{error}</p>}
-      {servers.length > 1 && onServerChange ? <><p className="text-xs text-player-foreground/70">Tentar outro servidor</p><div className="flex max-w-full flex-wrap justify-center gap-2">{servers.map((server, index) => <Button key={server.id} variant={server.id === selectedServer ? "default" : "secondary"} size="sm" aria-pressed={server.id === selectedServer} onClick={() => onServerChange(index)}>Servidor {index + 1}</Button>)}</div></> : <Button variant="secondary" size="sm" onClick={() => { if (onRetry) onRetry(); else { const video = media.current; if (video) { setFailed(false); setWaiting(true); video.load(); video.play().catch(() => {}); } } }}>Tentar novamente</Button>}
+      {(failureMessage || error && error.length > 12) && <p className="max-w-md text-xs text-player-foreground/70">{failureMessage ?? error}</p>}
+      {servers.length > 1 && onServerChange ? <><p className="text-xs text-player-foreground/70">Tentar outro servidor</p><div className="flex max-w-full flex-wrap justify-center gap-2">{servers.map((server, index) => <Button key={server.id} variant={server.id === selectedServer ? "default" : "secondary"} size="sm" aria-pressed={server.id === selectedServer} onClick={() => onServerChange(index)}>Servidor {index + 1}</Button>)}</div></> : <Button variant="secondary" size="sm" onClick={() => { if (onRetry) onRetry(); else { const video = media.current; if (video) { setFailed(false); setFailureMessage(null); setWaiting(true); video.load(); video.play().catch(() => {}); } } }}>Tentar novamente</Button>}
     </div>}
   </div>;
 }

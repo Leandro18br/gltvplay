@@ -1,8 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoPlayerFrame } from './VideoPlayerFrame';
+import { MEDIA_WAIT_TIMEOUT_MS } from '@/lib/playback/media-error';
 beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); delete document.documentElement.dataset['remoteNavigation']; });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); delete document.documentElement.dataset['remoteNavigation']; });
 function setup() {
   const rendered = render(<VideoPlayerFrame title="Movie"><video /></VideoPlayerFrame>);
   const video = rendered.container.querySelector('video');
@@ -12,6 +13,21 @@ function setup() {
   return video;
 }
 describe('Native player remote controls',()=>{
+  it('stalled media stops waiting and retry loads the same video',()=>{
+    vi.useFakeTimers();
+    const video=setup();
+    const load=vi.spyOn(video,'load').mockImplementation(()=>{});
+    vi.spyOn(video,'play').mockResolvedValue();
+    fireEvent.waiting(video);
+    act(()=>{vi.advanceTimersByTime(MEDIA_WAIT_TIMEOUT_MS);});
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Tentar novamente'}));
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.canPlay(video);
+    act(()=>{vi.advanceTimersByTime(MEDIA_WAIT_TIMEOUT_MS);});
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
   it('arrows on focused play do not trigger seek or playback',()=>{
     const video=setup(),play=vi.spyOn(video,'play').mockResolvedValue();
     const control=screen.getByRole('button',{name:'Reproduzir'});act(()=>control.focus());fireEvent.keyDown(control,{key:'ArrowRight'});
