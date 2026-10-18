@@ -1,8 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { classifyResponse, isDirectEmbedEndpoint, isScriptEndpoint } from "./script-url";
+import { classifyResponse, frameAllowed, needsResourceProbe, isDirectEmbedEndpoint, isScriptEndpoint } from "./script-url";
 const o = "https://cinema.bugoumods.com/player.php?type=live_streams&id=2012360165&ext=mp4";
 const base = { status: 200, xfo: null, csp: null, body: "", finalUrl: o, originalUrl: o };
 describe("player.php endpoints", () => {
+  it("probes an extensionless play URL instead of treating its fragment as MP4", () => {
+    const url = "https://hsflix.top/play/B6c8jk8eQ343P2laAVL9Mc__UlLXVx0hWxRi9qMKa_c#.mp4";
+    expect(needsResourceProbe(url)).toBe(true);
+    const response = classifyResponse({ ...base, originalUrl: url, finalUrl: url, contentType: "text/html", body: "<!doctype html>" });
+    expect(response).toMatchObject({ kind: "html", playUrl: url });
+    expect(new URL(url).pathname.endsWith(".mp4")).toBe(false);
+    expect(needsResourceProbe("http://example.com/movie/1")).toBe(false);
+    expect(needsResourceProbe("https://example.com/play/movie.mp4#t=10")).toBe(false);
+    expect(needsResourceProbe(o)).toBe(false);
+  });
+  it("keeps query and fragment for actual video and HLS responses", () => {
+    const url = "https://example.com/play/item?key=value#.mp4";
+    for (const contentType of ["video/mp4", "application/vnd.apple.mpegurl"]) expect(classifyResponse({ ...base, originalUrl: url, contentType }).playUrl).toBe(url);
+  });
+  it("honors explicit allowed frame ancestors rather than allowing arbitrary origins", () => {
+    expect(frameAllowed(null, "frame-ancestors https://owner.example", "https://player.example/play/1", "https://gltvplay.lovable.app")).toBe(false);
+    expect(frameAllowed(null, "frame-ancestors 'self' https://gltvplay.lovable.app", "https://player.example/play/1", "https://gltvplay.lovable.app")).toBe(true);
+    expect(frameAllowed(null, "frame-ancestors https://*.lovable.app", "https://player.example/play/1", "https://gltvplay.lovable.app")).toBe(true);
+    expect(frameAllowed(null, "frame-ancestors 'none'", "https://player.example/play/1", "https://gltvplay.lovable.app")).toBe(false);
+  });
   it("uses BugouMods VIP player.php directly as an iframe endpoint", () => {
     expect(isDirectEmbedEndpoint(o)).toBe(true);
     expect(isDirectEmbedEndpoint("http://cinema.bugoumods.com/player.php?id=1")).toBe(false);
