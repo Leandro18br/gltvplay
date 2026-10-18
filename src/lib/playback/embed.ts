@@ -36,7 +36,8 @@ export function normalizeEmbed(input: string, policy: EmbedPolicy): string {
   if (url.protocol !== "https:" || url.username || url.password || url.port || /[\s<>]/.test(value)) throw new Error("Use uma URL HTTPS sem credenciais ou portas personalizadas");
   domainSchema.parse(host);
   if (!embedDomainAllowed(host, policy.domains)) throw new Error(`Domínio não autorizado: ${host}`);
-  url.hash = "";
+  // Provider fragments may configure its browser player. They are not sent by HTTP,
+  // but must survive validation and iframe rendering unchanged.
   return url.href;
 }
 /** Best-effort hostname of an embed URL or iframe code, for admin hints only (not a security check). */

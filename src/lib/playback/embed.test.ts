@@ -3,6 +3,11 @@ import { domainSchema, normalizeEmbed, normalizePlayback, emptyPlayback, embedHo
 
 const policy={domains:["youtube.com","youtube-nocookie.com","player.vimeo.com"],allowIframe:true};
 describe("authorized embeds",()=>{
+  it("preserves provider query and fragment for both URL and authorized Embed",()=>{
+    const url="https://youtube.com/play/item?token=value#.mp4";
+    expect(normalizeEmbed(url,policy)).toBe(url);
+    expect(normalizePlayback({...emptyPlayback,type:"url",input:url},policy)).toBe(url);
+  });
   it("accepts an authorized iframe URL",()=>{expect(normalizeEmbed("https://youtube-nocookie.com/embed/123",policy)).toBe("https://youtube-nocookie.com/embed/123");});
   it("extracts a single iframe without rendering its HTML",()=>{expect(normalizeEmbed('<iframe src="https://player.vimeo.com/video/123" allowfullscreen></iframe>',policy)).toBe("https://player.vimeo.com/video/123");});
   it("refuses iframe code when disabled",()=>{expect(()=>normalizeEmbed('<iframe src="https://youtube.com/embed/123"></iframe>',{...policy,allowIframe:false})).toThrow("desabilitado");});
