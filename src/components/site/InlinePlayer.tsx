@@ -128,9 +128,11 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
 function InlineHls({ url, title, servers, selectedServer, onServerChange }: { url: string; title: string; poster: string | null; servers: Src[]; selectedServer: string; onServerChange: (index: number) => void }) {
   const [el, setEl] = useState<HTMLVideoElement | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!el) return;
+    setFailed(false); setLevels([]); setLevel(-1); setEngine(null);
     let cancelled = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let hls: any = null;
@@ -148,15 +150,15 @@ function InlineHls({ url, title, servers, selectedServer, onServerChange }: { ur
         });
         setEngine(hls);
         hls.on(Hls.Events.ERROR, (_e: unknown, d: { fatal: boolean }) => { if (d.fatal) setFailed(true); });
-      });
+      }).catch(() => { if (!cancelled) setFailed(true); });
     }
     return () => { cancelled = true; hls?.destroy(); };
-  }, [el, url]);
+  }, [el, url, attempt]);
 
   const [levels, setLevels] = useState<{ i: number; label: string }[]>([]);
   const [level, setLevel] = useState(-1);
   const [engine, setEngine] = useState<{ currentLevel: number } | null>(null);
-  return <VideoPlayerFrame title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} error={failed ? "HLS" : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
+  return <VideoPlayerFrame key={attempt} title={title} servers={servers} selectedServer={selectedServer} onServerChange={onServerChange} onRetry={() => setAttempt(value => value + 1)} error={failed ? "Falha ao carregar HLS. Verifique a conexão, as permissões da origem e tente novamente." : null} qualities={levels} quality={level} onQualityChange={value => { setLevel(value); if (engine) engine.currentLevel = value; }}>
     <video ref={setEl} title={title} autoPlay playsInline className="h-full w-full bg-player" />
   </VideoPlayerFrame>;
 }

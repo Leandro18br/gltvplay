@@ -133,11 +133,12 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     const onPause = () => { update(); setVisible(true); clearTimeout(idle.current); };
     let waitTimer: ReturnType<typeof setTimeout> | undefined;
     const onWaiting = () => {
-      setWaiting(true); clearTimeout(waitTimer);
-      waitTimer = setTimeout(() => { setWaiting(false); setFailed(true); setFailureMessage("O vídeo demorou demais para carregar. Verifique a conexão e tente novamente."); setVisible(true); }, MEDIA_WAIT_TIMEOUT_MS);
+      setWaiting(true);
+      if (waitTimer !== undefined) return;
+      waitTimer = setTimeout(() => { waitTimer = undefined; setWaiting(false); setFailed(true); setFailureMessage("O vídeo demorou demais para carregar. Verifique a conexão e tente novamente."); setVisible(true); }, MEDIA_WAIT_TIMEOUT_MS);
     };
-    const onReady = () => { clearTimeout(waitTimer); setWaiting(false); setFailed(false); setFailureMessage(null); update(); };
-    const onError = () => { clearTimeout(waitTimer); setFailed(true); setFailureMessage(mediaErrorMessage(video.error?.code)); setWaiting(false); setVisible(true); };
+    const onReady = () => { clearTimeout(waitTimer); waitTimer = undefined; setWaiting(false); setFailed(false); setFailureMessage(null); update(); };
+    const onError = () => { clearTimeout(waitTimer); waitTimer = undefined; setFailed(true); setFailureMessage(mediaErrorMessage(video.error?.code)); setWaiting(false); setVisible(true); };
     const onVolume = () => {
       update();
       try { sessionStorage.setItem("gltv-player-volume", JSON.stringify({ volume: video.volume, muted: video.muted })); } catch { /* Optional preference. */ }
