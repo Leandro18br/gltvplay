@@ -1,6 +1,8 @@
 # Playback resource audit
-- [ ] Audit the supplied URL and both playback paths; correct uncertain-resource routing and bounded error/retry handling without data writes.
-- [ ] Run playback/remote regression tests and desktop/mobile browser checks with the supplied URL and a public MP4; report external limitations.
+- [x] Audit supplied URL and both playback paths; share bounded resource classification, preserve query/fragment, enforce HTML frame/domain rules, add native error/timeout and retry. No catalog or queue writes.
+- [x] All 201 tests pass and automatic build OK. Signed-in inline hsflix test fails safely with retry and Escape restores Play. Public W3C MP4 returns video/mp4 and 206 (H.264/AAC), but this Chromium reports no H.264 support and media error 4. Remote WebM also fails in this environment; browser-only intercepted copy of public VP8/Vorbis WebM verifies actual time advancement, pause, +10s seek, mute state, fullscreen, resume and 390/1280 sizing. This fixture is not proof of external playback or audible sound.
+- [ ] Confirm actual hsflix resource type and playback after provider fixes HTTPS: curl certificate host mismatch (XUI.one vs hsflix.top); browser ERR_CERT_AUTHORITY_INVALID; no successful HTTP response, so redirects/type/Range/CORS/frame headers/codecs cannot be established. No TLS bypass or guessed embed URL.
+- [ ] Confirm public H.264 MP4, HLS and physical TV playback on a compatible device; sandbox lacks H.264 and external media checks failed. Full-player resource decision is integrated but not independently exercised end-to-end in this round.
 
 # Public TV remote navigation
 - [x] Implement reusable directional focus, contextual return and stable restoration without changing catalog or sources.
