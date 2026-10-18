@@ -1,3 +1,7 @@
+# Playback resource audit
+- [ ] Audit the supplied URL and both playback paths; correct uncertain-resource routing and bounded error/retry handling without data writes.
+- [ ] Run playback/remote regression tests and desktop/mobile browser checks with the supplied URL and a public MP4; report external limitations.
+
 # Public TV remote navigation
 - [x] Implement reusable directional focus, contextual return and stable restoration without changing catalog or sources.
 - [x] Integrate carousels, detail/episode controls and native players; preserve text fields and Radix widgets.
