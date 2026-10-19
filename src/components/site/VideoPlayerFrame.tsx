@@ -32,12 +32,13 @@ type Props = {
   quality?: number;
   onQualityChange?: (index: number) => void;
   error?: string | null;
+  failureMessage?: string;
   onRetry?: () => void;
   fullPage?: boolean;
 };
 
 // Only native media controls. This frame never resolves or changes a playback URL.
-export function VideoPlayerFrame({ children, title, header, actions, servers = [], selectedServer, onServerChange, qualities = [], quality = -1, onQualityChange, error, onRetry, fullPage = false }: Props) {
+export function VideoPlayerFrame({ children, title, header, actions, servers = [], selectedServer, onServerChange, qualities = [], quality = -1, onQualityChange, error, failureMessage, onRetry, fullPage = false }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const media = useRef<RemoteVideo | null>(null);
   const idle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -227,7 +228,7 @@ export function VideoPlayerFrame({ children, title, header, actions, servers = [
     {notice && !hasError && <p role="status" className="pointer-events-none absolute inset-x-3 top-3 rounded bg-player/85 px-3 py-1 text-center text-xs">{notice}</p>}
     {hasError && <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-2 overflow-y-auto rounded-[inherit] bg-player/95 px-3 py-2 text-center">
       <AlertTriangle className="hidden size-6 text-primary sm:block" /><p className="text-sm font-semibold sm:text-lg">Não foi possível reproduzir este vídeo.</p>
-      {error && error.length > 12 && <p className="max-w-md text-xs text-player-foreground/70">{error}</p>}
+      {(error && error.length > 12 ? error : failureMessage) && <p className="max-w-md text-xs text-player-foreground/70">{error && error.length > 12 ? error : failureMessage}</p>}
       {servers.length > 1 && onServerChange ? <><p className="text-xs text-player-foreground/70">Tentar outro servidor</p><div className="flex max-w-full flex-wrap justify-center gap-2">{servers.map((server, index) => <Button key={server.id} variant={server.id === selectedServer ? "default" : "secondary"} size="sm" aria-pressed={server.id === selectedServer} onClick={() => onServerChange(index)}>Servidor {index + 1}</Button>)}</div></> : <Button variant="secondary" size="sm" onClick={() => { if (onRetry) onRetry(); else { const video = media.current; if (video) { setFailed(false); setWaiting(true); video.load(); video.play().catch(() => {}); } } }}>Tentar novamente</Button>}
     </div>}
   </div>;
