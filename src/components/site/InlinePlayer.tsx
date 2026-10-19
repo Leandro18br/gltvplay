@@ -16,6 +16,19 @@ const sb: any = supabase;
 
 type Src = PlaybackSource;
 
+/** Browsers do not expose TLS certificate details from a failed media request. */
+function getPlaybackFailureMessage(rawUrl: string): string | undefined {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol === "https:" && url.hostname.toLowerCase() === "hsflix.top") {
+      return "A fonte hsflix.top falhou ao carregar. Se o servidor retornar HTTP 526, o Cloudflare está rejeitando o certificado SSL do servidor de origem. Isso precisa ser corrigido pelo administrador do hsflix.top; o GLTV Play não pode corrigir nem ignorar essa validação.";
+    }
+    return "Verifique a conexão, a disponibilidade da fonte e se o servidor permite reprodução segura por HTTPS.";
+  } catch {
+    return "O endereço da fonte é inválido. Verifique a configuração de reprodução.";
+  }
+}
+
 /**
  * Compact public player block: cover + centered Play; nothing external loads
  * until the viewer clicks. On click, loads the primary configured source
@@ -104,7 +117,7 @@ export function InlinePlayer({ kind, id, title, poster, className = "", autoStar
         ) : isHls ? (
           <InlineHls key={source.id} url={source.url} title={title} poster={poster} servers={sources} selectedServer={source.id} onServerChange={setServer} />
         ) : (
-          <VideoPlayerFrame key={source.id} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer}>
+          <VideoPlayerFrame key={source.id} title={title} servers={sources} selectedServer={source.id} onServerChange={setServer} failureMessage={getPlaybackFailureMessage(source.url)}>
             <video src={source.url} autoPlay playsInline className="h-full w-full bg-player" />
           </VideoPlayerFrame>
         )}
